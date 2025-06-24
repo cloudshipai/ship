@@ -9,16 +9,16 @@ import (
 )
 
 type Config struct {
-	Token      string          `yaml:"token"`
-	OrgID      string          `yaml:"org_id"`
-	DefaultEnv string          `yaml:"default_env"`
-	BaseURL    string          `yaml:"base_url"`
-	Telemetry  TelemetryConfig `yaml:"telemetry"`
+	Token      string          `mapstructure:"token"`
+	OrgID      string          `mapstructure:"org_id"`
+	DefaultEnv string          `mapstructure:"default_env"`
+	BaseURL    string          `mapstructure:"base_url"`
+	Telemetry  TelemetryConfig `mapstructure:"telemetry"`
 }
 
 type TelemetryConfig struct {
-	Enabled   bool   `yaml:"enabled"`
-	SessionID string `yaml:"session_id"`
+	Enabled   bool   `mapstructure:"enabled"`
+	SessionID string `mapstructure:"session_id"`
 }
 
 const (
@@ -59,17 +59,18 @@ func Load() (*Config, error) {
 		}, nil
 	}
 
-	// Set up viper
-	viper.SetConfigName(configFileName)
-	viper.SetConfigType(configFileType)
-	viper.AddConfigPath(configDir)
+	// Create a new viper instance for loading
+	v := viper.New()
+	v.SetConfigName(configFileName)
+	v.SetConfigType(configFileType)
+	v.AddConfigPath(configDir)
 	
 	// Set defaults
-	viper.SetDefault("base_url", defaultBaseURL)
-	viper.SetDefault("telemetry.enabled", false)
+	v.SetDefault("base_url", defaultBaseURL)
+	v.SetDefault("telemetry.enabled", false)
 	
 	// Read config file
-	if err := viper.ReadInConfig(); err != nil {
+	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			// Config file not found; return empty config
 			return &Config{
@@ -80,7 +81,7 @@ func Load() (*Config, error) {
 	}
 	
 	var cfg Config
-	if err := viper.Unmarshal(&cfg); err != nil {
+	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 	
@@ -93,16 +94,20 @@ func Save(cfg *Config) error {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 	
+	// Create a new viper instance for saving
+	v := viper.New()
+	v.SetConfigType(configFileType)
+	
 	// Set all config values
-	viper.Set("token", cfg.Token)
-	viper.Set("org_id", cfg.OrgID)
-	viper.Set("default_env", cfg.DefaultEnv)
-	viper.Set("base_url", cfg.BaseURL)
-	viper.Set("telemetry.enabled", cfg.Telemetry.Enabled)
-	viper.Set("telemetry.session_id", cfg.Telemetry.SessionID)
+	v.Set("token", cfg.Token)
+	v.Set("org_id", cfg.OrgID)
+	v.Set("default_env", cfg.DefaultEnv)
+	v.Set("base_url", cfg.BaseURL)
+	v.Set("telemetry.enabled", cfg.Telemetry.Enabled)
+	v.Set("telemetry.session_id", cfg.Telemetry.SessionID)
 	
 	// Write config file
-	if err := viper.WriteConfigAs(configPath); err != nil {
+	if err := v.WriteConfigAs(configPath); err != nil {
 		return fmt.Errorf("failed to write config: %w", err)
 	}
 	

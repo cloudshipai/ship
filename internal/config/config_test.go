@@ -64,6 +64,10 @@ func TestConfig(t *testing.T) {
 			t.Errorf("Expected permissions 0600, got %v", info.Mode().Perm())
 		}
 		
+		// Debug: Check what was actually saved
+		savedContent, _ := os.ReadFile(configPath)
+		t.Logf("Saved config content: %s", savedContent)
+		
 		// Load config
 		loadedCfg, err := Load()
 		if err != nil {

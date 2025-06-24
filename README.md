@@ -1,0 +1,2 @@
+# ship
+CloudshipAI CLI

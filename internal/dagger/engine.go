@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"dagger.io/dagger"
+	"github.com/cloudship/ship/internal/dagger/modules"
 )
 
 // Engine manages the Dagger client and provides methods to run Dagger pipelines
@@ -82,4 +83,19 @@ func (e *Engine) RunSteampipeQuery(provider, query string) (string, error) {
 	}
 
 	return output, nil
+}
+
+// NewOpenInfraQuoteModule creates a new OpenInfraQuote module
+func (e *Engine) NewOpenInfraQuoteModule() *modules.OpenInfraQuoteModule {
+	return modules.NewOpenInfraQuoteModule(e.client)
+}
+
+// NewInfraScanModule creates a new InfraScan module
+func (e *Engine) NewInfraScanModule() *modules.InfraScanModule {
+	return modules.NewInfraScanModule(e.client)
+}
+
+// NewTerraformDocsModule creates a new terraform-docs module
+func (e *Engine) NewTerraformDocsModule() *modules.TerraformDocsModule {
+	return modules.NewTerraformDocsModule(e.client)
 }

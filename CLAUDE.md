@@ -95,6 +95,10 @@ The project implements four main commands:
 2. **`ship push`** - Uploads artifacts (tfplan, SBOM, etc.) for analysis
 3. **`ship investigate`** - Runs Steampipe queries via Dagger containers
 4. **`ship mcp`** - Starts MCP server for LLM tool integrations
+5. **`ship terraform-tools`** - Runs Terraform analysis tools via Dagger:
+   - `cost-analysis` - Estimates costs using OpenInfraQuote
+   - `security-scan` - Scans for security issues using Trivy
+   - `generate-docs` - Generates documentation using terraform-docs
 
 Key architectural decisions:
 - Uses Cobra for CLI framework
@@ -102,6 +106,7 @@ Key architectural decisions:
 - Configuration stored in `~/.ship/config.yaml`
 - Max file upload size: 100MB
 - Supports AWS, Cloudflare, and Heroku providers
+- Dagger modules run containerized tools without local installation
 
 ## Project Documentation
 

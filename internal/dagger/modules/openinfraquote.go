@@ -30,7 +30,7 @@ func (m *OpenInfraQuoteModule) AnalyzePlan(ctx context.Context, planFile string)
 	
 	// Mount the directory and run OpenInfraQuote
 	container := m.client.Container().
-		From("ghcr.io/initech-consulting/openinfraquote:latest").
+		From("gruebel/openinfraquote:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
@@ -51,7 +51,7 @@ func (m *OpenInfraQuoteModule) AnalyzePlan(ctx context.Context, planFile string)
 // AnalyzeDirectory analyzes all Terraform files in a directory
 func (m *OpenInfraQuoteModule) AnalyzeDirectory(ctx context.Context, dir string) (string, error) {
 	container := m.client.Container().
-		From("ghcr.io/initech-consulting/openinfraquote:latest").
+		From("gruebel/openinfraquote:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
@@ -72,7 +72,7 @@ func (m *OpenInfraQuoteModule) AnalyzeDirectory(ctx context.Context, dir string)
 // GetVersion returns the version of OpenInfraQuote
 func (m *OpenInfraQuoteModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
-		From("ghcr.io/initech-consulting/openinfraquote:latest").
+		From("gruebel/openinfraquote:latest").
 		WithExec([]string{"openinfraquote", "--version"})
 	
 	output, err := container.Stdout(ctx)

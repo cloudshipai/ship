@@ -1,0 +1,45 @@
+name: Update Changelog
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate Changelog
+        uses: TriPSs/conventional-changelog-action@v5
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          output-file: 'CHANGELOG.md'
+          preset: 'conventionalcommits'
+          tag-prefix: 'v'
+          release-count: 0
+          version-file: './package.json'
+          create-summary: true
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore(release): update changelog'
+          title: 'chore(release): update changelog'
+          body: |
+            This PR updates the changelog based on conventional commits.
+            
+            - Updates CHANGELOG.md
+            - Auto-generated from commit history
+          branch: changelog-update
+          delete-branch: true

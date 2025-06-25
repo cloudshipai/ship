@@ -1,0 +1,155 @@
+# .goreleaser.yml
+version: 2
+project_name: ship
+
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+
+builds:
+  - id: ship
+    main: ./cmd/ship
+    binary: ship
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+      - arm
+    goarm:
+      - "7"
+    ignore:
+      - goos: windows
+        goarch: arm64
+      - goos: windows
+        goarch: arm
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+
+archives:
+  - id: ship
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+      - docs/*
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  use: github
+  sort: asc
+  groups:
+    - title: 'New Features'
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: 'Bug Fixes'
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: 'Documentation'
+      regexp: '^.*?docs(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: 'Dependency Updates'
+      regexp: '^.*?chore\(deps\):.+$'
+      order: 3
+    - title: 'Other Changes'
+      order: 999
+  filters:
+    exclude:
+      - '^test:'
+      - '^ci:'
+      - Merge pull request
+      - Merge branch
+
+release:
+  github:
+    owner: cloudshipai
+    name: ship
+  draft: false
+  prerelease: auto
+  mode: append
+  header: |
+    ## Ship CLI Release {{ .Tag }}
+    
+    CloudshipAI CLI - Infrastructure analysis tools at your fingertips 🚀
+  footer: |
+    ## Quick Start
+    
+    ```bash
+    # macOS/Linux
+    curl -sSL https://github.com/cloudshipai/ship/releases/download/{{ .Tag }}/ship_{{ .Tag }}_$(uname -s)_$(uname -m).tar.gz | tar xz
+    sudo mv ship /usr/local/bin/
+    
+    # Verify installation
+    ship --version
+    ```
+    
+    **Full Documentation**: https://github.com/cloudshipai/ship#readme
+
+brews:
+  - repository:
+      owner: cloudshipai
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: https://github.com/cloudshipai/ship
+    description: "CloudshipAI CLI - Infrastructure analysis tools"
+    license: "Apache-2.0"
+    test: |
+      system "#{bin}/ship", "--version"
+    dependencies:
+      - name: docker
+        type: optional
+
+nfpms:
+  - id: packages
+    package_name: ship
+    vendor: CloudshipAI
+    homepage: https://github.com/cloudshipai/ship
+    maintainer: CloudshipAI Team <support@cloudshipai.com>
+    description: CloudshipAI CLI - Infrastructure analysis tools
+    license: Apache-2.0
+    formats:
+      - deb
+      - rpm
+      - apk
+    dependencies:
+      - docker
+    recommends:
+      - git
+
+dockers:
+  - image_templates:
+      - "cloudshipai/ship:{{ .Tag }}"
+      - "cloudshipai/ship:v{{ .Major }}"
+      - "cloudshipai/ship:v{{ .Major }}.{{ .Minor }}"
+      - "cloudshipai/ship:latest"
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+    goos: linux
+    goarch: amd64
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"

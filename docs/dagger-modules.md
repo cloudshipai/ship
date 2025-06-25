@@ -313,6 +313,80 @@ Ship CLI includes these built-in modules:
 | OpenInfraQuote | Cost analysis | `ghcr.io/initech-consulting/openinfraquote:latest` |
 | InfraScan | Security scanning | `aquasec/trivy:latest` (using Trivy) |
 | terraform-docs | Documentation generation | `quay.io/terraform-docs/terraform-docs:latest` |
+| TFLint | Terraform linter | `ghcr.io/terraform-linters/tflint:latest` |
+| Checkov | Multi-cloud security scanner | `bridgecrew/checkov:latest` |
+| Infracost | Cloud cost estimation | `infracost/infracost:latest` |
+
+## CLI Commands
+
+### Terraform Tools Commands
+
+All Terraform analysis tools are available under the `terraform-tools` subcommand:
+
+```bash
+ship terraform-tools <command> [directory]
+```
+
+#### Available Commands:
+
+##### Cost Analysis (OpenInfraQuote)
+```bash
+ship terraform-tools cost-analysis [plan-file|directory]
+```
+Analyzes Terraform costs using OpenInfraQuote. Can analyze both plan files and directories.
+
+##### Security Scan (Trivy)
+```bash
+ship terraform-tools security-scan [directory]
+```
+Scans Terraform code for security issues using Trivy.
+
+##### Generate Documentation
+```bash
+ship terraform-tools generate-docs [directory]
+```
+Generates documentation for Terraform modules using terraform-docs.
+
+##### Lint Code (TFLint)
+```bash
+ship terraform-tools lint [directory]
+```
+Lints Terraform code using TFLint to catch errors and enforce best practices.
+
+##### Security Scan with Checkov
+```bash
+ship terraform-tools checkov-scan [directory]
+```
+Performs comprehensive multi-cloud security scanning using Checkov.
+
+##### Cost Estimation (Infracost)
+```bash
+ship terraform-tools cost-estimate [directory]
+```
+Estimates cloud infrastructure costs using Infracost. Requires `INFRACOST_API_KEY` environment variable for full functionality.
+
+### Examples
+
+```bash
+# Analyze costs for current directory
+ship terraform-tools cost-analysis
+
+# Scan a specific directory for security issues
+ship terraform-tools security-scan ./modules/vpc
+
+# Generate documentation for a module
+ship terraform-tools generate-docs ./modules/eks
+
+# Lint Terraform files
+ship terraform-tools lint ./environments/prod
+
+# Run Checkov security scan
+ship terraform-tools checkov-scan ./infrastructure
+
+# Estimate costs with Infracost
+export INFRACOST_API_KEY=your-api-key
+ship terraform-tools cost-estimate ./environments/staging
+```
 
 ## Contributing a Module
 

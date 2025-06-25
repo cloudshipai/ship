@@ -1,0 +1,19 @@
+{
+  "name": "ship-cli",
+  "version": "0.1.0",
+  "description": "CloudshipAI CLI - Infrastructure analysis tools",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cloudshipai/ship.git"
+  },
+  "keywords": [
+    "cli",
+    "terraform",
+    "infrastructure",
+    "devops",
+    "cloudship"
+  ],
+  "author": "CloudshipAI",
+  "license": "Apache-2.0",
+  "private": true
+}

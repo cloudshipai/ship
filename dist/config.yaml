@@ -1,0 +1,225 @@
+version: 2
+project_name: ship
+release:
+  github:
+    owner: cloudshipai
+    name: ship
+  prerelease: auto
+  name_template: '{{.Tag}}'
+  header: "## Ship CLI Release {{ .Tag }}\n\nCloudshipAI CLI - Infrastructure analysis tools at your fingertips \U0001F680\n"
+  footer: |
+    ## Quick Start
+
+    ```bash
+    # macOS/Linux
+    curl -sSL https://github.com/cloudshipai/ship/releases/download/{{ .Tag }}/ship_{{ .Tag }}_$(uname -s)_$(uname -m).tar.gz | tar xz
+    sudo mv ship /usr/local/bin/
+
+    # Verify installation
+    ship --version
+    ```
+
+    **Full Documentation**: https://github.com/cloudshipai/ship#readme
+  mode: append
+brews:
+  - name: ship
+    repository:
+      owner: cloudshipai
+      name: homebrew-tap
+      token: '{{ .Env.HOMEBREW_TAP_TOKEN }}'
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    commit_msg_template: Brew formula update for {{ .ProjectName }} version {{ .Tag }}
+    directory: Formula
+    dependencies:
+      - name: docker
+        type: optional
+    test: |
+      system "#{bin}/ship", "--version"
+    description: CloudshipAI CLI - Infrastructure analysis tools
+    homepage: https://github.com/cloudshipai/ship
+    license: Apache-2.0
+    goarm: "6"
+    goamd64: v1
+builds:
+  - id: ship
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+      - arm
+    goarm:
+      - "7"
+    gomips:
+      - hardfloat
+    goamd64:
+      - v1
+    targets:
+      - linux_amd64_v1
+      - linux_arm64
+      - linux_arm_7
+      - darwin_amd64_v1
+      - darwin_arm64
+      - windows_amd64_v1
+    ignore:
+      - goos: windows
+        goarch: arm64
+      - goos: windows
+        goarch: arm
+    dir: .
+    main: ./cmd/ship
+    binary: ship
+    builder: go
+    gobinary: go
+    command: build
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+    env:
+      - CGO_ENABLED=0
+archives:
+  - id: ship
+    name_template: '{{ .ProjectName }}_ {{- .Version }}_ {{- .Os }}_ {{- if eq .Arch "amd64" }}x86_64 {{- else if eq .Arch "386" }}i386 {{- else }}{{ .Arch }}{{ end }} {{- if .Arm }}v{{ .Arm }}{{ end }}'
+    format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - src: README.md
+      - src: LICENSE
+      - src: docs/*
+nfpms:
+  - file_name_template: '{{ .PackageName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
+    package_name: ship
+    dependencies:
+      - docker
+    recommends:
+      - git
+    id: packages
+    formats:
+      - deb
+      - rpm
+      - apk
+    vendor: CloudshipAI
+    homepage: https://github.com/cloudshipai/ship
+    maintainer: CloudshipAI Team <support@cloudshipai.com>
+    description: CloudshipAI CLI - Infrastructure analysis tools
+    license: Apache-2.0
+    bindir: /usr/bin
+    libdirs:
+      header: /usr/include
+      carchive: /usr/lib
+      cshared: /usr/lib
+snapshot:
+  name_template: '{{ incpatch .Version }}-next'
+  version_template: '{{ incpatch .Version }}-next'
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+dockers:
+  - goos: linux
+    goarch: amd64
+    goarm: "6"
+    goamd64: v1
+    dockerfile: Dockerfile.goreleaser
+    image_templates:
+      - cloudshipai/ship:{{ .Tag }}
+      - cloudshipai/ship:v{{ .Major }}
+      - cloudshipai/ship:v{{ .Major }}.{{ .Minor }}
+      - cloudshipai/ship:latest
+    build_flag_templates:
+      - --platform=linux/amd64
+      - --label=org.opencontainers.image.created={{.Date}}
+      - --label=org.opencontainers.image.title={{.ProjectName}}
+      - --label=org.opencontainers.image.revision={{.FullCommit}}
+      - --label=org.opencontainers.image.version={{.Version}}
+    use: buildx
+changelog:
+  filters:
+    exclude:
+      - '^test:'
+      - '^ci:'
+      - Merge pull request
+      - Merge branch
+  sort: asc
+  use: github
+  format: '{{ .SHA }}: {{ .Message }} ({{ with .AuthorUsername }}@{{ . }}{{ else }}{{ .AuthorName }} <{{ .AuthorEmail }}>{{ end }})'
+  groups:
+    - title: New Features
+      regexp: ^.*?feat(\([[:word:]]+\))??!?:.+$
+    - title: Bug Fixes
+      regexp: ^.*?fix(\([[:word:]]+\))??!?:.+$
+      order: 1
+    - title: Documentation
+      regexp: ^.*?docs(\([[:word:]]+\))??!?:.+$
+      order: 2
+    - title: Dependency Updates
+      regexp: ^.*?chore\(deps\):.+$
+      order: 3
+    - title: Other Changes
+      order: 999
+dist: dist
+env_files:
+  github_token: ~/.config/goreleaser/github_token
+  gitlab_token: ~/.config/goreleaser/gitlab_token
+  gitea_token: ~/.config/goreleaser/gitea_token
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+source:
+  name_template: '{{ .ProjectName }}-{{ .Version }}'
+  format: tar.gz
+gomod:
+  gobinary: go
+announce:
+  twitter:
+    message_template: '{{ .ProjectName }} {{ .Tag }} is out! Check it out at {{ .ReleaseURL }}'
+  mastodon:
+    message_template: '{{ .ProjectName }} {{ .Tag }} is out! Check it out at {{ .ReleaseURL }}'
+    server: ""
+  reddit:
+    title_template: '{{ .ProjectName }} {{ .Tag }} is out!'
+    url_template: '{{ .ReleaseURL }}'
+  slack:
+    message_template: '{{ .ProjectName }} {{ .Tag }} is out! Check it out at {{ .ReleaseURL }}'
+    username: GoReleaser
+  discord:
+    message_template: '{{ .ProjectName }} {{ .Tag }} is out! Check it out at {{ .ReleaseURL }}'
+    author: GoReleaser
+    color: "3888754"
+    icon_url: https://goreleaser.com/static/avatar.png
+  teams:
+    title_template: '{{ .ProjectName }} {{ .Tag }} is out!'
+    message_template: '{{ .ProjectName }} {{ .Tag }} is out! Check it out at {{ .ReleaseURL }}'
+    color: '#2D313E'
+    icon_url: https://goreleaser.com/static/avatar.png
+  smtp:
+    subject_template: '{{ .ProjectName }} {{ .Tag }} is out!'
+    body_template: 'You can view details from: {{ .ReleaseURL }}'
+  mattermost:
+    message_template: '{{ .ProjectName }} {{ .Tag }} is out! Check it out at {{ .ReleaseURL }}'
+    title_template: '{{ .ProjectName }} {{ .Tag }} is out!'
+    username: GoReleaser
+  linkedin:
+    message_template: '{{ .ProjectName }} {{ .Tag }} is out! Check it out at {{ .ReleaseURL }}'
+  telegram:
+    message_template: '{{ mdv2escape .ProjectName }} {{ mdv2escape .Tag }} is out{{ mdv2escape "!" }} Check it out at {{ mdv2escape .ReleaseURL }}'
+    parse_mode: MarkdownV2
+  webhook:
+    message_template: '{ "message": "{{ .ProjectName }} {{ .Tag }} is out! Check it out at {{ .ReleaseURL }}"}'
+    content_type: application/json; charset=utf-8
+  opencollective:
+    title_template: '{{ .Tag }}'
+    message_template: '{{ .ProjectName }} {{ .Tag }} is out!<br/>Check it out at <a href="{{ .ReleaseURL }}">{{ .ReleaseURL }}</a>'
+  bluesky:
+    message_template: '{{ .ProjectName }} {{ .Tag }} is out! Check it out at {{ .ReleaseURL }}'
+git:
+  tag_sort: -version:refname
+github_urls:
+  download: https://github.com
+gitlab_urls:
+  download: https://gitlab.com

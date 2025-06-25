@@ -1,0 +1,8 @@
+# Dockerfile for GoReleaser
+FROM scratch
+
+# Copy the binary
+COPY ship /
+
+# Run the binary
+ENTRYPOINT ["/ship"]

@@ -99,3 +99,18 @@ func (e *Engine) NewInfraScanModule() *modules.InfraScanModule {
 func (e *Engine) NewTerraformDocsModule() *modules.TerraformDocsModule {
 	return modules.NewTerraformDocsModule(e.client)
 }
+
+// NewTFLintModule creates a new TFLint module
+func (e *Engine) NewTFLintModule() *modules.TFLintModule {
+	return modules.NewTFLintModule(e.client)
+}
+
+// NewCheckovModule creates a new Checkov module
+func (e *Engine) NewCheckovModule() *modules.CheckovModule {
+	return modules.NewCheckovModule(e.client)
+}
+
+// NewInfracostModule creates a new Infracost module
+func (e *Engine) NewInfracostModule() *modules.InfracostModule {
+	return modules.NewInfracostModule(e.client)
+}

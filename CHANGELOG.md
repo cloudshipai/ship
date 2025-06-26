@@ -1,3 +1,17 @@
+## [0.2.2](https://github.com/cloudshipai/ship/compare/v0.2.1...v0.2.2) (2025-06-26)
+
+
+### Bug Fixes
+
+* additional CI/CD fixes ([46c4159](https://github.com/cloudshipai/ship/commit/46c41590f16afbacb52452277d813cf953b95d7f))
+
+## [0.2.1](https://github.com/cloudshipai/ship/compare/v0.2.0...v0.2.1) (2025-06-26)
+
+
+### Bug Fixes
+
+* resolve CI/CD pipeline failures ([2fb3ae4](https://github.com/cloudshipai/ship/commit/2fb3ae49aad83e8fce608892ca90308cec214a6b))
+
 ## [0.2.0](https://github.com/cloudshipai/ship/compare/v0.1.0...v0.2.0) (2025-06-25)
 
 

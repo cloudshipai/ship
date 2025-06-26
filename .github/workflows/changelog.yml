@@ -27,7 +27,8 @@ jobs:
           preset: 'conventionalcommits'
           tag-prefix: 'v'
           release-count: 0
-          version-file: './package.json'
+          skip-version-file: true
+          skip-commit: true
           create-summary: true
 
       - name: Create Pull Request

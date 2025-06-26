@@ -32,8 +32,7 @@ builds:
       - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
 
 archives:
-  - id: ship
-    name_template: >-
+  - name_template: >-
       {{ .ProjectName }}_
       {{- .Version }}_
       {{- .Os }}_
@@ -41,11 +40,6 @@ archives:
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
-    # GoReleaser v2 automatically uses tar.gz for Unix and zip for Windows
-    files:
-      - README.md
-      - LICENSE
-      - docs/*
 
 checksum:
   name_template: 'checksums.txt'

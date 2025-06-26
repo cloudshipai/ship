@@ -143,11 +143,7 @@ main() {
         exit 1
     fi
     
-    # Create and push tag
-    print_info "Creating tag $NEW_VERSION..."
-    git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
-    
-    # Update changelog
+    # Update changelog BEFORE creating tag
     print_info "Updating CHANGELOG.md..."
     cat > CHANGELOG.md.tmp << EOF
 # Changelog
@@ -165,11 +161,20 @@ EOF
     
     mv CHANGELOG.md.tmp CHANGELOG.md
     git add CHANGELOG.md
-    git commit -m "chore: update changelog for $NEW_VERSION" || true
     
-    # Push changes
-    print_info "Pushing changes and tag..."
-    git push origin main
+    # Commit changelog if there are changes
+    if ! git diff --cached --quiet; then
+        git commit -m "chore: update changelog for $NEW_VERSION"
+        print_info "Pushing changelog update..."
+        git push origin main
+    fi
+    
+    # Create and push tag on the latest commit
+    print_info "Creating tag $NEW_VERSION..."
+    git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
+    
+    # Push the tag
+    print_info "Pushing tag..."
     git push origin "$NEW_VERSION"
     
     # Check for GitHub token

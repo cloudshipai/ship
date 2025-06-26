@@ -14,10 +14,39 @@ CloudshipAI CLI - A powerful command-line tool that brings enterprise-grade infr
 
 ## 📦 Installation
 
+### Quick Install (Recommended)
+
+```bash
+# Linux/macOS - Install latest release
+wget -qO- https://github.com/cloudshipai/ship/releases/latest/download/ship_$(uname -s)_$(uname -m).tar.gz | tar xz && sudo mv ship /usr/local/bin/
+
+# Or with curl
+curl -sSL https://github.com/cloudshipai/ship/releases/latest/download/ship_$(uname -s)_$(uname -m).tar.gz | tar xz && sudo mv ship /usr/local/bin/
+
+# Verify installation
+ship version
+```
+
+### Platform-Specific Downloads
+
+```bash
+# Linux x86_64
+wget https://github.com/cloudshipai/ship/releases/latest/download/ship_Linux_x86_64.tar.gz
+
+# macOS Intel
+wget https://github.com/cloudshipai/ship/releases/latest/download/ship_Darwin_x86_64.tar.gz
+
+# macOS Apple Silicon
+wget https://github.com/cloudshipai/ship/releases/latest/download/ship_Darwin_arm64.tar.gz
+
+# Linux ARM64
+wget https://github.com/cloudshipai/ship/releases/latest/download/ship_Linux_arm64.tar.gz
+```
+
 ### From Source
 ```bash
 # Clone the repository
-git clone https://github.com/cloudship/ship.git
+git clone https://github.com/cloudshipai/ship.git
 cd ship
 
 # Build and install
@@ -25,12 +54,12 @@ go build -o ship ./cmd/ship
 sudo mv ship /usr/local/bin/
 
 # Verify installation
-ship --version
+ship version
 ```
 
 ### Using Go Install
 ```bash
-go install github.com/cloudship/ship/cmd/ship@latest
+go install github.com/cloudshipai/ship/cmd/ship@latest
 ```
 
 ## 🏃 Quick Start

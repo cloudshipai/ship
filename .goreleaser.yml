@@ -95,12 +95,14 @@ release:
     ## Quick Start
     
     ```bash
-    # macOS/Linux
-    curl -sSL https://github.com/cloudshipai/ship/releases/download/{{ .Tag }}/ship_{{ .Tag }}_$(uname -s)_$(uname -m).tar.gz | tar xz
-    sudo mv ship /usr/local/bin/
+    # One-liner install (Linux/macOS)
+    wget -qO- https://github.com/cloudshipai/ship/releases/download/{{ .Tag }}/ship_$(uname -s)_$(uname -m).tar.gz | tar xz && sudo mv ship /usr/local/bin/
+    
+    # Or with curl
+    curl -sSL https://github.com/cloudshipai/ship/releases/download/{{ .Tag }}/ship_$(uname -s)_$(uname -m).tar.gz | tar xz && sudo mv ship /usr/local/bin/
     
     # Verify installation
-    ship --version
+    ship version
     ```
     
     **Full Documentation**: https://github.com/cloudshipai/ship#readme
@@ -125,7 +127,7 @@ nfpms:
     package_name: ship
     vendor: CloudshipAI
     homepage: https://github.com/cloudshipai/ship
-    maintainer: CloudshipAI Team <support@cloudshipai.com>
+    maintainer: Esteban Puerta <epuer94@gmail.com>
     description: CloudshipAI CLI - Infrastructure analysis tools
     license: Apache-2.0
     formats:

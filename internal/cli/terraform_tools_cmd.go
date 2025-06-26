@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/cloudship/ship/internal/dagger"
 	"github.com/fatih/color"
@@ -65,6 +66,53 @@ func init() {
 	terraformToolsCmd.AddCommand(lintCmd)
 	terraformToolsCmd.AddCommand(checkovScanCmd)
 	terraformToolsCmd.AddCommand(infracostCmd)
+
+	// Add output file flags
+	generateDocsCmd.Flags().StringP("output", "o", "", "Output file to save documentation (default: print to stdout)")
+	generateDocsCmd.Flags().StringP("filename", "f", "README.md", "Filename to save documentation as")
+	
+	costAnalysisCmd.Flags().StringP("output", "o", "", "Output file to save cost analysis (default: print to stdout)")
+	costAnalysisCmd.Flags().StringP("format", "", "json", "Output format: json, table")
+	
+	securityScanCmd.Flags().StringP("output", "o", "", "Output file to save security scan results (default: print to stdout)")
+	securityScanCmd.Flags().StringP("format", "", "json", "Output format: json, table, sarif")
+	
+	lintCmd.Flags().StringP("output", "o", "", "Output file to save lint results (default: print to stdout)")
+	lintCmd.Flags().StringP("format", "", "default", "Output format: default, json, compact")
+	
+	checkovScanCmd.Flags().StringP("output", "o", "", "Output file to save scan results (default: print to stdout)")
+	checkovScanCmd.Flags().StringP("format", "", "cli", "Output format: cli, json, junit, sarif")
+	
+	infracostCmd.Flags().StringP("output", "o", "", "Output file to save cost estimation (default: print to stdout)")
+	infracostCmd.Flags().StringP("format", "", "table", "Output format: json, table, html")
+}
+
+// saveOrPrintOutput saves output to a file or prints to stdout
+func saveOrPrintOutput(output, outputFile string, successMsg string) error {
+	if outputFile != "" {
+		// Ensure output directory exists
+		if dir := filepath.Dir(outputFile); dir != "." {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				return fmt.Errorf("failed to create output directory: %w", err)
+			}
+		}
+		
+		// Write to file
+		err := os.WriteFile(outputFile, []byte(output), 0644)
+		if err != nil {
+			return fmt.Errorf("failed to write output file: %w", err)
+		}
+		
+		green := color.New(color.FgGreen)
+		green.Printf("✓ %s\n", successMsg)
+		fmt.Printf("Output saved to: %s\n", outputFile)
+	} else {
+		// Print to stdout
+		green := color.New(color.FgGreen)
+		green.Printf("\n✓ %s\n", successMsg)
+		fmt.Printf("\n%s\n", output)
+	}
+	return nil
 }
 
 func runCostAnalysis(cmd *cobra.Command, args []string) error {
@@ -108,11 +156,11 @@ func runCostAnalysis(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("cost analysis failed: %w", err)
 	}
 
-	green := color.New(color.FgGreen)
-	green.Println("\n✓ Cost analysis completed!")
-	fmt.Printf("\nResults:\n%s\n", output)
-
-	return nil
+	// Get output flag
+	outputFile, _ := cmd.Flags().GetString("output")
+	
+	// Save or print output
+	return saveOrPrintOutput(output, outputFile, "Cost analysis completed!")
 }
 
 func runSecurityScan(cmd *cobra.Command, args []string) error {
@@ -146,11 +194,11 @@ func runSecurityScan(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("security scan failed: %w", err)
 	}
 
-	green := color.New(color.FgGreen)
-	green.Println("\n✓ Security scan completed!")
-	fmt.Printf("\nResults:\n%s\n", output)
-
-	return nil
+	// Get output flag
+	outputFile, _ := cmd.Flags().GetString("output")
+	
+	// Save or print output
+	return saveOrPrintOutput(output, outputFile, "Security scan completed!")
 }
 
 func runGenerateDocs(cmd *cobra.Command, args []string) error {
@@ -160,6 +208,18 @@ func runGenerateDocs(cmd *cobra.Command, args []string) error {
 	dir := "."
 	if len(args) > 0 {
 		dir = args[0]
+	}
+
+	// Get flags
+	outputFile, _ := cmd.Flags().GetString("output")
+	filename, _ := cmd.Flags().GetString("filename")
+
+	// If output flag is not set but we have a filename, use it
+	if outputFile == "" && filename != "README.md" {
+		outputFile = filename
+	} else if outputFile == "" && filename == "README.md" {
+		// Auto-generate output file path
+		outputFile = filepath.Join(dir, "README.md")
 	}
 
 	// Check if directory exists
@@ -184,11 +244,8 @@ func runGenerateDocs(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("documentation generation failed: %w", err)
 	}
 
-	green := color.New(color.FgGreen)
-	green.Println("\n✓ Documentation generated!")
-	fmt.Printf("\n%s\n", output)
-
-	return nil
+	// Save or print output
+	return saveOrPrintOutput(output, outputFile, "Documentation generated!")
 }
 
 func runLint(cmd *cobra.Command, args []string) error {
@@ -222,11 +279,11 @@ func runLint(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("linting failed: %w", err)
 	}
 
-	green := color.New(color.FgGreen)
-	green.Println("\n✓ Linting completed!")
-	fmt.Printf("\nResults:\n%s\n", output)
-
-	return nil
+	// Get output flag
+	outputFile, _ := cmd.Flags().GetString("output")
+	
+	// Save or print output
+	return saveOrPrintOutput(output, outputFile, "Linting completed!")
 }
 
 func runCheckovScan(cmd *cobra.Command, args []string) error {
@@ -260,11 +317,11 @@ func runCheckovScan(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("Checkov scan failed: %w", err)
 	}
 
-	green := color.New(color.FgGreen)
-	green.Println("\n✓ Checkov scan completed!")
-	fmt.Printf("\nResults:\n%s\n", output)
-
-	return nil
+	// Get output flag
+	outputFile, _ := cmd.Flags().GetString("output")
+	
+	// Save or print output
+	return saveOrPrintOutput(output, outputFile, "Checkov scan completed!")
 }
 
 func runInfracost(cmd *cobra.Command, args []string) error {
@@ -303,9 +360,9 @@ func runInfracost(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("cost estimation failed: %w", err)
 	}
 
-	green := color.New(color.FgGreen)
-	green.Println("\n✓ Cost estimation completed!")
-	fmt.Printf("\n%s\n", output)
-
-	return nil
+	// Get output flag
+	outputFile, _ := cmd.Flags().GetString("output")
+	
+	// Save or print output
+	return saveOrPrintOutput(output, outputFile, "Cost estimation completed!")
 }

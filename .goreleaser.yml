@@ -41,11 +41,7 @@ archives:
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
-    format: tar.gz
-    # Use format: zip for Windows
-    format_overrides:
-      - goos: windows
-        format: zip
+    # GoReleaser v2 automatically uses tar.gz for Unix and zip for Windows
     files:
       - README.md
       - LICENSE

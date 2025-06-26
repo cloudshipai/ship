@@ -18,10 +18,10 @@ CloudshipAI CLI - A powerful command-line tool that brings enterprise-grade infr
 
 ```bash
 # Linux/macOS - Install latest release with wget
-wget -qO- https://github.com/cloudshipai/ship/releases/latest/download/ship_$(uname -s)_$(uname -m | sed 's/x86_64/x86_64/;s/aarch64/arm64/').tar.gz | tar xz && sudo mv ship /usr/local/bin/
+wget -qO- https://github.com/cloudshipai/ship/releases/latest/download/ship_$(uname -s)_$(uname -m).tar.gz | tar xz && sudo mv ship /usr/local/bin/
 
 # Or with curl
-curl -sSL https://github.com/cloudshipai/ship/releases/latest/download/ship_$(uname -s)_$(uname -m | sed 's/x86_64/x86_64/;s/aarch64/arm64/').tar.gz | tar xz && sudo mv ship /usr/local/bin/
+curl -sSL https://github.com/cloudshipai/ship/releases/latest/download/ship_$(uname -s)_$(uname -m).tar.gz | tar xz && sudo mv ship /usr/local/bin/
 
 # Verify installation
 ship version

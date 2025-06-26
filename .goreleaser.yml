@@ -29,7 +29,7 @@ builds:
       - goos: windows
         goarch: arm
     ldflags:
-      - -s -w -X github.com/cloudship/ship/cmd/ship.version={{.Version}} -X github.com/cloudship/ship/cmd/ship.commit={{.Commit}} -X github.com/cloudship/ship/cmd/ship.date={{.Date}}
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
 
 archives:
   - id: ship

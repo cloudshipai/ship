@@ -1,0 +1,26 @@
+run:
+  timeout: 5m
+  issues-exit-code: 1
+  tests: true
+  skip-dirs:
+    - vendor
+    - test/mocks
+
+linters:
+  enable:
+    - gofmt
+    - govet
+    - errcheck
+    - staticcheck
+    - ineffassign
+    - typecheck
+  disable-all: true
+
+linters-settings:
+  gofmt:
+    simplify: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-use-default: false

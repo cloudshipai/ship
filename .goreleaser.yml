@@ -41,6 +41,8 @@ archives:
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
+    format: tar.gz
+    # Use format: zip for Windows
     format_overrides:
       - goos: windows
         format: zip

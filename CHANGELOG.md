@@ -1,4 +1,10 @@
-## [0.2.2](https://github.com/cloudshipai/ship/compare/v0.2.1...v0.2.2) (2025-06-26)
+# Changelog
+
+## [v0.3.1] - 2025-06-26
+
+### Added
+- See commit history for changes
+
 
 
 ### Bug Fixes

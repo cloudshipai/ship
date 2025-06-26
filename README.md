@@ -16,24 +16,18 @@ CloudshipAI CLI - A powerful command-line tool that brings enterprise-grade infr
 
 ### Quick Install (Recommended)
 
-> **Note**: Binary releases will be available after the first official release. For now, please build from source.
-
 ```bash
-# Once releases are available, you can install with:
-# Linux/macOS
-curl -s https://api.github.com/repos/cloudshipai/ship/releases/latest | \
-  grep browser_download_url | \
-  grep "$(uname -s)_$(uname -m).tar.gz" | \
-  cut -d '"' -f 4 | \
-  xargs curl -L | tar xz && sudo mv ship /usr/local/bin/
+# Linux/macOS - Install latest release with wget
+wget -qO- https://github.com/cloudshipai/ship/releases/latest/download/ship_$(uname -s)_$(uname -m | sed 's/x86_64/x86_64/;s/aarch64/arm64/').tar.gz | tar xz && sudo mv ship /usr/local/bin/
+
+# Or with curl
+curl -sSL https://github.com/cloudshipai/ship/releases/latest/download/ship_$(uname -s)_$(uname -m | sed 's/x86_64/x86_64/;s/aarch64/arm64/').tar.gz | tar xz && sudo mv ship /usr/local/bin/
 
 # Verify installation
 ship version
 ```
 
 ### Platform-Specific Downloads
-
-Once releases are available, you can download directly:
 
 ```bash
 # Linux x86_64

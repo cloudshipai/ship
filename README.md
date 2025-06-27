@@ -10,6 +10,8 @@ CloudshipAI CLI - A powerful command-line tool that brings enterprise-grade infr
 - **📝 Documentation Generation**: Auto-generate beautiful Terraform module documentation
 - **🧠 AI-Powered Infrastructure Investigation**: Query your cloud infrastructure using natural language
 - **🔎 Real-time Cloud Analysis**: Investigate live AWS, Azure, and GCP resources with Steampipe
+- **🤖 AI Assistant Integration**: Built-in MCP server for Claude Desktop, Cursor, and other AI tools
+- **🔌 Extensible Module System**: Add custom tools and Dagger functions without modifying core CLI
 - **🐳 Containerized Tools**: All tools run in containers via Dagger - no local installations needed
 - **☁️ Cloud Integration**: Seamlessly works with AWS, Azure, GCP, and other cloud providers
 - **🔧 CI/CD Ready**: Perfect for integration into your existing pipelines
@@ -130,7 +132,50 @@ ship ai-investigate --prompt "Find all publicly accessible RDS instances" --exec
 - **Resource Inventory**: "List all S3 buckets", "Show running instances", "Find RDS databases"
 - **Compliance Checks**: "Check encryption status", "Verify MFA settings", "Audit logging configuration"
 
-### 4. CI/CD Integration
+### 4. AI Assistant Integration (MCP)
+
+Ship CLI includes a built-in MCP (Model Context Protocol) server that makes all functionality available to AI assistants like Claude Desktop and Cursor:
+
+```bash
+# Start MCP server for AI assistant integration
+ship mcp
+
+# Configure in Claude Desktop (claude_desktop_config.json):
+{
+  "mcpServers": {
+    "ship-cli": {
+      "command": "ship",
+      "args": ["mcp"],
+      "env": {
+        "AWS_PROFILE": "your-profile"
+      }
+    }
+  }
+}
+```
+
+**What AI assistants can do with Ship CLI:**
+- **Infrastructure Investigation**: "Check my AWS account for security issues"
+- **Terraform Analysis**: "Analyze this Terraform code for costs and security"
+- **Cost Optimization**: "Find unused resources in my cloud account"
+- **Documentation**: "Generate docs for this Terraform module"
+- **Compliance Audits**: "Run a compliance check on my infrastructure"
+
+**Available MCP Tools:**
+- `ai_investigate` - Natural language infrastructure investigation
+- `terraform_lint` - Code linting and best practices
+- `terraform_security_scan` - Security analysis
+- `terraform_cost_estimate` - Cost estimation
+- `terraform_generate_docs` - Documentation generation
+- `cloudship_push` - Upload artifacts for AI analysis
+
+**Pre-built Workflows:**
+- `security_audit` - Comprehensive security audit process
+- `cost_optimization` - Cost optimization analysis workflow
+
+See the [MCP Integration Guide](docs/mcp-integration.md) for complete setup instructions.
+
+### 5. CI/CD Integration
 
 ```yaml
 # GitHub Actions Example
@@ -171,6 +216,36 @@ jobs:
 | **OpenInfraQuote** | `ship terraform-tools cost-analysis` | Alternative cost analysis tool | `gruebel/openinfraquote` |
 
 ## 📋 Command Reference
+
+### Module Management
+```bash
+# List all available modules (built-in, user, project)
+ship modules list
+
+# Show detailed information about a module
+ship modules info terraform-tools
+
+# Create a new custom module template
+ship modules new my-custom-tool --type docker --description "My custom analysis tool"
+
+# Filter modules by type or source
+ship modules list --type docker --source user
+ship modules list --trusted  # Show only trusted modules
+```
+
+### AI-Powered Investigation
+```bash
+# Natural language infrastructure investigation
+ship ai-investigate --prompt "Show me all S3 buckets" --execute
+ship ai-investigate --prompt "Check for security issues" --execute  
+ship ai-investigate --prompt "Find unused resources costing money" --execute
+
+# Use specific AWS profile/region
+ship ai-investigate --prompt "List running instances" --aws-profile prod --aws-region us-west-2 --execute
+
+# Preview queries without execution
+ship ai-investigate --prompt "Security audit" --provider aws
+```
 
 ### Linting
 ```bash
@@ -300,6 +375,8 @@ We welcome contributions! See our [Contributing Guide](CONTRIBUTING.md) for deta
 ## 📚 Documentation
 
 - [CLI Reference](docs/cli-reference.md) - Complete command reference
+- [MCP Integration Guide](docs/mcp-integration.md) - AI assistant integration setup
+- [Dynamic Module Discovery](docs/dynamic-module-discovery.md) - Extensible module system
 - [Dagger Modules](docs/dagger-modules.md) - How to add new tools
 - [Development Guide](docs/development-tasks.md) - For contributors
 - [Technical Spec](docs/technical-spec.md) - Architecture and design

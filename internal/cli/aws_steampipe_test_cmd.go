@@ -69,7 +69,7 @@ func runAWSSteampipeTest(cmd *cobra.Command, args []string) error {
 
 	// Test 1: Container with all configurations
 	fmt.Println("\n1. Setting up Steampipe container with AWS plugin...")
-	
+
 	container := client.Container().
 		From("turbot/steampipe:latest")
 
@@ -97,7 +97,7 @@ func runAWSSteampipeTest(cmd *cobra.Command, args []string) error {
 	// Install AWS plugin
 	fmt.Println("\n2. Installing AWS plugin...")
 	container = container.WithExec([]string{"steampipe", "plugin", "install", "aws"})
-	
+
 	output, err := container.Stdout(ctx)
 	if err != nil {
 		fmt.Printf("⚠️  Plugin installation had issues: %v\n", err)
@@ -108,7 +108,7 @@ func runAWSSteampipeTest(cmd *cobra.Command, args []string) error {
 	// Test 2: Check plugin list
 	fmt.Println("\n3. Checking installed plugins...")
 	pluginContainer := container.WithExec([]string{"steampipe", "plugin", "list"})
-	
+
 	output, err = pluginContainer.Stdout(ctx)
 	if err != nil {
 		fmt.Printf("❌ Failed to list plugins: %v\n", err)
@@ -119,7 +119,7 @@ func runAWSSteampipeTest(cmd *cobra.Command, args []string) error {
 	// Test 3: Simple AWS query
 	fmt.Println("\n4. Testing simple AWS query (list regions)...")
 	queryContainer := container.WithExec([]string{
-		"steampipe", "query", 
+		"steampipe", "query",
 		"SELECT name, opt_in_status FROM aws_region ORDER BY name",
 		"--output", "json",
 	})
@@ -127,10 +127,10 @@ func runAWSSteampipeTest(cmd *cobra.Command, args []string) error {
 	output, err = queryContainer.Stdout(ctx)
 	if err != nil {
 		fmt.Printf("❌ Query failed: %v\n", err)
-		
+
 		// Try to get error details
 		errContainer := container.WithExec([]string{
-			"steampipe", "query", 
+			"steampipe", "query",
 			"SELECT 1",
 			"--output", "json",
 		})
@@ -165,7 +165,7 @@ func runAWSSteampipeTest(cmd *cobra.Command, args []string) error {
 	// Test 5: Try with explicit credentials if available
 	if accessKey := os.Getenv("AWS_ACCESS_KEY_ID"); accessKey != "" {
 		fmt.Println("\n6. Testing with environment credentials...")
-		
+
 		envContainer := client.Container().
 			From("turbot/steampipe:latest").
 			WithEnvVariable("AWS_ACCESS_KEY_ID", os.Getenv("AWS_ACCESS_KEY_ID")).

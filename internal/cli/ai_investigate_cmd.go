@@ -20,7 +20,7 @@ var aiInvestigateCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(aiInvestigateCmd)
-	
+
 	aiInvestigateCmd.Flags().String("prompt", "", "Natural language investigation prompt")
 	aiInvestigateCmd.Flags().String("provider", "aws", "Cloud provider (aws, azure, gcp)")
 	aiInvestigateCmd.Flags().String("llm-provider", "openai", "LLM provider (openai, anthropic, ollama)")
@@ -28,13 +28,13 @@ func init() {
 	aiInvestigateCmd.Flags().Bool("execute", false, "Execute the generated queries")
 	aiInvestigateCmd.Flags().String("aws-profile", "", "AWS profile to use (from ~/.aws/config)")
 	aiInvestigateCmd.Flags().String("aws-region", "", "AWS region to use")
-	
+
 	aiInvestigateCmd.MarkFlagRequired("prompt")
 }
 
 func runAIInvestigate(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-	
+
 	prompt, _ := cmd.Flags().GetString("prompt")
 	provider, _ := cmd.Flags().GetString("provider")
 	llmProvider, _ := cmd.Flags().GetString("llm-provider")
@@ -42,7 +42,7 @@ func runAIInvestigate(cmd *cobra.Command, args []string) error {
 	execute, _ := cmd.Flags().GetBool("execute")
 	awsProfile, _ := cmd.Flags().GetString("aws-profile")
 	awsRegion, _ := cmd.Flags().GetString("aws-region")
-	
+
 	// Initialize Dagger engine
 	fmt.Println("Initializing Dagger engine...")
 	engine, err := dagger.NewEngine(ctx)
@@ -50,17 +50,17 @@ func runAIInvestigate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to initialize dagger: %w", err)
 	}
 	defer engine.Close()
-	
+
 	// Create modules
 	_ = modules.NewLLMModule(engine.GetClient(), llmProvider, model) // Will be used for actual LLM calls in production
 	steampipeModule := engine.NewSteampipeModule()
-	
+
 	// Step 1: Generate investigation plan
 	fmt.Printf("\n🤖 AI: Creating investigation plan for: %s\n", prompt)
-	
+
 	// Generate dynamic investigation plan based on the prompt
 	investigationSteps := GenerateInvestigationPlan(ctx, prompt, provider)
-	
+
 	// Display the plan
 	fmt.Println("\n📋 Investigation Plan:")
 	for _, step := range investigationSteps {
@@ -71,15 +71,15 @@ func runAIInvestigate(cmd *cobra.Command, args []string) error {
 			fmt.Printf("   Query: %s\n", truncateQuery(step.Query))
 		}
 	}
-	
+
 	if !execute {
 		fmt.Println("\n💡 To execute this investigation, add the --execute flag")
 		return nil
 	}
-	
+
 	// Step 2: Execute queries
 	fmt.Println("\n🔍 Executing investigation...")
-	
+
 	// Prepare credentials with profile and region
 	credentials := getProviderCredentials(provider)
 	if provider == "aws" {
@@ -90,25 +90,25 @@ func runAIInvestigate(cmd *cobra.Command, args []string) error {
 			credentials["AWS_REGION"] = awsRegion
 		}
 	}
-	
+
 	allResults := make(map[string]interface{})
-	
+
 	for _, step := range investigationSteps {
 		fmt.Printf("\nStep %d: %s\n", step.StepNumber, step.Description)
-		
+
 		// Execute query
 		result, err := steampipeModule.RunQuery(ctx, provider, step.Query, credentials)
 		if err != nil {
 			fmt.Printf("❌ Error: %v\n", err)
 			continue
 		}
-		
+
 		// Parse results
 		var queryResults []map[string]interface{}
 		if err := json.Unmarshal([]byte(result), &queryResults); err == nil {
 			allResults[fmt.Sprintf("step_%d", step.StepNumber)] = queryResults
 			fmt.Printf("✓ Found %d results\n", len(queryResults))
-			
+
 			// Show sample results
 			if len(queryResults) > 0 && len(queryResults[0]) > 0 {
 				fmt.Println("   Sample finding:")
@@ -121,20 +121,20 @@ func runAIInvestigate(cmd *cobra.Command, args []string) error {
 			}
 		}
 	}
-	
+
 	// Step 3: AI Analysis
 	fmt.Println("\n🧠 AI Analysis:")
-	
+
 	// Generate insights based on actual results
 	insights := ParseQueryResults(allResults, prompt)
-	
+
 	if insights != "" {
 		fmt.Println("\n📊 Summary of Findings:")
 		fmt.Println(insights)
 	} else {
 		fmt.Println("\n✅ Investigation completed. No significant issues found based on your query.")
 	}
-	
+
 	// Provide contextual recommendations based on the prompt
 	fmt.Println("\n💡 Recommendations:")
 	if strings.Contains(strings.ToLower(prompt), "s3") {
@@ -150,14 +150,13 @@ func runAIInvestigate(cmd *cobra.Command, args []string) error {
 		fmt.Println("- Consider using reserved instances for long-running workloads")
 		fmt.Println("- Implement auto-scaling to optimize resource usage")
 	}
-	
+
 	fmt.Println("\n📝 Next Steps:")
 	fmt.Println("- Run 'ship terraform-tools checkov-scan' for detailed security analysis")
 	fmt.Println("- Use 'ship push' to analyze your infrastructure with Cloudship AI")
-	
+
 	return nil
 }
-
 
 func truncateQuery(query string) string {
 	if len(query) > 80 {
@@ -168,7 +167,7 @@ func truncateQuery(query string) string {
 
 func getProviderCredentials(provider string) map[string]string {
 	creds := make(map[string]string)
-	
+
 	switch provider {
 	case "aws":
 		// AWS credentials from environment
@@ -204,7 +203,7 @@ func getProviderCredentials(provider string) map[string]string {
 			creds["GOOGLE_APPLICATION_CREDENTIALS"] = v
 		}
 	}
-	
+
 	return creds
 }
 

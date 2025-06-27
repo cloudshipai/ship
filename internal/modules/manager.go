@@ -31,7 +31,7 @@ func (m *Manager) LoadModules(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to discover modules: %w", err)
 	}
-	
+
 	m.modules = modules
 	return nil
 }
@@ -57,17 +57,17 @@ func (m *Manager) ExecuteModule(ctx context.Context, moduleName, command string,
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Validate command exists
 	if !m.hasCommand(module, command) {
 		return nil, fmt.Errorf("command '%s' not found in module '%s'", command, moduleName)
 	}
-	
+
 	// Security check
 	if !module.Trusted && !m.config.AllowUntrusted {
 		return nil, fmt.Errorf("module '%s' is not trusted and untrusted modules are disabled", moduleName)
 	}
-	
+
 	return m.executor.Execute(ctx, module, command, args, flags)
 }
 
@@ -101,23 +101,23 @@ func (m *Manager) registerModuleCommands(rootCmd *cobra.Command, module *Module)
 			Long:  fmt.Sprintf("%s\n\nModule: %s (%s)", cmdSpec.Description, module.Metadata.Name, module.Source),
 			RunE:  m.createCommandRunner(module, cmdSpec),
 		}
-		
+
 		// Add flags
 		for _, flag := range cmdSpec.Flags {
 			if err := m.addFlag(cmd, flag); err != nil {
 				return fmt.Errorf("failed to add flag %s: %w", flag.Name, err)
 			}
 		}
-		
+
 		// Add examples
 		if len(cmdSpec.Examples) > 0 {
 			cmd.Example = strings.Join(cmdSpec.Examples, "\n")
 		}
-		
+
 		// Register command
 		rootCmd.AddCommand(cmd)
 	}
-	
+
 	return nil
 }
 
@@ -125,7 +125,7 @@ func (m *Manager) registerModuleCommands(rootCmd *cobra.Command, module *Module)
 func (m *Manager) createCommandRunner(module *Module, cmdSpec ModuleCommand) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-		
+
 		// Extract flags
 		flags := make(map[string]interface{})
 		for _, flagSpec := range cmdSpec.Flags {
@@ -137,13 +137,13 @@ func (m *Manager) createCommandRunner(module *Module, cmdSpec ModuleCommand) fun
 				flags[flagSpec.Name] = value
 			}
 		}
-		
+
 		// Execute module
 		result, err := m.ExecuteModule(ctx, module.Metadata.Name, cmdSpec.Name, args, flags)
 		if err != nil {
 			return err
 		}
-		
+
 		// Output result
 		if result.Stdout != "" {
 			fmt.Print(result.Stdout)
@@ -151,12 +151,12 @@ func (m *Manager) createCommandRunner(module *Module, cmdSpec ModuleCommand) fun
 		if result.Stderr != "" {
 			fmt.Fprint(cmd.ErrOrStderr(), result.Stderr)
 		}
-		
+
 		// Set exit code
 		if result.ExitCode != 0 {
 			return fmt.Errorf("module execution failed with exit code %d", result.ExitCode)
 		}
-		
+
 		return nil
 	}
 }
@@ -178,7 +178,7 @@ func (m *Manager) addFlag(cmd *cobra.Command, flag ModuleFlag) error {
 		if flag.Required {
 			cmd.MarkFlagRequired(flag.Name)
 		}
-		
+
 	case "bool":
 		defaultVal := false
 		if flag.Default != nil {
@@ -190,7 +190,7 @@ func (m *Manager) addFlag(cmd *cobra.Command, flag ModuleFlag) error {
 		if flag.Short != "" {
 			cmd.Flags().BoolP(flag.Name, flag.Short, defaultVal, flag.Description)
 		}
-		
+
 	case "int":
 		defaultVal := 0
 		if flag.Default != nil {
@@ -205,7 +205,7 @@ func (m *Manager) addFlag(cmd *cobra.Command, flag ModuleFlag) error {
 		if flag.Required {
 			cmd.MarkFlagRequired(flag.Name)
 		}
-		
+
 	case "[]string":
 		defaultVal := []string{}
 		if flag.Default != nil {
@@ -217,11 +217,11 @@ func (m *Manager) addFlag(cmd *cobra.Command, flag ModuleFlag) error {
 		if flag.Short != "" {
 			cmd.Flags().StringSliceP(flag.Name, flag.Short, defaultVal, flag.Description)
 		}
-		
+
 	default:
 		return fmt.Errorf("unsupported flag type: %s", flag.Type)
 	}
-	
+
 	return nil
 }
 

@@ -19,12 +19,12 @@ type Module struct {
 	Kind       string         `yaml:"kind"`
 	Metadata   ModuleMetadata `yaml:"metadata"`
 	Spec       ModuleSpec     `yaml:"spec"`
-	
+
 	// Runtime fields
-	Path       string    `yaml:"-"`
-	Source     string    `yaml:"-"`
-	LoadedAt   time.Time `yaml:"-"`
-	Trusted    bool      `yaml:"-"`
+	Path     string    `yaml:"-"`
+	Source   string    `yaml:"-"`
+	LoadedAt time.Time `yaml:"-"`
+	Trusted  bool      `yaml:"-"`
 }
 
 // ModuleMetadata contains module identification information
@@ -39,12 +39,12 @@ type ModuleMetadata struct {
 
 // ModuleSpec defines the module's behavior and integration
 type ModuleSpec struct {
-	Type         ModuleType          `yaml:"type"`
-	Docker       *DockerModuleSpec   `yaml:"docker,omitempty"`
-	Dagger       *DaggerModuleSpec   `yaml:"dagger,omitempty"`
-	Commands     []ModuleCommand     `yaml:"commands"`
-	Dependencies []string            `yaml:"dependencies,omitempty"`
-	Permissions  []string            `yaml:"permissions,omitempty"`
+	Type         ModuleType        `yaml:"type"`
+	Docker       *DockerModuleSpec `yaml:"docker,omitempty"`
+	Dagger       *DaggerModuleSpec `yaml:"dagger,omitempty"`
+	Commands     []ModuleCommand   `yaml:"commands"`
+	Dependencies []string          `yaml:"dependencies,omitempty"`
+	Permissions  []string          `yaml:"permissions,omitempty"`
 }
 
 // DockerModuleSpec defines Docker-based module configuration
@@ -82,7 +82,7 @@ type ModuleCommand struct {
 type ModuleFlag struct {
 	Name        string      `yaml:"name"`
 	Short       string      `yaml:"short,omitempty"`
-	Type        string      `yaml:"type"`        // string, int, bool, []string
+	Type        string      `yaml:"type"` // string, int, bool, []string
 	Default     interface{} `yaml:"default,omitempty"`
 	Required    bool        `yaml:"required,omitempty"`
 	Description string      `yaml:"description"`
@@ -106,7 +106,7 @@ type ExecutionResult struct {
 
 // ModuleSource represents where a module was discovered from
 type ModuleSource struct {
-	Type        string    `yaml:"type"`        // builtin, user, project, git
+	Type        string    `yaml:"type"` // builtin, user, project, git
 	Path        string    `yaml:"path"`
 	URL         string    `yaml:"url,omitempty"`
 	Ref         string    `yaml:"ref,omitempty"`
@@ -116,12 +116,12 @@ type ModuleSource struct {
 
 // ModuleConfig represents module configuration from ship config
 type ModuleConfig struct {
-	Repositories     []GitRepository `yaml:"repositories,omitempty"`
-	Directories      []string        `yaml:"directories,omitempty"`
-	AllowUntrusted   bool            `yaml:"allow_untrusted"`
-	Sandbox          bool            `yaml:"sandbox"`
-	CacheDir         string          `yaml:"cache_dir,omitempty"`
-	UpdateInterval   string          `yaml:"update_interval,omitempty"`
+	Repositories   []GitRepository `yaml:"repositories,omitempty"`
+	Directories    []string        `yaml:"directories,omitempty"`
+	AllowUntrusted bool            `yaml:"allow_untrusted"`
+	Sandbox        bool            `yaml:"sandbox"`
+	CacheDir       string          `yaml:"cache_dir,omitempty"`
+	UpdateInterval string          `yaml:"update_interval,omitempty"`
 }
 
 // GitRepository represents a git-based module source

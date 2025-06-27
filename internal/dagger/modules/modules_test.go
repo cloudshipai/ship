@@ -42,7 +42,7 @@ func TestOpenInfraQuoteModule(t *testing.T) {
 			t.Skip("Test file not found, skipping")
 		}
 
-		output, err := module.AnalyzePlan(ctx, testFile)
+		output, err := module.AnalyzePlan(ctx, testFile, "us-east-1")
 		if err != nil {
 			// OpenInfraQuote might fail if the plan format isn't exactly right
 			t.Logf("Expected error (plan format): %v", err)
@@ -63,7 +63,7 @@ func TestOpenInfraQuoteModule(t *testing.T) {
 			t.Skip("Test directory not found, skipping")
 		}
 
-		output, err := module.AnalyzeDirectory(ctx, testDir)
+		output, err := module.AnalyzeDirectory(ctx, testDir, "us-east-1")
 		if err != nil {
 			// This might fail without actual AWS credentials
 			t.Logf("Expected error (no credentials): %v", err)
@@ -108,7 +108,7 @@ func TestInfraScanModule(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotEmpty(t, output)
 		t.Logf("Security scan output: %s", output)
-		
+
 		// The mock files should have security issues
 		assert.Contains(t, output, "AWS_ACCESS_KEY_ID", "Should detect hardcoded AWS credentials")
 	})
@@ -164,14 +164,14 @@ func TestTerraformDocsModule(t *testing.T) {
 		output, err := module.GenerateMarkdown(ctx, testDir)
 		assert.NoError(t, err)
 		assert.NotEmpty(t, output)
-		
+
 		// Check for expected content
 		assert.Contains(t, output, "## Requirements")
 		assert.Contains(t, output, "## Providers")
 		assert.Contains(t, output, "## Resources")
 		assert.Contains(t, output, "## Inputs")
 		assert.Contains(t, output, "## Outputs")
-		
+
 		t.Logf("Generated markdown:\n%s", output)
 	})
 
@@ -189,11 +189,11 @@ func TestTerraformDocsModule(t *testing.T) {
 		output, err := module.GenerateJSON(ctx, testDir)
 		assert.NoError(t, err)
 		assert.NotEmpty(t, output)
-		
+
 		// Should be valid JSON
 		assert.Contains(t, output, "{")
 		assert.Contains(t, output, "}")
-		
+
 		t.Logf("Generated JSON length: %d bytes", len(output))
 	})
 
@@ -211,13 +211,13 @@ func TestTerraformDocsModule(t *testing.T) {
 		output, err := module.GenerateTable(ctx, testDir)
 		assert.NoError(t, err)
 		assert.NotEmpty(t, output)
-		
+
 		// Should contain table markers
 		assert.Contains(t, output, "|")
 		assert.Contains(t, output, "Name")
 		assert.Contains(t, output, "Type")
 		assert.Contains(t, output, "Default")
-		
+
 		t.Logf("Generated table:\n%s", output)
 	})
 }

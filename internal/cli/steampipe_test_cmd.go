@@ -58,7 +58,7 @@ func runSteampipeTest(cmd *cobra.Command, args []string) error {
 
 	// Test 3: Run queries based on provider
 	fmt.Printf("\n3. Testing %s queries...\n", provider)
-	
+
 	credentials := make(map[string]string)
 	queries := []string{}
 
@@ -117,7 +117,7 @@ func runSteampipeTest(cmd *cobra.Command, args []string) error {
 	// Test 4: Run compliance benchmark (if requested)
 	if runCompliance && provider == "aws" {
 		fmt.Println("\n4. Testing AWS compliance benchmark...")
-		
+
 		// Install AWS compliance mod
 		modPath := "github.com/turbot/steampipe-mod-aws-compliance"
 		result, err := module.RunModCheck(ctx, "aws", modPath, credentials)
@@ -136,7 +136,7 @@ func runSteampipeTest(cmd *cobra.Command, args []string) error {
 
 	green := color.New(color.FgGreen)
 	green.Printf("\n✓ Steampipe module test completed!\n")
-	
+
 	fmt.Println("\nKey findings:")
 	fmt.Println("- Steampipe container runs successfully")
 	fmt.Println("- Plugin installation works")

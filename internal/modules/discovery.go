@@ -21,17 +21,17 @@ func NewDiscoveryManager(config ModuleConfig) *DiscoveryManager {
 	dm := &DiscoveryManager{
 		config: config,
 	}
-	
+
 	// Add built-in discovery sources
 	dm.addDiscovery(&BuiltinDiscovery{})
 	dm.addDiscovery(&UserDirectoryDiscovery{})
 	dm.addDiscovery(&ProjectDiscovery{})
-	
+
 	// Add git-based discovery if configured
 	if len(config.Repositories) > 0 {
 		dm.addDiscovery(&GitDiscovery{})
 	}
-	
+
 	return dm
 }
 
@@ -45,7 +45,7 @@ func (dm *DiscoveryManager) addDiscovery(d Discovery) {
 func (dm *DiscoveryManager) DiscoverAll(ctx context.Context) ([]*Module, error) {
 	var allModules []*Module
 	moduleNames := make(map[string]bool) // Track duplicates
-	
+
 	for _, discovery := range dm.discoveries {
 		modules, err := discovery.DiscoverModules(ctx)
 		if err != nil {
@@ -53,7 +53,7 @@ func (dm *DiscoveryManager) DiscoverAll(ctx context.Context) ([]*Module, error) 
 			fmt.Fprintf(os.Stderr, "Warning: discovery error from %s: %v\n", discovery.GetSourceType(), err)
 			continue
 		}
-		
+
 		// Add modules, handling duplicates (higher priority sources win)
 		for _, module := range modules {
 			if !moduleNames[module.Metadata.Name] {
@@ -62,7 +62,7 @@ func (dm *DiscoveryManager) DiscoverAll(ctx context.Context) ([]*Module, error) 
 			}
 		}
 	}
-	
+
 	return allModules, nil
 }
 
@@ -169,44 +169,44 @@ func (d *UserDirectoryDiscovery) DiscoverModules(ctx context.Context) ([]*Module
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user home directory: %w", err)
 	}
-	
+
 	userModulesDir := filepath.Join(homeDir, ".ship", "modules")
 	return d.discoverModulesInDirectory(userModulesDir, "user")
 }
 
 func (d *UserDirectoryDiscovery) discoverModulesInDirectory(dir, source string) ([]*Module, error) {
 	var modules []*Module
-	
+
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		return modules, nil
 	}
-	
+
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory %s: %w", dir, err)
 	}
-	
+
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
-		
+
 		modulePath := filepath.Join(dir, entry.Name())
 		moduleYaml := filepath.Join(modulePath, "module.yaml")
-		
+
 		if _, err := os.Stat(moduleYaml); os.IsNotExist(err) {
 			continue
 		}
-		
+
 		module, err := d.loadModuleFromFile(moduleYaml, modulePath, source)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to load module from %s: %v\n", moduleYaml, err)
 			continue
 		}
-		
+
 		modules = append(modules, module)
 	}
-	
+
 	return modules, nil
 }
 
@@ -215,17 +215,17 @@ func (d *UserDirectoryDiscovery) loadModuleFromFile(yamlPath, modulePath, source
 	if err != nil {
 		return nil, fmt.Errorf("failed to read module.yaml: %w", err)
 	}
-	
+
 	var module Module
 	if err := yaml.Unmarshal(data, &module); err != nil {
 		return nil, fmt.Errorf("failed to parse module.yaml: %w", err)
 	}
-	
+
 	// Set runtime fields
 	module.Path = modulePath
 	module.Source = source
 	module.Trusted = source == "builtin" || (source == "user" && d.config.AllowUntrusted)
-	
+
 	return &module, nil
 }
 
@@ -244,7 +244,7 @@ func (d *ProjectDiscovery) GetSourceType() string {
 
 func (d *ProjectDiscovery) DiscoverModules(ctx context.Context) ([]*Module, error) {
 	var modules []*Module
-	
+
 	// Check for .ship/modules directory
 	if _, err := os.Stat(".ship/modules"); err == nil {
 		userDiscovery := &UserDirectoryDiscovery{config: d.config}
@@ -254,7 +254,7 @@ func (d *ProjectDiscovery) DiscoverModules(ctx context.Context) ([]*Module, erro
 		}
 		modules = append(modules, projectModules...)
 	}
-	
+
 	// Check for dagger.json (Dagger module)
 	if _, err := os.Stat("dagger.json"); err == nil {
 		daggerModule, err := d.discoverDaggerModule()
@@ -264,7 +264,7 @@ func (d *ProjectDiscovery) DiscoverModules(ctx context.Context) ([]*Module, erro
 			modules = append(modules, daggerModule)
 		}
 	}
-	
+
 	return modules, nil
 }
 
@@ -275,9 +275,9 @@ func (d *ProjectDiscovery) discoverDaggerModule() (*Module, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	projectName := filepath.Base(cwd)
-	
+
 	return &Module{
 		APIVersion: "ship.cloudship.ai/v1",
 		Kind:       "Module",
@@ -320,9 +320,9 @@ func (d *GitDiscovery) GetSourceType() string {
 
 func (d *GitDiscovery) DiscoverModules(ctx context.Context) ([]*Module, error) {
 	var modules []*Module
-	
+
 	// For now, return empty - git discovery would require git clone logic
 	// This would be implemented in Phase 2 of the roadmap
-	
+
 	return modules, nil
 }

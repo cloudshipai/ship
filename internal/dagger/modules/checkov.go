@@ -40,12 +40,12 @@ func (m *CheckovModule) ScanDirectory(ctx context.Context, dir string) (string, 
 
 	// Always get the output, even if checkov "failed" (found issues)
 	output, _ := container.Stdout(ctx)
-	
+
 	// If we got output, it's a success (checkov ran and produced results)
 	if output != "" {
 		return output, nil
 	}
-	
+
 	// Only return error if we got no output at all
 	return "", fmt.Errorf("failed to run checkov: no output received")
 }
@@ -71,12 +71,12 @@ func (m *CheckovModule) ScanFile(ctx context.Context, filePath string) (string, 
 
 	// Always get the output, even if checkov "failed" (found issues)
 	output, _ := container.Stdout(ctx)
-	
+
 	// If we got output, it's a success (checkov ran and produced results)
 	if output != "" {
 		return output, nil
 	}
-	
+
 	// Only return error if we got no output at all
 	return "", fmt.Errorf("failed to run checkov on file: no output received")
 }

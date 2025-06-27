@@ -21,7 +21,7 @@ func init() {
 
 func runDaggerSteampipeTest(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-	
+
 	// Initialize Dagger engine
 	fmt.Println("Initializing Dagger engine for Steampipe test...")
 	engine, err := dagger.NewEngine(ctx)
@@ -29,29 +29,29 @@ func runDaggerSteampipeTest(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to initialize dagger: %w", err)
 	}
 	defer engine.Close()
-	
+
 	// Test running Steampipe container
 	fmt.Println("\nTesting Steampipe container...")
 	client := engine.GetClient()
-	
+
 	// Run Steampipe with version command
 	container := client.Container().
 		From("turbot/steampipe:latest").
 		WithExec([]string{"steampipe", "--version"})
-	
+
 	output, err := container.Stdout(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to run steampipe container: %w", err)
 	}
-	
+
 	fmt.Printf("Steampipe version:\n%s\n", output)
-	
+
 	// Test listing available plugins
 	fmt.Println("\nListing available Steampipe plugins...")
 	pluginContainer := client.Container().
 		From("turbot/steampipe:latest").
 		WithExec([]string{"steampipe", "plugin", "list", "--output", "json"})
-	
+
 	pluginOutput, err := pluginContainer.Stdout(ctx)
 	if err != nil {
 		// This might fail if no plugins are installed, which is OK
@@ -59,11 +59,11 @@ func runDaggerSteampipeTest(cmd *cobra.Command, args []string) error {
 	} else {
 		fmt.Printf("Installed plugins:\n%s\n", pluginOutput)
 	}
-	
+
 	green := color.New(color.FgGreen)
 	green.Printf("\n✓ Steampipe container is working correctly!\n")
 	fmt.Println("\nThis demonstrates that Ship CLI can run Steampipe")
 	fmt.Println("in containers without requiring local installation.")
-	
+
 	return nil
 }

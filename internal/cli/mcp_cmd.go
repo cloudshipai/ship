@@ -1,3 +1,6 @@
+//go:build ignore
+// +build ignore
+
 package cli
 
 import (
@@ -23,8 +26,9 @@ and cloud resource management.`,
 }
 
 func init() {
-	rootCmd.AddCommand(mcpCmd)
-	
+	// Temporarily disabled due to MCP library issues
+	// rootCmd.AddCommand(mcpCmd)
+
 	mcpCmd.Flags().Int("port", 0, "Port to listen on (0 for stdio)")
 	mcpCmd.Flags().String("host", "localhost", "Host to bind to")
 	mcpCmd.Flags().Bool("stdio", true, "Use stdio transport (default)")
@@ -34,28 +38,28 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 	port, _ := cmd.Flags().GetInt("port")
 	host, _ := cmd.Flags().GetString("host")
 	useStdio, _ := cmd.Flags().GetBool("stdio")
-	
+
 	// Create MCP server
 	s := server.NewMCPServer(
-		"ship-cli", 
+		"ship-cli",
 		"1.0.0",
 	)
-	
+
 	// Add tools for terraform analysis
 	addTerraformTools(s)
-	
+
 	// Add tools for infrastructure investigation
 	addInvestigationTools(s)
-	
+
 	// Add tools for general cloud operations
 	addCloudTools(s)
-	
+
 	// Add resources for documentation and help
 	addResources(s)
-	
+
 	// Add prompts for common use cases
 	addPrompts(s)
-	
+
 	// Start server
 	if useStdio || port == 0 {
 		fmt.Fprintf(os.Stderr, "Starting Ship CLI MCP server on stdio...\n")
@@ -71,93 +75,93 @@ func addTerraformTools(s *server.MCPServer) {
 	// Terraform Lint Tool
 	lintTool := mcp.NewTool("terraform_lint",
 		mcp.WithDescription("Run TFLint on Terraform code to check for syntax errors and best practices"),
-		mcp.WithString("directory", 
+		mcp.WithString("directory",
 			mcp.Description("Directory containing Terraform files (default: current directory)"),
 		),
-		mcp.WithString("config", 
+		mcp.WithString("config",
 			mcp.Description("Path to TFLint configuration file"),
 		),
 	)
-	
+
 	s.AddTool(lintTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := []string{"terraform-tools", "lint"}
-		
+
 		if dir := request.GetString("directory", ""); dir != "" {
 			args = append(args, dir)
 		}
 		if config := request.GetString("config", ""); config != "" {
 			args = append(args, "--config", config)
 		}
-		
+
 		return executeShipCommand(args)
 	})
-	
+
 	// Terraform Security Scan Tool
 	securityTool := mcp.NewTool("terraform_security_scan",
 		mcp.WithDescription("Run Checkov security scan on Terraform code"),
-		mcp.WithString("directory", 
+		mcp.WithString("directory",
 			mcp.Description("Directory containing Terraform files (default: current directory)"),
 		),
-		mcp.WithString("framework", 
+		mcp.WithString("framework",
 			mcp.Description("Security framework to use (terraform, arm, etc.)"),
 		),
 	)
-	
+
 	s.AddTool(securityTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := []string{"terraform-tools", "checkov-scan"}
-		
+
 		if dir := request.GetString("directory", ""); dir != "" {
 			args = append(args, dir)
 		}
 		if framework := request.GetString("framework", ""); framework != "" {
 			args = append(args, "--framework", framework)
 		}
-		
+
 		return executeShipCommand(args)
 	})
-	
+
 	// Terraform Cost Estimation Tool
 	costTool := mcp.NewTool("terraform_cost_estimate",
 		mcp.WithDescription("Estimate infrastructure costs for Terraform code"),
-		mcp.WithString("directory", 
+		mcp.WithString("directory",
 			mcp.Description("Directory containing Terraform files (default: current directory)"),
 		),
-		mcp.WithString("cloud", 
+		mcp.WithString("cloud",
 			mcp.Description("Cloud provider (aws, azure, gcp)"),
 		),
 	)
-	
+
 	s.AddTool(costTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := []string{"terraform-tools", "cost-estimate"}
-		
+
 		if dir := request.GetString("directory", ""); dir != "" {
 			args = append(args, dir)
 		}
 		if cloud := request.GetString("cloud", ""); cloud != "" {
 			args = append(args, "--cloud", cloud)
 		}
-		
+
 		return executeShipCommand(args)
 	})
-	
+
 	// Terraform Documentation Tool
 	docsTool := mcp.NewTool("terraform_generate_docs",
 		mcp.WithDescription("Generate documentation for Terraform modules"),
-		mcp.WithString("directory", 
+		mcp.WithString("directory",
 			mcp.Description("Directory containing Terraform files (default: current directory)"),
 		),
-		mcp.WithString("format", 
+		mcp.WithString("format",
 			mcp.Description("Output format (markdown, json)"),
 			mcp.Enum("markdown", "json"),
 		),
-		mcp.WithBoolean("show_examples", 
+		mcp.WithBoolean("show_examples",
 			mcp.Description("Include examples in documentation"),
 		),
 	)
-	
+
 	s.AddTool(docsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := []string{"terraform-tools", "generate-docs"}
-		
+
 		if dir := request.GetString("directory", ""); dir != "" {
 			args = append(args, dir)
 		}
@@ -167,7 +171,7 @@ func addTerraformTools(s *server.MCPServer) {
 		if showExamples := request.GetBool("show_examples", false); showExamples {
 			args = append(args, "--show-examples")
 		}
-		
+
 		return executeShipCommand(args)
 	})
 }
@@ -176,28 +180,28 @@ func addInvestigationTools(s *server.MCPServer) {
 	// AI Infrastructure Investigation Tool
 	investigateTool := mcp.NewTool("ai_investigate",
 		mcp.WithDescription("Investigate cloud infrastructure using natural language queries powered by Steampipe"),
-		mcp.WithString("prompt", 
+		mcp.WithString("prompt",
 			mcp.Required(),
 			mcp.Description("Natural language description of what to investigate (e.g., 'Show me all S3 buckets', 'Check for security issues')"),
 		),
-		mcp.WithString("provider", 
+		mcp.WithString("provider",
 			mcp.Description("Cloud provider to investigate (aws, azure, gcp)"),
 			mcp.Enum("aws", "azure", "gcp"),
 		),
-		mcp.WithString("aws_profile", 
+		mcp.WithString("aws_profile",
 			mcp.Description("AWS profile to use for authentication"),
 		),
-		mcp.WithString("aws_region", 
+		mcp.WithString("aws_region",
 			mcp.Description("AWS region to focus on"),
 		),
-		mcp.WithBoolean("execute", 
+		mcp.WithBoolean("execute",
 			mcp.Description("Whether to execute the generated queries (default: false, will only show plan)"),
 		),
 	)
-	
+
 	s.AddTool(investigateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := []string{"ai-investigate"}
-		
+
 		if prompt, err := request.RequireString("prompt"); err == nil {
 			args = append(args, "--prompt", prompt)
 		} else {
@@ -215,7 +219,7 @@ func addInvestigationTools(s *server.MCPServer) {
 		if execute := request.GetBool("execute", false); execute {
 			args = append(args, "--execute")
 		}
-		
+
 		return executeShipCommand(args)
 	})
 }
@@ -224,19 +228,19 @@ func addCloudTools(s *server.MCPServer) {
 	// Push artifacts to Cloudship for analysis
 	pushTool := mcp.NewTool("cloudship_push",
 		mcp.WithDescription("Upload and analyze infrastructure artifacts with Cloudship AI"),
-		mcp.WithString("file", 
+		mcp.WithString("file",
 			mcp.Required(),
 			mcp.Description("Path to the file to upload (Terraform plan, SBOM, etc.)"),
 		),
-		mcp.WithString("type", 
+		mcp.WithString("type",
 			mcp.Description("Type of artifact being uploaded"),
 			mcp.Enum("terraform-plan", "sbom", "dockerfile", "kubernetes-manifest"),
 		),
 	)
-	
+
 	s.AddTool(pushTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		args := []string{"push"}
-		
+
 		if file, err := request.RequireString("file"); err == nil {
 			args = append(args, file)
 		} else {
@@ -245,7 +249,7 @@ func addCloudTools(s *server.MCPServer) {
 		if artifactType := request.GetString("type", ""); artifactType != "" {
 			args = append(args, "--type", artifactType)
 		}
-		
+
 		return executeShipCommand(args)
 	})
 }
@@ -257,19 +261,19 @@ func addResources(s *server.MCPServer) {
 		mcp.WithResourceDescription("Complete help and usage information for Ship CLI"),
 		mcp.WithMIMEType("text/markdown"),
 	)
-	
+
 	s.AddResource(helpResource, func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 		result, err := executeShipCommand([]string{"--help"})
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Extract text from result - the result should be a simple text response
 		var helpText string
 		if result != nil {
 			helpText = result.Content[0].Text
 		}
-		
+
 		return []mcp.ResourceContents{
 			{
 				URI:      "ship://help",
@@ -278,14 +282,14 @@ func addResources(s *server.MCPServer) {
 			},
 		}, nil
 	})
-	
+
 	// Available tools resource
 	toolsResource := mcp.NewResource("ship://tools",
 		"Available Ship CLI Tools",
 		mcp.WithResourceDescription("List of all available Ship CLI tools and their capabilities"),
 		mcp.WithMIMEType("text/markdown"),
 	)
-	
+
 	s.AddResource(toolsResource, func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 		content := `# Ship CLI Tools
 
@@ -309,7 +313,7 @@ func addResources(s *server.MCPServer) {
 - ` + "`ship ai-investigate --prompt \"Show me all S3 buckets\" --execute`" + ` - Investigate S3 buckets
 - ` + "`ship push terraform.tfplan --type terraform-plan`" + ` - Upload Terraform plan for analysis
 `
-		
+
 		return []mcp.ResourceContents{
 			{
 				URI:      "ship://tools",
@@ -324,17 +328,17 @@ func addPrompts(s *server.MCPServer) {
 	// Security audit prompt
 	securityPrompt := mcp.NewPrompt("security_audit",
 		mcp.WithPromptDescription("Comprehensive security audit of cloud infrastructure"),
-		mcp.WithArgument("provider", 
+		mcp.WithArgument("provider",
 			mcp.ArgumentDescription("Cloud provider to audit (aws, azure, gcp)"),
 		),
 	)
-	
+
 	s.AddPrompt(securityPrompt, func(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		provider := "aws"
 		if p, ok := request.Params.Arguments["provider"]; ok && p != "" {
 			provider = p
 		}
-		
+
 		return &mcp.GetPromptResult{
 			Description: "Comprehensive security audit workflow",
 			Messages: []mcp.PromptMessage{
@@ -362,21 +366,21 @@ Please be thorough and provide actionable recommendations.`, provider),
 			},
 		}, nil
 	})
-	
+
 	// Cost optimization prompt
 	costPrompt := mcp.NewPrompt("cost_optimization",
 		mcp.WithPromptDescription("Identify cost optimization opportunities"),
-		mcp.WithArgument("provider", 
+		mcp.WithArgument("provider",
 			mcp.ArgumentDescription("Cloud provider to analyze (aws, azure, gcp)"),
 		),
 	)
-	
+
 	s.AddPrompt(costPrompt, func(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		provider := "aws"
 		if p, ok := request.Params.Arguments["provider"]; ok && p != "" {
 			provider = p
 		}
-		
+
 		return &mcp.GetPromptResult{
 			Description: "Cost optimization analysis workflow",
 			Messages: []mcp.PromptMessage{
@@ -413,14 +417,14 @@ func executeShipCommand(args []string) (*mcp.CallToolResult, error) {
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("failed to get executable path: %v", err)), nil
 	}
-	
+
 	// Execute the ship command
 	cmd := exec.Command(executable, args...)
 	output, err := cmd.CombinedOutput()
-	
+
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Command failed: %s\n\nOutput:\n%s", err.Error(), string(output))), nil
 	}
-	
+
 	return mcp.NewToolResultText(string(output)), nil
 }

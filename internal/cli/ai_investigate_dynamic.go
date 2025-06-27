@@ -78,25 +78,25 @@ type DynamicQueryGenerator struct {
 // GenerateQuery creates a Steampipe query from a natural language prompt
 func (g *DynamicQueryGenerator) GenerateQuery(prompt string) (string, string) {
 	lowerPrompt := strings.ToLower(prompt)
-	
+
 	// Check for security-related queries
-	if strings.Contains(lowerPrompt, "security") || strings.Contains(lowerPrompt, "vulnerable") || 
-	   strings.Contains(lowerPrompt, "public") || strings.Contains(lowerPrompt, "exposed") {
+	if strings.Contains(lowerPrompt, "security") || strings.Contains(lowerPrompt, "vulnerable") ||
+		strings.Contains(lowerPrompt, "public") || strings.Contains(lowerPrompt, "exposed") {
 		return g.generateSecurityQuery(lowerPrompt)
 	}
-	
+
 	// Check for cost-related queries
-	if strings.Contains(lowerPrompt, "cost") || strings.Contains(lowerPrompt, "expensive") || 
-	   strings.Contains(lowerPrompt, "billing") {
+	if strings.Contains(lowerPrompt, "cost") || strings.Contains(lowerPrompt, "expensive") ||
+		strings.Contains(lowerPrompt, "billing") {
 		return g.generateCostQuery(lowerPrompt)
 	}
-	
+
 	// Check for compliance queries
-	if strings.Contains(lowerPrompt, "compliance") || strings.Contains(lowerPrompt, "encrypt") || 
-	   strings.Contains(lowerPrompt, "audit") {
+	if strings.Contains(lowerPrompt, "compliance") || strings.Contains(lowerPrompt, "encrypt") ||
+		strings.Contains(lowerPrompt, "audit") {
 		return g.generateComplianceQuery(lowerPrompt)
 	}
-	
+
 	// Resource-specific queries
 	for key, template := range awsQueryTemplates {
 		keywords := g.getResourceKeywords(key)
@@ -106,7 +106,7 @@ func (g *DynamicQueryGenerator) GenerateQuery(prompt string) (string, string) {
 			}
 		}
 	}
-	
+
 	// Default to a general resource listing
 	return g.generateGeneralQuery(lowerPrompt)
 }
@@ -131,7 +131,7 @@ func (g *DynamicQueryGenerator) getResourceKeywords(resourceType string) []strin
 // generateSecurityQuery creates security-focused queries
 func (g *DynamicQueryGenerator) generateSecurityQuery(prompt string) (string, string) {
 	queries := []string{}
-	
+
 	// Public resources
 	if strings.Contains(prompt, "public") || strings.Contains(prompt, "exposed") {
 		queries = append(queries,
@@ -140,14 +140,14 @@ func (g *DynamicQueryGenerator) generateSecurityQuery(prompt string) (string, st
 			"SELECT instance_id, public_ip_address, state FROM aws_ec2_instance WHERE public_ip_address IS NOT NULL",
 		)
 	}
-	
+
 	// Security groups
 	if strings.Contains(prompt, "security") || strings.Contains(prompt, "firewall") || strings.Contains(prompt, "0.0.0.0") {
 		queries = append(queries,
 			"SELECT group_name, group_id, from_port, to_port, cidr_ip FROM aws_vpc_security_group_rule WHERE cidr_ip = '0.0.0.0/0' AND type = 'ingress'",
 		)
 	}
-	
+
 	// General security scan
 	if len(queries) == 0 {
 		queries = append(queries,
@@ -156,7 +156,7 @@ func (g *DynamicQueryGenerator) generateSecurityQuery(prompt string) (string, st
 			"SELECT volume_id, encrypted, size FROM aws_ebs_volume WHERE encrypted = false",
 		)
 	}
-	
+
 	if len(queries) > 0 {
 		return queries[0], "Security Analysis"
 	}
@@ -170,11 +170,11 @@ func (g *DynamicQueryGenerator) generateCostQuery(prompt string) (string, string
 		"SELECT volume_id, size, volume_type, state FROM aws_ebs_volume WHERE state != 'in-use' ORDER BY size DESC",
 		"SELECT db_instance_identifier, db_instance_class, engine, allocated_storage FROM aws_rds_db_instance ORDER BY allocated_storage DESC",
 	}
-	
+
 	if strings.Contains(prompt, "unused") || strings.Contains(prompt, "idle") {
 		return "SELECT volume_id, size, volume_type, state, create_time FROM aws_ebs_volume WHERE state = 'available'", "Unused Resources"
 	}
-	
+
 	return queries[0], "Cost Analysis"
 }
 
@@ -183,15 +183,15 @@ func (g *DynamicQueryGenerator) generateComplianceQuery(prompt string) (string, 
 	if strings.Contains(prompt, "encrypt") {
 		return "SELECT volume_id, encrypted, size, volume_type FROM aws_ebs_volume WHERE encrypted = false", "Encryption Compliance"
 	}
-	
+
 	if strings.Contains(prompt, "mfa") {
 		return "SELECT name, user_id, mfa_enabled, password_last_used FROM aws_iam_user WHERE mfa_enabled = false", "MFA Compliance"
 	}
-	
+
 	if strings.Contains(prompt, "logging") || strings.Contains(prompt, "audit") {
 		return "SELECT name, is_logging, is_multi_region_trail, log_file_validation_enabled FROM aws_cloudtrail_trail", "Audit Compliance"
 	}
-	
+
 	// General compliance check
 	return "SELECT name, user_id, mfa_enabled FROM aws_iam_user WHERE mfa_enabled = false", "Compliance Check"
 }
@@ -200,13 +200,13 @@ func (g *DynamicQueryGenerator) generateComplianceQuery(prompt string) (string, 
 func (g *DynamicQueryGenerator) generateResourceQuery(template QueryTemplate, prompt string) (string, string) {
 	fields := strings.Join(template.Fields, ", ")
 	query := fmt.Sprintf("SELECT %s FROM %s", fields, template.Table)
-	
+
 	// Add conditions based on prompt
 	conditions := []string{}
-	
+
 	// Filter by region if mentioned
-	if strings.Contains(prompt, "us-east-1") || strings.Contains(prompt, "us-west-2") || 
-	   strings.Contains(prompt, "eu-west-1") {
+	if strings.Contains(prompt, "us-east-1") || strings.Contains(prompt, "us-west-2") ||
+		strings.Contains(prompt, "eu-west-1") {
 		for _, region := range []string{"us-east-1", "us-west-2", "eu-west-1", "eu-central-1", "ap-southeast-1"} {
 			if strings.Contains(prompt, region) {
 				conditions = append(conditions, fmt.Sprintf("region = '%s'", region))
@@ -214,7 +214,7 @@ func (g *DynamicQueryGenerator) generateResourceQuery(template QueryTemplate, pr
 			}
 		}
 	}
-	
+
 	// Add state filters
 	if strings.Contains(prompt, "running") {
 		if strings.Contains(template.Table, "ec2") {
@@ -229,7 +229,7 @@ func (g *DynamicQueryGenerator) generateResourceQuery(template QueryTemplate, pr
 			conditions = append(conditions, "state = 'stopped'")
 		}
 	}
-	
+
 	// Add date filters
 	if strings.Contains(prompt, "recent") || strings.Contains(prompt, "new") {
 		if strings.Contains(template.Table, "s3") {
@@ -238,11 +238,11 @@ func (g *DynamicQueryGenerator) generateResourceQuery(template QueryTemplate, pr
 			conditions = append(conditions, "create_time > now() - interval '30 days'")
 		}
 	}
-	
+
 	if len(conditions) > 0 {
 		query += " WHERE " + strings.Join(conditions, " AND ")
 	}
-	
+
 	// Add sorting
 	if strings.Contains(prompt, "recent") || strings.Contains(prompt, "latest") {
 		if strings.Contains(template.Table, "s3") {
@@ -255,7 +255,7 @@ func (g *DynamicQueryGenerator) generateResourceQuery(template QueryTemplate, pr
 			query += " ORDER BY size DESC"
 		}
 	}
-	
+
 	// Add limit if requested
 	if strings.Contains(prompt, "top") || strings.Contains(prompt, "first") {
 		numbers := []string{"5", "10", "20", "50", "100"}
@@ -269,7 +269,7 @@ func (g *DynamicQueryGenerator) generateResourceQuery(template QueryTemplate, pr
 			query += " LIMIT 10"
 		}
 	}
-	
+
 	return query, template.ResourceType + " Query"
 }
 
@@ -279,7 +279,7 @@ func (g *DynamicQueryGenerator) generateGeneralQuery(prompt string) (string, str
 	queries := []string{
 		"SELECT 'EC2' as service, COUNT(*) as count FROM aws_ec2_instance UNION ALL SELECT 'S3' as service, COUNT(*) as count FROM aws_s3_bucket UNION ALL SELECT 'RDS' as service, COUNT(*) as count FROM aws_rds_db_instance",
 	}
-	
+
 	return queries[0], "Resource Overview"
 }
 
@@ -287,10 +287,10 @@ func (g *DynamicQueryGenerator) generateGeneralQuery(prompt string) (string, str
 func GenerateInvestigationPlan(ctx context.Context, prompt string, provider string) []modules.InvestigationStep {
 	generator := &DynamicQueryGenerator{Provider: provider}
 	steps := []modules.InvestigationStep{}
-	
+
 	// Analyze prompt to determine investigation type
 	lowerPrompt := strings.ToLower(prompt)
-	
+
 	// Generate primary query based on prompt
 	query1, desc1 := generator.GenerateQuery(prompt)
 	steps = append(steps, modules.InvestigationStep{
@@ -300,7 +300,7 @@ func GenerateInvestigationPlan(ctx context.Context, prompt string, provider stri
 		Query:            query1,
 		ExpectedInsights: "Primary investigation results based on your request",
 	})
-	
+
 	// Add complementary queries based on context
 	if strings.Contains(lowerPrompt, "s3") {
 		// Add S3 security check
@@ -312,7 +312,7 @@ func GenerateInvestigationPlan(ctx context.Context, prompt string, provider stri
 			ExpectedInsights: "S3 bucket security configuration",
 		})
 	}
-	
+
 	if strings.Contains(lowerPrompt, "ec2") || strings.Contains(lowerPrompt, "instance") {
 		// Add instance security check
 		steps = append(steps, modules.InvestigationStep{
@@ -323,7 +323,7 @@ func GenerateInvestigationPlan(ctx context.Context, prompt string, provider stri
 			ExpectedInsights: "Security configuration for running instances",
 		})
 	}
-	
+
 	if strings.Contains(lowerPrompt, "cost") || strings.Contains(lowerPrompt, "expensive") {
 		// Add cost optimization checks
 		steps = append(steps, modules.InvestigationStep{
@@ -334,7 +334,7 @@ func GenerateInvestigationPlan(ctx context.Context, prompt string, provider stri
 			ExpectedInsights: "Identify resources that are provisioned but not in use",
 		})
 	}
-	
+
 	// Always add a general security overview unless already focused on security
 	if !strings.Contains(lowerPrompt, "security") && len(steps) < 3 {
 		steps = append(steps, modules.InvestigationStep{
@@ -345,14 +345,14 @@ func GenerateInvestigationPlan(ctx context.Context, prompt string, provider stri
 			ExpectedInsights: "High-level security posture assessment",
 		})
 	}
-	
+
 	return steps
 }
 
 // ParseQueryResults analyzes the results and generates insights
 func ParseQueryResults(results map[string]interface{}, prompt string) string {
 	insights := []string{}
-	
+
 	// Analyze each step's results
 	for stepKey, stepResults := range results {
 		if queryResults, ok := stepResults.([]map[string]interface{}); ok && len(queryResults) > 0 {
@@ -362,11 +362,11 @@ func ParseQueryResults(results map[string]interface{}, prompt string) string {
 			}
 		}
 	}
-	
+
 	if len(insights) == 0 {
 		return "No significant findings based on the investigation."
 	}
-	
+
 	return strings.Join(insights, "\n\n")
 }
 
@@ -375,13 +375,13 @@ func analyzeStepResults(stepKey string, results []map[string]interface{}, prompt
 	if len(results) == 0 {
 		return ""
 	}
-	
+
 	// Count results
 	count := len(results)
-	
+
 	// Analyze based on content
 	insights := []string{}
-	
+
 	// Check for security issues
 	for _, result := range results {
 		if cidr, ok := result["cidr_ip"].(string); ok && cidr == "0.0.0.0/0" {
@@ -389,24 +389,24 @@ func analyzeStepResults(stepKey string, results []map[string]interface{}, prompt
 				insights = append(insights, fmt.Sprintf("⚠️  Security group '%s' allows traffic from anywhere (0.0.0.0/0)", groupName))
 			}
 		}
-		
+
 		if public, ok := result["publicly_accessible"].(bool); ok && public {
 			if identifier, ok := result["db_instance_identifier"].(string); ok {
 				insights = append(insights, fmt.Sprintf("⚠️  RDS instance '%s' is publicly accessible", identifier))
 			}
 		}
-		
+
 		if encrypted, ok := result["encrypted"].(bool); ok && !encrypted {
 			if volumeID, ok := result["volume_id"].(string); ok {
 				insights = append(insights, fmt.Sprintf("⚠️  EBS volume '%s' is not encrypted", volumeID))
 			}
 		}
 	}
-	
+
 	// General count insights
 	if count > 0 && len(insights) == 0 {
 		insights = append(insights, fmt.Sprintf("Found %d results for %s", count, stepKey))
 	}
-	
+
 	return strings.Join(insights, "\n")
 }

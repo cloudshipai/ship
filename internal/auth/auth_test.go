@@ -50,7 +50,7 @@ func TestValidateToken(t *testing.T) {
 			expectError: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test server
@@ -59,31 +59,31 @@ func TestValidateToken(t *testing.T) {
 				if r.Method != "POST" {
 					t.Errorf("Expected POST method, got %s", r.Method)
 				}
-				
+
 				// Check path
 				if r.URL.Path != "/auth/validate" {
 					t.Errorf("Expected /auth/validate path, got %s", r.URL.Path)
 				}
-				
+
 				// Check auth header
 				authHeader := r.Header.Get("Authorization")
 				expectedHeader := "Bearer " + tt.token
 				if authHeader != expectedHeader {
 					t.Errorf("Expected auth header %s, got %s", expectedHeader, authHeader)
 				}
-				
+
 				// Send response
 				w.WriteHeader(tt.responseCode)
 				json.NewEncoder(w).Encode(tt.responseBody)
 			}))
 			defer server.Close()
-			
+
 			// Create client
 			client := NewClient(server.URL)
-			
+
 			// Test validate token
 			resp, err := client.ValidateToken(tt.token)
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Error("Expected error, got none")
@@ -92,7 +92,7 @@ func TestValidateToken(t *testing.T) {
 				if err != nil {
 					t.Errorf("Unexpected error: %v", err)
 				}
-				
+
 				if resp.OrgID != tt.expectedOrgID {
 					t.Errorf("Expected org ID %s, got %s", tt.expectedOrgID, resp.OrgID)
 				}
@@ -127,7 +127,7 @@ func TestLogout(t *testing.T) {
 			expectError:  true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test server
@@ -136,12 +136,12 @@ func TestLogout(t *testing.T) {
 				if r.Method != "POST" {
 					t.Errorf("Expected POST method, got %s", r.Method)
 				}
-				
+
 				// Check path
 				if r.URL.Path != "/auth/logout" {
 					t.Errorf("Expected /auth/logout path, got %s", r.URL.Path)
 				}
-				
+
 				// Send response
 				w.WriteHeader(tt.responseCode)
 				if tt.expectError {
@@ -152,13 +152,13 @@ func TestLogout(t *testing.T) {
 				}
 			}))
 			defer server.Close()
-			
+
 			// Create client
 			client := NewClient(server.URL)
-			
+
 			// Test logout
 			err := client.Logout(tt.token)
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Error("Expected error, got none")

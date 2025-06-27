@@ -70,20 +70,20 @@ func init() {
 	// Add output file flags
 	generateDocsCmd.Flags().StringP("output", "o", "", "Output file to save documentation (default: print to stdout)")
 	generateDocsCmd.Flags().StringP("filename", "f", "README.md", "Filename to save documentation as")
-	
+
 	costAnalysisCmd.Flags().StringP("output", "o", "", "Output file to save cost analysis (default: print to stdout)")
 	costAnalysisCmd.Flags().StringP("format", "", "json", "Output format: json, table")
 	costAnalysisCmd.Flags().StringP("region", "r", "us-east-1", "AWS region for pricing (e.g., us-east-1, us-west-2)")
-	
+
 	securityScanCmd.Flags().StringP("output", "o", "", "Output file to save security scan results (default: print to stdout)")
 	securityScanCmd.Flags().StringP("format", "", "json", "Output format: json, table, sarif")
-	
+
 	lintCmd.Flags().StringP("output", "o", "", "Output file to save lint results (default: print to stdout)")
 	lintCmd.Flags().StringP("format", "", "default", "Output format: default, json, compact")
-	
+
 	checkovScanCmd.Flags().StringP("output", "o", "", "Output file to save scan results (default: print to stdout)")
 	checkovScanCmd.Flags().StringP("format", "", "cli", "Output format: cli, json, junit, sarif")
-	
+
 	infracostCmd.Flags().StringP("output", "o", "", "Output file to save cost estimation (default: print to stdout)")
 	infracostCmd.Flags().StringP("format", "", "table", "Output format: json, table, html")
 }
@@ -97,13 +97,13 @@ func saveOrPrintOutput(output, outputFile string, successMsg string) error {
 				return fmt.Errorf("failed to create output directory: %w", err)
 			}
 		}
-		
+
 		// Write to file
 		err := os.WriteFile(outputFile, []byte(output), 0644)
 		if err != nil {
 			return fmt.Errorf("failed to write output file: %w", err)
 		}
-		
+
 		green := color.New(color.FgGreen)
 		green.Printf("✓ %s\n", successMsg)
 		fmt.Printf("Output saved to: %s\n", outputFile)
@@ -164,7 +164,7 @@ func runCostAnalysis(cmd *cobra.Command, args []string) error {
 
 	// Get output flag
 	outputFile, _ := cmd.Flags().GetString("output")
-	
+
 	// Save or print output
 	return saveOrPrintOutput(output, outputFile, "Cost analysis completed!")
 }
@@ -202,7 +202,7 @@ func runSecurityScan(cmd *cobra.Command, args []string) error {
 
 	// Get output flag
 	outputFile, _ := cmd.Flags().GetString("output")
-	
+
 	// Save or print output
 	return saveOrPrintOutput(output, outputFile, "Security scan completed!")
 }
@@ -287,7 +287,7 @@ func runLint(cmd *cobra.Command, args []string) error {
 
 	// Get output flag
 	outputFile, _ := cmd.Flags().GetString("output")
-	
+
 	// Save or print output
 	return saveOrPrintOutput(output, outputFile, "Linting completed!")
 }
@@ -325,7 +325,7 @@ func runCheckovScan(cmd *cobra.Command, args []string) error {
 
 	// Get output flag
 	outputFile, _ := cmd.Flags().GetString("output")
-	
+
 	// Save or print output
 	return saveOrPrintOutput(output, outputFile, "Checkov scan completed!")
 }
@@ -368,7 +368,7 @@ func runInfracost(cmd *cobra.Command, args []string) error {
 
 	// Get output flag
 	outputFile, _ := cmd.Flags().GetString("output")
-	
+
 	// Save or print output
 	return saveOrPrintOutput(output, outputFile, "Cost estimation completed!")
 }

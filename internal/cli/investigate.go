@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	investigateEnv       string
-	investigateProvider  string
-	investigateAI        bool
+	investigateEnv      string
+	investigateProvider string
+	investigateAI       bool
 )
 
 var investigateCmd = &cobra.Command{
@@ -25,11 +25,11 @@ var investigateCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(investigateCmd)
-	
+
 	investigateCmd.Flags().StringVar(&investigateEnv, "env", "prod", "Environment to investigate")
 	investigateCmd.Flags().StringVar(&investigateProvider, "provider", "", "Cloud provider (aws, cloudflare, heroku)")
 	investigateCmd.Flags().BoolVar(&investigateAI, "ai", false, "Use AI for goal mapping")
-	
+
 	investigateCmd.MarkFlagRequired("provider")
 }
 
@@ -37,7 +37,7 @@ func runInvestigate(cmd *cobra.Command, args []string) error {
 	// Create context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
-	
+
 	// Initialize Dagger engine
 	fmt.Println("Initializing Dagger engine...")
 	engine, err := dagger.NewEngine(ctx)
@@ -45,18 +45,18 @@ func runInvestigate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to initialize dagger: %w", err)
 	}
 	defer engine.Close()
-	
+
 	// Create pipeline
 	pipeline := dagger.NewPipeline(engine, fmt.Sprintf("investigate-%s", investigateProvider))
-	
+
 	// For now, use hardcoded queries
 	// In production, these would come from the goals API
 	queries := getDefaultQueries(investigateProvider)
-	
+
 	fmt.Printf("Running %s investigation...\n", investigateProvider)
-	
+
 	var results map[string]string
-	
+
 	switch investigateProvider {
 	case "aws":
 		results, err = pipeline.InvestigateAWS(queries)
@@ -67,15 +67,15 @@ func runInvestigate(cmd *cobra.Command, args []string) error {
 	default:
 		return fmt.Errorf("unsupported provider: %s", investigateProvider)
 	}
-	
+
 	if err != nil {
 		return fmt.Errorf("investigation failed: %w", err)
 	}
-	
+
 	// Display results
 	green := color.New(color.FgGreen)
 	green.Printf("\n✓ Investigation completed!\n\n")
-	
+
 	fmt.Printf("Results:\n")
 	for queryID, result := range results {
 		fmt.Printf("\n=== %s ===\n", queryID)
@@ -85,12 +85,12 @@ func runInvestigate(cmd *cobra.Command, args []string) error {
 			fmt.Println(result)
 		}
 	}
-	
+
 	fmt.Printf("\nNext steps:\n")
 	fmt.Println("1. Results will be automatically pushed to Cloudship")
 	fmt.Println("2. Check the Cloudship UI for detailed analysis")
 	fmt.Println("3. Review cost optimization and security recommendations")
-	
+
 	return nil
 }
 

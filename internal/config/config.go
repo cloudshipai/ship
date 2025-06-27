@@ -37,7 +37,7 @@ func init() {
 	if err != nil {
 		panic(fmt.Errorf("failed to get home directory: %w", err))
 	}
-	
+
 	configDir = filepath.Join(homeDir, ".ship")
 	configPath = filepath.Join(configDir, "config.yaml")
 }
@@ -64,11 +64,11 @@ func Load() (*Config, error) {
 	v.SetConfigName(configFileName)
 	v.SetConfigType(configFileType)
 	v.AddConfigPath(configDir)
-	
+
 	// Set defaults
 	v.SetDefault("base_url", defaultBaseURL)
 	v.SetDefault("telemetry.enabled", false)
-	
+
 	// Read config file
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
@@ -79,12 +79,12 @@ func Load() (*Config, error) {
 		}
 		return nil, fmt.Errorf("failed to read config: %w", err)
 	}
-	
+
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
-	
+
 	return &cfg, nil
 }
 
@@ -93,11 +93,11 @@ func Save(cfg *Config) error {
 	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
-	
+
 	// Create a new viper instance for saving
 	v := viper.New()
 	v.SetConfigType(configFileType)
-	
+
 	// Set all config values
 	v.Set("token", cfg.Token)
 	v.Set("org_id", cfg.OrgID)
@@ -105,17 +105,17 @@ func Save(cfg *Config) error {
 	v.Set("base_url", cfg.BaseURL)
 	v.Set("telemetry.enabled", cfg.Telemetry.Enabled)
 	v.Set("telemetry.session_id", cfg.Telemetry.SessionID)
-	
+
 	// Write config file
 	if err := v.WriteConfigAs(configPath); err != nil {
 		return fmt.Errorf("failed to write config: %w", err)
 	}
-	
+
 	// Set secure permissions (owner read/write only)
 	if err := os.Chmod(configPath, 0600); err != nil {
 		return fmt.Errorf("failed to set config permissions: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -123,13 +123,13 @@ func Clear() error {
 	if err := os.Remove(configPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove config file: %w", err)
 	}
-	
+
 	// Also remove cache directory if it exists
 	cacheDir := filepath.Join(configDir, "cache")
 	if err := os.RemoveAll(cacheDir); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove cache directory: %w", err)
 	}
-	
+
 	return nil
 }
 

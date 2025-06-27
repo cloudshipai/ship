@@ -2,9 +2,6 @@ run:
   timeout: 5m
   issues-exit-code: 1
   tests: true
-  skip-dirs:
-    - vendor
-    - test/mocks
 
 linters:
   enable:
@@ -24,3 +21,6 @@ issues:
   max-issues-per-linter: 0
   max-same-issues: 0
   exclude-use-default: false
+  exclude-dirs:
+    - vendor
+    - test/mocks

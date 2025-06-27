@@ -56,11 +56,11 @@ func runSteampipeSimpleTest(cmd *cobra.Command, args []string) error {
 	awsKeyId := os.Getenv("AWS_ACCESS_KEY_ID")
 	awsProfile := os.Getenv("AWS_PROFILE")
 	awsConfigFile := os.Getenv("AWS_CONFIG_FILE")
-	
+
 	fmt.Printf("AWS_ACCESS_KEY_ID set: %v\n", awsKeyId != "")
 	fmt.Printf("AWS_PROFILE set: %v (value: %s)\n", awsProfile != "", awsProfile)
 	fmt.Printf("AWS_CONFIG_FILE set: %v (value: %s)\n", awsConfigFile != "", awsConfigFile)
-	
+
 	if stat, err := os.Stat(os.ExpandEnv("$HOME/.aws/config")); err == nil {
 		fmt.Printf("~/.aws/config exists: Yes (size: %d bytes)\n", stat.Size())
 	} else {
@@ -75,7 +75,7 @@ func runSteampipeSimpleTest(cmd *cobra.Command, args []string) error {
 
 	// Test 4: Try AWS query with explicit credentials
 	fmt.Println("\n4. Testing AWS query with mounted credentials...")
-	
+
 	// Read AWS credentials file to check format
 	credsFile := os.ExpandEnv("$HOME/.aws/credentials")
 	if data, err := os.ReadFile(credsFile); err == nil {

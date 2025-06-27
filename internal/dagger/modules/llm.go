@@ -163,7 +163,7 @@ Focus on security, compliance, cost, and performance aspects.
 func (m *LLMModule) runPrompt(ctx context.Context, prompt string) (string, error) {
 	// This is a simplified implementation
 	// In production, this would use Dagger's LLM primitive
-	
+
 	container := m.client.Container()
 
 	switch m.provider {

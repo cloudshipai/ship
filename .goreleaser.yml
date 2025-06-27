@@ -76,7 +76,7 @@ changelog:
 
 release:
   github:
-    owner: cloudship
+    owner: cloudshipai
     name: ship
   draft: false
   prerelease: auto
@@ -90,24 +90,24 @@ release:
     
     ```bash
     # One-liner install (Linux/macOS)
-    wget -qO- https://github.com/cloudship/ship/releases/download/{{ .Tag }}/ship_$(uname -s)_$(uname -m).tar.gz | tar xz && sudo mv ship /usr/local/bin/
+    wget -qO- https://github.com/cloudshipai/ship/releases/download/{{ .Tag }}/ship_$(uname -s)_$(uname -m).tar.gz | tar xz && sudo mv ship /usr/local/bin/
     
     # Or with curl
-    curl -sSL https://github.com/cloudship/ship/releases/download/{{ .Tag }}/ship_$(uname -s)_$(uname -m).tar.gz | tar xz && sudo mv ship /usr/local/bin/
+    curl -sSL https://github.com/cloudshipai/ship/releases/download/{{ .Tag }}/ship_$(uname -s)_$(uname -m).tar.gz | tar xz && sudo mv ship /usr/local/bin/
     
     # Verify installation
     ship version
     ```
     
-    **Full Documentation**: https://github.com/cloudship/ship#readme
+    **Full Documentation**: https://github.com/cloudshipai/ship#readme
 
 brews:
   - repository:
-      owner: cloudship
+      owner: cloudshipai
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     directory: Formula
-    homepage: https://github.com/cloudship/ship
+    homepage: https://github.com/cloudshipai/ship
     description: "CloudshipAI CLI - Infrastructure analysis tools"
     license: "Apache-2.0"
     test: |
@@ -120,7 +120,7 @@ nfpms:
   - id: packages
     package_name: ship
     vendor: CloudshipAI
-    homepage: https://github.com/cloudship/ship
+    homepage: https://github.com/cloudshipai/ship
     maintainer: Esteban Puerta <epuer94@gmail.com>
     description: CloudshipAI CLI - Infrastructure analysis tools
     license: Apache-2.0
@@ -135,10 +135,10 @@ nfpms:
 
 dockers:
   - image_templates:
-      - "cloudship/ship:{{ .Tag }}"
-      - "cloudship/ship:v{{ .Major }}"
-      - "cloudship/ship:v{{ .Major }}.{{ .Minor }}"
-      - "cloudship/ship:latest"
+      - "cloudshipai/ship:{{ .Tag }}"
+      - "cloudshipai/ship:v{{ .Major }}"
+      - "cloudshipai/ship:v{{ .Major }}.{{ .Minor }}"
+      - "cloudshipai/ship:latest"
     dockerfile: Dockerfile.goreleaser
     use: buildx
     goos: linux

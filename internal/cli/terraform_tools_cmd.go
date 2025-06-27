@@ -73,6 +73,7 @@ func init() {
 	
 	costAnalysisCmd.Flags().StringP("output", "o", "", "Output file to save cost analysis (default: print to stdout)")
 	costAnalysisCmd.Flags().StringP("format", "", "json", "Output format: json, table")
+	costAnalysisCmd.Flags().StringP("region", "r", "us-east-1", "AWS region for pricing (e.g., us-east-1, us-west-2)")
 	
 	securityScanCmd.Flags().StringP("output", "o", "", "Output file to save security scan results (default: print to stdout)")
 	securityScanCmd.Flags().StringP("format", "", "json", "Output format: json, table, sarif")
@@ -140,16 +141,21 @@ func runCostAnalysis(cmd *cobra.Command, args []string) error {
 	// Create OpenInfraQuote module
 	module := engine.NewOpenInfraQuoteModule()
 
+	// Get region flag
+	region, _ := cmd.Flags().GetString("region")
+
 	// Check if it's a file or directory
 	fileInfo, _ := os.Stat(path)
 	var output string
 
 	if fileInfo.IsDir() {
 		fmt.Printf("Analyzing Terraform directory: %s\n", path)
-		output, err = module.AnalyzeDirectory(ctx, path)
+		fmt.Printf("Using AWS region: %s\n", region)
+		output, err = module.AnalyzeDirectory(ctx, path, region)
 	} else {
 		fmt.Printf("Analyzing Terraform plan file: %s\n", path)
-		output, err = module.AnalyzePlan(ctx, path)
+		fmt.Printf("Using AWS region: %s\n", region)
+		output, err = module.AnalyzePlan(ctx, path, region)
 	}
 
 	if err != nil {

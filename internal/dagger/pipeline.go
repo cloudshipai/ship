@@ -27,7 +27,7 @@ func (p *Pipeline) InvestigateAWS(queries []string) (map[string]string, error) {
 
 	// Create a container with AWS CLI and Steampipe
 	container := client.Container().
-		From("public.ecr.aws/steampipe/steampipe:latest").
+		From("turbot/steampipe:latest").
 		WithExec([]string{"steampipe", "plugin", "install", "aws"})
 
 	// Mount AWS credentials from host
@@ -62,7 +62,7 @@ func (p *Pipeline) InvestigateCloudflare(queries []string) (map[string]string, e
 
 	// Create a container with Cloudflare CLI and Steampipe
 	container := client.Container().
-		From("public.ecr.aws/steampipe/steampipe:latest").
+		From("turbot/steampipe:latest").
 		WithExec([]string{"steampipe", "plugin", "install", "cloudflare"})
 
 	// Set Cloudflare API token if available
@@ -95,7 +95,7 @@ func (p *Pipeline) InvestigateHeroku(queries []string) (map[string]string, error
 
 	// Create a container with Heroku CLI and Steampipe
 	container := client.Container().
-		From("public.ecr.aws/steampipe/steampipe:latest").
+		From("turbot/steampipe:latest").
 		WithExec([]string{"steampipe", "plugin", "install", "heroku"})
 
 	// Set Heroku API key if available

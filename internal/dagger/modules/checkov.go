@@ -33,14 +33,21 @@ func (m *CheckovModule) ScanDirectory(ctx context.Context, dir string) (string, 
 			"--directory", ".",
 			"--output", "json",
 			"--framework", "terraform",
+		}, dagger.ContainerWithExecOpts{
+			// Checkov returns non-zero exit code when it finds issues, which is expected
+			Expect: "ANY",
 		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to run checkov: %w", err)
+	// Always get the output, even if checkov "failed" (found issues)
+	output, _ := container.Stdout(ctx)
+	
+	// If we got output, it's a success (checkov ran and produced results)
+	if output != "" {
+		return output, nil
 	}
-
-	return output, nil
+	
+	// Only return error if we got no output at all
+	return "", fmt.Errorf("failed to run checkov: no output received")
 }
 
 // ScanFile scans a specific file for security issues
@@ -57,14 +64,21 @@ func (m *CheckovModule) ScanFile(ctx context.Context, filePath string) (string, 
 			"--file", filename,
 			"--output", "json",
 			"--framework", "terraform",
+		}, dagger.ContainerWithExecOpts{
+			// Checkov returns non-zero exit code when it finds issues, which is expected
+			Expect: "ANY",
 		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to run checkov on file: %w", err)
+	// Always get the output, even if checkov "failed" (found issues)
+	output, _ := container.Stdout(ctx)
+	
+	// If we got output, it's a success (checkov ran and produced results)
+	if output != "" {
+		return output, nil
 	}
-
-	return output, nil
+	
+	// Only return error if we got no output at all
+	return "", fmt.Errorf("failed to run checkov on file: no output received")
 }
 
 // ScanWithPolicy scans using custom policies

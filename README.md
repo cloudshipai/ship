@@ -8,6 +8,8 @@ CloudshipAI CLI - A powerful command-line tool that brings enterprise-grade infr
 - **🛡️ Security Scanning**: Multi-cloud security analysis with Checkov and Trivy
 - **💰 Cost Estimation**: Estimate infrastructure costs with Infracost and OpenInfraQuote
 - **📝 Documentation Generation**: Auto-generate beautiful Terraform module documentation
+- **🧠 AI-Powered Infrastructure Investigation**: Query your cloud infrastructure using natural language
+- **🔎 Real-time Cloud Analysis**: Investigate live AWS, Azure, and GCP resources with Steampipe
 - **🐳 Containerized Tools**: All tools run in containers via Dagger - no local installations needed
 - **☁️ Cloud Integration**: Seamlessly works with AWS, Azure, GCP, and other cloud providers
 - **🔧 CI/CD Ready**: Perfect for integration into your existing pipelines
@@ -95,7 +97,40 @@ ship terraform-tools cost-estimate
 ship terraform-tools generate-docs > README.md
 ```
 
-### 3. CI/CD Integration
+### 3. AI-Powered Infrastructure Investigation
+
+Query your live cloud infrastructure using natural language with Steampipe-powered analysis:
+
+```bash
+# Configure AWS credentials (Ship CLI will use your existing AWS config)
+export AWS_PROFILE=your-profile  # or use default
+
+# Ask questions about your infrastructure in natural language
+ship ai-investigate --prompt "Show me all my S3 buckets with their creation dates and regions" --execute
+
+ship ai-investigate --prompt "Check for security issues in my AWS account" --execute
+
+ship ai-investigate --prompt "List all running EC2 instances with their IP addresses" --execute
+
+ship ai-investigate --prompt "Show me any unused or idle resources that might be costing money" --execute
+
+ship ai-investigate --prompt "Find all publicly accessible RDS instances" --execute
+```
+
+#### How it works:
+1. **Natural Language Processing**: Ship analyzes your prompt to understand what you're looking for
+2. **Dynamic Query Generation**: Automatically generates appropriate Steampipe SQL queries
+3. **Multi-Step Investigation**: Creates comprehensive investigation plans with multiple related queries
+4. **Real-Time Analysis**: Executes queries against your live cloud infrastructure
+5. **Intelligent Insights**: Provides security findings, cost optimization tips, and actionable recommendations
+
+#### Supported Prompts:
+- **Security Analysis**: "Check for security vulnerabilities", "Find open security groups", "Show unencrypted resources"
+- **Cost Optimization**: "Find unused resources", "Show expensive instances", "Identify idle resources"
+- **Resource Inventory**: "List all S3 buckets", "Show running instances", "Find RDS databases"
+- **Compliance Checks**: "Check encryption status", "Verify MFA settings", "Audit logging configuration"
+
+### 4. CI/CD Integration
 
 ```yaml
 # GitHub Actions Example
@@ -127,6 +162,7 @@ jobs:
 
 | Tool | Command | Description | Docker Image |
 |------|---------|-------------|--------------|
+| **Steampipe + AI** | `ship ai-investigate` | AI-powered cloud infrastructure investigation | `turbot/steampipe:latest` |
 | **TFLint** | `ship terraform-tools lint` | Terraform linter for syntax and best practices | `ghcr.io/terraform-linters/tflint` |
 | **Checkov** | `ship terraform-tools checkov-scan` | Comprehensive security and compliance scanner | `bridgecrew/checkov` |
 | **Infracost** | `ship terraform-tools cost-estimate` | Cloud cost estimation with breakdown | `infracost/infracost` |
@@ -182,6 +218,30 @@ ship terraform-tools generate-docs --format json
 
 # Include examples in docs
 ship terraform-tools generate-docs --show-examples
+```
+
+### AI Infrastructure Investigation
+```bash
+# Basic investigation with natural language
+ship ai-investigate --prompt "Show me my S3 buckets"
+
+# Execute the generated queries (add --execute to run)
+ship ai-investigate --prompt "Check for security issues" --execute
+
+# Use specific cloud provider
+ship ai-investigate --prompt "List running instances" --provider aws --execute
+
+# Use specific AWS profile and region
+ship ai-investigate --prompt "Find unused EBS volumes" --aws-profile production --aws-region us-west-2 --execute
+
+# Cost analysis investigation
+ship ai-investigate --prompt "Show me expensive resources that might be optimized" --execute
+
+# Security-focused investigation
+ship ai-investigate --prompt "Find all publicly accessible resources" --execute
+
+# Compliance investigation
+ship ai-investigate --prompt "Check encryption status across all resources" --execute
 ```
 
 ## 🔐 Authentication

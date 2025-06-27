@@ -1,0 +1,4530 @@
+{
+    "check_type": "terraform",
+    "results": {
+        "passed_checks": [
+            {
+                "check_id": "CKV_AWS_25",
+                "bc_check_id": "BC_AWS_NETWORKING_2",
+                "check_name": "Ensure no security groups allow ingress from 0.0.0.0:0 to port 3389",
+                "check_result": {
+                    "result": "PASSED",
+                    "evaluated_keys": []
+                },
+                "code_block": [
+                    [
+                        69,
+                        "resource \"aws_security_group\" \"web\" {\n"
+                    ],
+                    [
+                        70,
+                        "  name_prefix = \"${var.environment}-web-\"\n"
+                    ],
+                    [
+                        71,
+                        "  vpc_id      = aws_vpc.main.id\n"
+                    ],
+                    [
+                        72,
+                        "\n"
+                    ],
+                    [
+                        73,
+                        "  ingress {\n"
+                    ],
+                    [
+                        74,
+                        "    from_port   = 80\n"
+                    ],
+                    [
+                        75,
+                        "    to_port     = 80\n"
+                    ],
+                    [
+                        76,
+                        "    protocol    = \"tcp\"\n"
+                    ],
+                    [
+                        77,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]\n"
+                    ],
+                    [
+                        78,
+                        "  }\n"
+                    ],
+                    [
+                        79,
+                        "\n"
+                    ],
+                    [
+                        80,
+                        "  ingress {\n"
+                    ],
+                    [
+                        81,
+                        "    from_port   = 443\n"
+                    ],
+                    [
+                        82,
+                        "    to_port     = 443\n"
+                    ],
+                    [
+                        83,
+                        "    protocol    = \"tcp\"\n"
+                    ],
+                    [
+                        84,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]\n"
+                    ],
+                    [
+                        85,
+                        "  }\n"
+                    ],
+                    [
+                        86,
+                        "\n"
+                    ],
+                    [
+                        87,
+                        "  ingress {\n"
+                    ],
+                    [
+                        88,
+                        "    from_port   = 22\n"
+                    ],
+                    [
+                        89,
+                        "    to_port     = 22\n"
+                    ],
+                    [
+                        90,
+                        "    protocol    = \"tcp\"\n"
+                    ],
+                    [
+                        91,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]  # Security issue: too permissive\n"
+                    ],
+                    [
+                        92,
+                        "  }\n"
+                    ],
+                    [
+                        93,
+                        "\n"
+                    ],
+                    [
+                        94,
+                        "  egress {\n"
+                    ],
+                    [
+                        95,
+                        "    from_port   = 0\n"
+                    ],
+                    [
+                        96,
+                        "    to_port     = 0\n"
+                    ],
+                    [
+                        97,
+                        "    protocol    = \"-1\"\n"
+                    ],
+                    [
+                        98,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]\n"
+                    ],
+                    [
+                        99,
+                        "  }\n"
+                    ],
+                    [
+                        100,
+                        "\n"
+                    ],
+                    [
+                        101,
+                        "  tags = {\n"
+                    ],
+                    [
+                        102,
+                        "    Name        = \"${var.environment}-web-sg\"\n"
+                    ],
+                    [
+                        103,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        104,
+                        "  }\n"
+                    ],
+                    [
+                        105,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    69,
+                    105
+                ],
+                "resource": "aws_security_group.web",
+                "evaluations": null,
+                "check_class": "checkov.terraform.checks.resource.aws.SecurityGroupUnrestrictedIngress3389",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-web-sg"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-networking-policies/networking-2",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "name_prefix": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV_AWS_277",
+                "bc_check_id": "BC_AWS_NETWORKING_78",
+                "check_name": "Ensure no security groups allow ingress from 0.0.0.0:0 to port -1",
+                "check_result": {
+                    "result": "PASSED",
+                    "evaluated_keys": []
+                },
+                "code_block": [
+                    [
+                        69,
+                        "resource \"aws_security_group\" \"web\" {\n"
+                    ],
+                    [
+                        70,
+                        "  name_prefix = \"${var.environment}-web-\"\n"
+                    ],
+                    [
+                        71,
+                        "  vpc_id      = aws_vpc.main.id\n"
+                    ],
+                    [
+                        72,
+                        "\n"
+                    ],
+                    [
+                        73,
+                        "  ingress {\n"
+                    ],
+                    [
+                        74,
+                        "    from_port   = 80\n"
+                    ],
+                    [
+                        75,
+                        "    to_port     = 80\n"
+                    ],
+                    [
+                        76,
+                        "    protocol    = \"tcp\"\n"
+                    ],
+                    [
+                        77,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]\n"
+                    ],
+                    [
+                        78,
+                        "  }\n"
+                    ],
+                    [
+                        79,
+                        "\n"
+                    ],
+                    [
+                        80,
+                        "  ingress {\n"
+                    ],
+                    [
+                        81,
+                        "    from_port   = 443\n"
+                    ],
+                    [
+                        82,
+                        "    to_port     = 443\n"
+                    ],
+                    [
+                        83,
+                        "    protocol    = \"tcp\"\n"
+                    ],
+                    [
+                        84,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]\n"
+                    ],
+                    [
+                        85,
+                        "  }\n"
+                    ],
+                    [
+                        86,
+                        "\n"
+                    ],
+                    [
+                        87,
+                        "  ingress {\n"
+                    ],
+                    [
+                        88,
+                        "    from_port   = 22\n"
+                    ],
+                    [
+                        89,
+                        "    to_port     = 22\n"
+                    ],
+                    [
+                        90,
+                        "    protocol    = \"tcp\"\n"
+                    ],
+                    [
+                        91,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]  # Security issue: too permissive\n"
+                    ],
+                    [
+                        92,
+                        "  }\n"
+                    ],
+                    [
+                        93,
+                        "\n"
+                    ],
+                    [
+                        94,
+                        "  egress {\n"
+                    ],
+                    [
+                        95,
+                        "    from_port   = 0\n"
+                    ],
+                    [
+                        96,
+                        "    to_port     = 0\n"
+                    ],
+                    [
+                        97,
+                        "    protocol    = \"-1\"\n"
+                    ],
+                    [
+                        98,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]\n"
+                    ],
+                    [
+                        99,
+                        "  }\n"
+                    ],
+                    [
+                        100,
+                        "\n"
+                    ],
+                    [
+                        101,
+                        "  tags = {\n"
+                    ],
+                    [
+                        102,
+                        "    Name        = \"${var.environment}-web-sg\"\n"
+                    ],
+                    [
+                        103,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        104,
+                        "  }\n"
+                    ],
+                    [
+                        105,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    69,
+                    105
+                ],
+                "resource": "aws_security_group.web",
+                "evaluations": null,
+                "check_class": "checkov.terraform.checks.resource.aws.SecurityGroupUnrestrictedIngressAny",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-web-sg"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-networking-policies/ensure-aws-security-group-does-not-allow-all-traffic-on-all-ports",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "name_prefix": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV_AWS_88",
+                "bc_check_id": "BC_AWS_PUBLIC_12",
+                "check_name": "EC2 instance should not have public IP.",
+                "check_result": {
+                    "result": "PASSED",
+                    "evaluated_keys": [
+                        "associate_public_ip_address"
+                    ]
+                },
+                "code_block": [
+                    [
+                        108,
+                        "resource \"aws_instance\" \"web\" {\n"
+                    ],
+                    [
+                        109,
+                        "  ami                    = \"ami-0c55b159cbfafe1d0\"\n"
+                    ],
+                    [
+                        110,
+                        "  instance_type          = var.instance_type\n"
+                    ],
+                    [
+                        111,
+                        "  subnet_id              = aws_subnet.public.id\n"
+                    ],
+                    [
+                        112,
+                        "  vpc_security_group_ids = [aws_security_group.web.id]\n"
+                    ],
+                    [
+                        113,
+                        "\n"
+                    ],
+                    [
+                        114,
+                        "  # Missing metadata_options for IMDS v2 (security issue)\n"
+                    ],
+                    [
+                        115,
+                        "  \n"
+                    ],
+                    [
+                        116,
+                        "  tags = {\n"
+                    ],
+                    [
+                        117,
+                        "    Name        = \"${var.environment}-web-server\"\n"
+                    ],
+                    [
+                        118,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        119,
+                        "  }\n"
+                    ],
+                    [
+                        120,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    108,
+                    120
+                ],
+                "resource": "aws_instance.web",
+                "evaluations": null,
+                "check_class": "checkov.terraform.checks.resource.aws.EC2PublicIP",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-web-server"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/public-policies/public-12",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "instance_type": [
+                        {
+                            "type": "variable",
+                            "name": "instance_type",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV_AWS_46",
+                "bc_check_id": "BC_AWS_SECRETS_1",
+                "check_name": "Ensure no hard-coded secrets exist in EC2 user data",
+                "check_result": {
+                    "result": "PASSED",
+                    "evaluated_keys": [
+                        "user_data"
+                    ]
+                },
+                "code_block": [
+                    [
+                        108,
+                        "resource \"aws_instance\" \"web\" {\n"
+                    ],
+                    [
+                        109,
+                        "  ami                    = \"ami-0c55b159cbfafe1d0\"\n"
+                    ],
+                    [
+                        110,
+                        "  instance_type          = var.instance_type\n"
+                    ],
+                    [
+                        111,
+                        "  subnet_id              = aws_subnet.public.id\n"
+                    ],
+                    [
+                        112,
+                        "  vpc_security_group_ids = [aws_security_group.web.id]\n"
+                    ],
+                    [
+                        113,
+                        "\n"
+                    ],
+                    [
+                        114,
+                        "  # Missing metadata_options for IMDS v2 (security issue)\n"
+                    ],
+                    [
+                        115,
+                        "  \n"
+                    ],
+                    [
+                        116,
+                        "  tags = {\n"
+                    ],
+                    [
+                        117,
+                        "    Name        = \"${var.environment}-web-server\"\n"
+                    ],
+                    [
+                        118,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        119,
+                        "  }\n"
+                    ],
+                    [
+                        120,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    108,
+                    120
+                ],
+                "resource": "aws_instance.web",
+                "evaluations": null,
+                "check_class": "checkov.terraform.checks.resource.aws.EC2Credentials",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-web-server"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/secrets-policies/bc-aws-secrets-1",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "instance_type": [
+                        {
+                            "type": "variable",
+                            "name": "instance_type",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV_AWS_93",
+                "bc_check_id": "BC_AWS_S3_24",
+                "check_name": "Ensure S3 bucket policy does not lockout all but root user. (Prevent lockouts needing root account fixes)",
+                "check_result": {
+                    "result": "PASSED",
+                    "evaluated_keys": [
+                        "policy"
+                    ]
+                },
+                "code_block": [
+                    [
+                        123,
+                        "resource \"aws_s3_bucket\" \"data\" {\n"
+                    ],
+                    [
+                        124,
+                        "  bucket = \"${var.environment}-data-bucket-${random_id.bucket_suffix.hex}\"\n"
+                    ],
+                    [
+                        125,
+                        "\n"
+                    ],
+                    [
+                        126,
+                        "  tags = {\n"
+                    ],
+                    [
+                        127,
+                        "    Name        = \"${var.environment}-data-bucket\"\n"
+                    ],
+                    [
+                        128,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        129,
+                        "  }\n"
+                    ],
+                    [
+                        130,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    123,
+                    130
+                ],
+                "resource": "aws_s3_bucket.data",
+                "evaluations": null,
+                "check_class": "checkov.terraform.checks.resource.aws.S3ProtectAgainstPolicyLockout",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-data-bucket"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/s3-policies/bc-aws-s3-24",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "bucket": [
+                        {
+                            "type": "resource",
+                            "name": "random_id.bucket_suffix",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV_AWS_41",
+                "bc_check_id": "BC_AWS_SECRETS_5",
+                "check_name": "Ensure no hard coded AWS access key and secret key exists in provider",
+                "check_result": {
+                    "result": "PASSED",
+                    "evaluated_keys": []
+                },
+                "code_block": [
+                    [
+                        11,
+                        "provider \"aws\" {\n"
+                    ],
+                    [
+                        12,
+                        "  region = var.region\n"
+                    ],
+                    [
+                        13,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    11,
+                    13
+                ],
+                "resource": "aws.default",
+                "evaluations": null,
+                "check_class": "checkov.terraform.checks.provider.aws.credentials",
+                "fixed_definition": null,
+                "entity_tags": null,
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/secrets-policies/bc-aws-secrets-5",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "region": [
+                        {
+                            "type": "variable",
+                            "name": "region",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV_AWS_19",
+                "bc_check_id": "BC_AWS_S3_14",
+                "check_name": "Ensure all data stored in the S3 bucket is securely encrypted at rest",
+                "check_result": {
+                    "result": "PASSED",
+                    "entity": {
+                        "aws_s3_bucket": {
+                            "data": {
+                                "__end_line__": 130,
+                                "__start_line__": 123,
+                                "bucket": [
+                                    "dev-data-bucket-${random_id.bucket_suffix.hex}"
+                                ],
+                                "tags": [
+                                    {
+                                        "Environment": "dev",
+                                        "Name": "dev-data-bucket"
+                                    }
+                                ],
+                                "__address__": "aws_s3_bucket.data",
+                                "__provider_address__": "aws.default"
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "server_side_encryption_configuration/rule/apply_server_side_encryption_by_default/sse_algorithm",
+                        "rule/apply_server_side_encryption_by_default/sse_algorithm",
+                        "resource_type"
+                    ]
+                },
+                "code_block": [
+                    [
+                        123,
+                        "resource \"aws_s3_bucket\" \"data\" {\n"
+                    ],
+                    [
+                        124,
+                        "  bucket = \"${var.environment}-data-bucket-${random_id.bucket_suffix.hex}\"\n"
+                    ],
+                    [
+                        125,
+                        "\n"
+                    ],
+                    [
+                        126,
+                        "  tags = {\n"
+                    ],
+                    [
+                        127,
+                        "    Name        = \"${var.environment}-data-bucket\"\n"
+                    ],
+                    [
+                        128,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        129,
+                        "  }\n"
+                    ],
+                    [
+                        130,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    123,
+                    130
+                ],
+                "resource": "aws_s3_bucket.data",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-data-bucket"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/s3-policies/s3-14-data-encrypted-at-rest",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "bucket": [
+                        {
+                            "type": "resource",
+                            "name": "random_id.bucket_suffix",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV2_AWS_5",
+                "bc_check_id": "BC_AWS_NETWORKING_51",
+                "check_name": "Ensure that Security Groups are attached to another resource",
+                "check_result": {
+                    "result": "PASSED",
+                    "entity": {
+                        "aws_security_group": {
+                            "web": {
+                                "__end_line__": 105,
+                                "__start_line__": 69,
+                                "egress": [
+                                    {
+                                        "cidr_blocks": [
+                                            [
+                                                "0.0.0.0/0"
+                                            ]
+                                        ],
+                                        "from_port": [
+                                            0
+                                        ],
+                                        "protocol": [
+                                            "-1"
+                                        ],
+                                        "to_port": [
+                                            0
+                                        ]
+                                    }
+                                ],
+                                "ingress": [
+                                    {
+                                        "cidr_blocks": [
+                                            [
+                                                "0.0.0.0/0"
+                                            ]
+                                        ],
+                                        "from_port": [
+                                            80
+                                        ],
+                                        "protocol": [
+                                            "tcp"
+                                        ],
+                                        "to_port": [
+                                            80
+                                        ]
+                                    },
+                                    {
+                                        "cidr_blocks": [
+                                            [
+                                                "0.0.0.0/0"
+                                            ]
+                                        ],
+                                        "from_port": [
+                                            443
+                                        ],
+                                        "protocol": [
+                                            "tcp"
+                                        ],
+                                        "to_port": [
+                                            443
+                                        ]
+                                    },
+                                    {
+                                        "cidr_blocks": [
+                                            [
+                                                "0.0.0.0/0"
+                                            ]
+                                        ],
+                                        "from_port": [
+                                            22
+                                        ],
+                                        "protocol": [
+                                            "tcp"
+                                        ],
+                                        "to_port": [
+                                            22
+                                        ]
+                                    }
+                                ],
+                                "name_prefix": [
+                                    "dev-web-"
+                                ],
+                                "tags": [
+                                    {
+                                        "Environment": "dev",
+                                        "Name": "dev-web-sg"
+                                    }
+                                ],
+                                "vpc_id": [
+                                    "aws_vpc.main.id"
+                                ],
+                                "__address__": "aws_security_group.web",
+                                "__provider_address__": "aws.default"
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "networking",
+                        "resource_type"
+                    ]
+                },
+                "code_block": [
+                    [
+                        69,
+                        "resource \"aws_security_group\" \"web\" {\n"
+                    ],
+                    [
+                        70,
+                        "  name_prefix = \"${var.environment}-web-\"\n"
+                    ],
+                    [
+                        71,
+                        "  vpc_id      = aws_vpc.main.id\n"
+                    ],
+                    [
+                        72,
+                        "\n"
+                    ],
+                    [
+                        73,
+                        "  ingress {\n"
+                    ],
+                    [
+                        74,
+                        "    from_port   = 80\n"
+                    ],
+                    [
+                        75,
+                        "    to_port     = 80\n"
+                    ],
+                    [
+                        76,
+                        "    protocol    = \"tcp\"\n"
+                    ],
+                    [
+                        77,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]\n"
+                    ],
+                    [
+                        78,
+                        "  }\n"
+                    ],
+                    [
+                        79,
+                        "\n"
+                    ],
+                    [
+                        80,
+                        "  ingress {\n"
+                    ],
+                    [
+                        81,
+                        "    from_port   = 443\n"
+                    ],
+                    [
+                        82,
+                        "    to_port     = 443\n"
+                    ],
+                    [
+                        83,
+                        "    protocol    = \"tcp\"\n"
+                    ],
+                    [
+                        84,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]\n"
+                    ],
+                    [
+                        85,
+                        "  }\n"
+                    ],
+                    [
+                        86,
+                        "\n"
+                    ],
+                    [
+                        87,
+                        "  ingress {\n"
+                    ],
+                    [
+                        88,
+                        "    from_port   = 22\n"
+                    ],
+                    [
+                        89,
+                        "    to_port     = 22\n"
+                    ],
+                    [
+                        90,
+                        "    protocol    = \"tcp\"\n"
+                    ],
+                    [
+                        91,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]  # Security issue: too permissive\n"
+                    ],
+                    [
+                        92,
+                        "  }\n"
+                    ],
+                    [
+                        93,
+                        "\n"
+                    ],
+                    [
+                        94,
+                        "  egress {\n"
+                    ],
+                    [
+                        95,
+                        "    from_port   = 0\n"
+                    ],
+                    [
+                        96,
+                        "    to_port     = 0\n"
+                    ],
+                    [
+                        97,
+                        "    protocol    = \"-1\"\n"
+                    ],
+                    [
+                        98,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]\n"
+                    ],
+                    [
+                        99,
+                        "  }\n"
+                    ],
+                    [
+                        100,
+                        "\n"
+                    ],
+                    [
+                        101,
+                        "  tags = {\n"
+                    ],
+                    [
+                        102,
+                        "    Name        = \"${var.environment}-web-sg\"\n"
+                    ],
+                    [
+                        103,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        104,
+                        "  }\n"
+                    ],
+                    [
+                        105,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    69,
+                    105
+                ],
+                "resource": "aws_security_group.web",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-web-sg"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-networking-policies/ensure-that-security-groups-are-attached-to-ec2-instances-or-elastic-network-interfaces-enis",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "name_prefix": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV2_AWS_44",
+                "bc_check_id": "BC_AWS_NETWORKING_80",
+                "check_name": "Ensure AWS route table with VPC peering does not contain routes overly permissive to all traffic",
+                "check_result": {
+                    "result": "PASSED",
+                    "entity": {
+                        "aws_route_table": {
+                            "public": {
+                                "__end_line__": 149,
+                                "__start_line__": 137,
+                                "route": [
+                                    {
+                                        "cidr_block": [
+                                            "0.0.0.0/0"
+                                        ],
+                                        "gateway_id": [
+                                            "aws_internet_gateway.main.id"
+                                        ]
+                                    }
+                                ],
+                                "tags": [
+                                    {
+                                        "Environment": "dev",
+                                        "Name": "dev-public-rt"
+                                    }
+                                ],
+                                "vpc_id": [
+                                    "aws_vpc.main.id"
+                                ],
+                                "__address__": "aws_route_table.public",
+                                "__provider_address__": "aws.default"
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "route/*/vpc_peering_connection_id",
+                        "route/*/cidr_block",
+                        "destination_ipv6_cidr_block",
+                        "destination_cidr_block",
+                        "route/*/ipv6_cidr_block",
+                        "vpc_peering_connection_id"
+                    ]
+                },
+                "code_block": [
+                    [
+                        137,
+                        "resource \"aws_route_table\" \"public\" {\n"
+                    ],
+                    [
+                        138,
+                        "  vpc_id = aws_vpc.main.id\n"
+                    ],
+                    [
+                        139,
+                        "\n"
+                    ],
+                    [
+                        140,
+                        "  route {\n"
+                    ],
+                    [
+                        141,
+                        "    cidr_block = \"0.0.0.0/0\"\n"
+                    ],
+                    [
+                        142,
+                        "    gateway_id = aws_internet_gateway.main.id\n"
+                    ],
+                    [
+                        143,
+                        "  }\n"
+                    ],
+                    [
+                        144,
+                        "\n"
+                    ],
+                    [
+                        145,
+                        "  tags = {\n"
+                    ],
+                    [
+                        146,
+                        "    Name        = \"${var.environment}-public-rt\"\n"
+                    ],
+                    [
+                        147,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        148,
+                        "  }\n"
+                    ],
+                    [
+                        149,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    137,
+                    149
+                ],
+                "resource": "aws_route_table.public",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-public-rt"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-networking-policies/ensure-aws-route-table-with-vpc-peering-does-not-contain-routes-overly-permissive-to-all-traffic",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV2_AWS_35",
+                "bc_check_id": "BC_AWS_NETWORKING_77",
+                "check_name": "AWS NAT Gateways should be utilized for the default route",
+                "check_result": {
+                    "result": "PASSED",
+                    "entity": {
+                        "aws_route_table": {
+                            "public": {
+                                "__end_line__": 149,
+                                "__start_line__": 137,
+                                "route": [
+                                    {
+                                        "cidr_block": [
+                                            "0.0.0.0/0"
+                                        ],
+                                        "gateway_id": [
+                                            "aws_internet_gateway.main.id"
+                                        ]
+                                    }
+                                ],
+                                "tags": [
+                                    {
+                                        "Environment": "dev",
+                                        "Name": "dev-public-rt"
+                                    }
+                                ],
+                                "vpc_id": [
+                                    "aws_vpc.main.id"
+                                ],
+                                "__address__": "aws_route_table.public",
+                                "__provider_address__": "aws.default"
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "route/*/cidr_block",
+                        "instance_id",
+                        "route/*/instance_id",
+                        "destination_cidr_block"
+                    ]
+                },
+                "code_block": [
+                    [
+                        137,
+                        "resource \"aws_route_table\" \"public\" {\n"
+                    ],
+                    [
+                        138,
+                        "  vpc_id = aws_vpc.main.id\n"
+                    ],
+                    [
+                        139,
+                        "\n"
+                    ],
+                    [
+                        140,
+                        "  route {\n"
+                    ],
+                    [
+                        141,
+                        "    cidr_block = \"0.0.0.0/0\"\n"
+                    ],
+                    [
+                        142,
+                        "    gateway_id = aws_internet_gateway.main.id\n"
+                    ],
+                    [
+                        143,
+                        "  }\n"
+                    ],
+                    [
+                        144,
+                        "\n"
+                    ],
+                    [
+                        145,
+                        "  tags = {\n"
+                    ],
+                    [
+                        146,
+                        "    Name        = \"${var.environment}-public-rt\"\n"
+                    ],
+                    [
+                        147,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        148,
+                        "  }\n"
+                    ],
+                    [
+                        149,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    137,
+                    149
+                ],
+                "resource": "aws_route_table.public",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-public-rt"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-networking-policies/ensure-aws-nat-gateways-are-utilized-for-the-default-route",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV_AWS_20",
+                "bc_check_id": "BC_AWS_S3_1",
+                "check_name": "S3 Bucket has an ACL defined which allows public READ access.",
+                "check_result": {
+                    "result": "PASSED",
+                    "entity": {
+                        "aws_s3_bucket": {
+                            "data": {
+                                "__end_line__": 130,
+                                "__start_line__": 123,
+                                "bucket": [
+                                    "dev-data-bucket-${random_id.bucket_suffix.hex}"
+                                ],
+                                "tags": [
+                                    {
+                                        "Environment": "dev",
+                                        "Name": "dev-data-bucket"
+                                    }
+                                ],
+                                "__address__": "aws_s3_bucket.data",
+                                "__provider_address__": "aws.default"
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "access_control_policy",
+                        "resource_type",
+                        "access_control_policy/grant/*/grantee/uri",
+                        "acl",
+                        "access_control_policy/grant"
+                    ]
+                },
+                "code_block": [
+                    [
+                        123,
+                        "resource \"aws_s3_bucket\" \"data\" {\n"
+                    ],
+                    [
+                        124,
+                        "  bucket = \"${var.environment}-data-bucket-${random_id.bucket_suffix.hex}\"\n"
+                    ],
+                    [
+                        125,
+                        "\n"
+                    ],
+                    [
+                        126,
+                        "  tags = {\n"
+                    ],
+                    [
+                        127,
+                        "    Name        = \"${var.environment}-data-bucket\"\n"
+                    ],
+                    [
+                        128,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        129,
+                        "  }\n"
+                    ],
+                    [
+                        130,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    123,
+                    130
+                ],
+                "resource": "aws_s3_bucket.data",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-data-bucket"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/s3-policies/s3-1-acl-read-permissions-everyone",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "bucket": [
+                        {
+                            "type": "resource",
+                            "name": "random_id.bucket_suffix",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV_AWS_57",
+                "bc_check_id": "BC_AWS_S3_2",
+                "check_name": "S3 Bucket has an ACL defined which allows public WRITE access.",
+                "check_result": {
+                    "result": "PASSED",
+                    "entity": {
+                        "aws_s3_bucket": {
+                            "data": {
+                                "__end_line__": 130,
+                                "__start_line__": 123,
+                                "bucket": [
+                                    "dev-data-bucket-${random_id.bucket_suffix.hex}"
+                                ],
+                                "tags": [
+                                    {
+                                        "Environment": "dev",
+                                        "Name": "dev-data-bucket"
+                                    }
+                                ],
+                                "__address__": "aws_s3_bucket.data",
+                                "__provider_address__": "aws.default"
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "access_control_policy",
+                        "access_control_policy/grant/*/permission",
+                        "resource_type",
+                        "access_control_policy/grant/*/grantee/uri",
+                        "acl",
+                        "access_control_policy/grant"
+                    ]
+                },
+                "code_block": [
+                    [
+                        123,
+                        "resource \"aws_s3_bucket\" \"data\" {\n"
+                    ],
+                    [
+                        124,
+                        "  bucket = \"${var.environment}-data-bucket-${random_id.bucket_suffix.hex}\"\n"
+                    ],
+                    [
+                        125,
+                        "\n"
+                    ],
+                    [
+                        126,
+                        "  tags = {\n"
+                    ],
+                    [
+                        127,
+                        "    Name        = \"${var.environment}-data-bucket\"\n"
+                    ],
+                    [
+                        128,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        129,
+                        "  }\n"
+                    ],
+                    [
+                        130,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    123,
+                    130
+                ],
+                "resource": "aws_s3_bucket.data",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-data-bucket"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/s3-policies/s3-2-acl-write-permissions-everyone",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "bucket": [
+                        {
+                            "type": "resource",
+                            "name": "random_id.bucket_suffix",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            }
+        ],
+        "failed_checks": [
+            {
+                "check_id": "CKV_AWS_130",
+                "bc_check_id": "BC_AWS_NETWORKING_53",
+                "check_name": "Ensure VPC subnets do not assign public IP by default",
+                "check_result": {
+                    "result": "FAILED",
+                    "evaluated_keys": [
+                        "map_public_ip_on_launch"
+                    ]
+                },
+                "code_block": [
+                    [
+                        56,
+                        "resource \"aws_subnet\" \"public\" {\n"
+                    ],
+                    [
+                        57,
+                        "  vpc_id                  = aws_vpc.main.id\n"
+                    ],
+                    [
+                        58,
+                        "  cidr_block              = \"10.0.1.0/24\"\n"
+                    ],
+                    [
+                        59,
+                        "  availability_zone       = \"${var.region}a\"\n"
+                    ],
+                    [
+                        60,
+                        "  map_public_ip_on_launch = true\n"
+                    ],
+                    [
+                        61,
+                        "\n"
+                    ],
+                    [
+                        62,
+                        "  tags = {\n"
+                    ],
+                    [
+                        63,
+                        "    Name        = \"${var.environment}-public-subnet\"\n"
+                    ],
+                    [
+                        64,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        65,
+                        "  }\n"
+                    ],
+                    [
+                        66,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    56,
+                    66
+                ],
+                "resource": "aws_subnet.public",
+                "evaluations": null,
+                "check_class": "checkov.terraform.checks.resource.aws.SubnetPublicIP",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-public-subnet"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-networking-policies/ensure-vpc-subnets-do-not-assign-public-ip-by-default",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "availability_zone": [
+                        {
+                            "type": "variable",
+                            "name": "region",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV_AWS_260",
+                "bc_check_id": "BC_AWS_NETWORKING_67",
+                "check_name": "Ensure no security groups allow ingress from 0.0.0.0:0 to port 80",
+                "check_result": {
+                    "result": "FAILED",
+                    "evaluated_keys": [
+                        "ingress/[0]/from_port",
+                        "ingress/[0]/to_port",
+                        "ingress/[0]/cidr_blocks",
+                        "ingress/[0]/ipv6_cidr_blocks"
+                    ]
+                },
+                "code_block": [
+                    [
+                        69,
+                        "resource \"aws_security_group\" \"web\" {\n"
+                    ],
+                    [
+                        70,
+                        "  name_prefix = \"${var.environment}-web-\"\n"
+                    ],
+                    [
+                        71,
+                        "  vpc_id      = aws_vpc.main.id\n"
+                    ],
+                    [
+                        72,
+                        "\n"
+                    ],
+                    [
+                        73,
+                        "  ingress {\n"
+                    ],
+                    [
+                        74,
+                        "    from_port   = 80\n"
+                    ],
+                    [
+                        75,
+                        "    to_port     = 80\n"
+                    ],
+                    [
+                        76,
+                        "    protocol    = \"tcp\"\n"
+                    ],
+                    [
+                        77,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]\n"
+                    ],
+                    [
+                        78,
+                        "  }\n"
+                    ],
+                    [
+                        79,
+                        "\n"
+                    ],
+                    [
+                        80,
+                        "  ingress {\n"
+                    ],
+                    [
+                        81,
+                        "    from_port   = 443\n"
+                    ],
+                    [
+                        82,
+                        "    to_port     = 443\n"
+                    ],
+                    [
+                        83,
+                        "    protocol    = \"tcp\"\n"
+                    ],
+                    [
+                        84,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]\n"
+                    ],
+                    [
+                        85,
+                        "  }\n"
+                    ],
+                    [
+                        86,
+                        "\n"
+                    ],
+                    [
+                        87,
+                        "  ingress {\n"
+                    ],
+                    [
+                        88,
+                        "    from_port   = 22\n"
+                    ],
+                    [
+                        89,
+                        "    to_port     = 22\n"
+                    ],
+                    [
+                        90,
+                        "    protocol    = \"tcp\"\n"
+                    ],
+                    [
+                        91,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]  # Security issue: too permissive\n"
+                    ],
+                    [
+                        92,
+                        "  }\n"
+                    ],
+                    [
+                        93,
+                        "\n"
+                    ],
+                    [
+                        94,
+                        "  egress {\n"
+                    ],
+                    [
+                        95,
+                        "    from_port   = 0\n"
+                    ],
+                    [
+                        96,
+                        "    to_port     = 0\n"
+                    ],
+                    [
+                        97,
+                        "    protocol    = \"-1\"\n"
+                    ],
+                    [
+                        98,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]\n"
+                    ],
+                    [
+                        99,
+                        "  }\n"
+                    ],
+                    [
+                        100,
+                        "\n"
+                    ],
+                    [
+                        101,
+                        "  tags = {\n"
+                    ],
+                    [
+                        102,
+                        "    Name        = \"${var.environment}-web-sg\"\n"
+                    ],
+                    [
+                        103,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        104,
+                        "  }\n"
+                    ],
+                    [
+                        105,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    69,
+                    105
+                ],
+                "resource": "aws_security_group.web",
+                "evaluations": null,
+                "check_class": "checkov.terraform.checks.resource.aws.SecurityGroupUnrestrictedIngress80",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-web-sg"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-networking-policies/ensure-aws-security-groups-do-not-allow-ingress-from-00000-to-port-80",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "name_prefix": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV_AWS_24",
+                "bc_check_id": "BC_AWS_NETWORKING_1",
+                "check_name": "Ensure no security groups allow ingress from 0.0.0.0:0 to port 22",
+                "check_result": {
+                    "result": "FAILED",
+                    "evaluated_keys": [
+                        "ingress/[2]/from_port",
+                        "ingress/[2]/to_port",
+                        "ingress/[2]/cidr_blocks",
+                        "ingress/[2]/ipv6_cidr_blocks"
+                    ]
+                },
+                "code_block": [
+                    [
+                        69,
+                        "resource \"aws_security_group\" \"web\" {\n"
+                    ],
+                    [
+                        70,
+                        "  name_prefix = \"${var.environment}-web-\"\n"
+                    ],
+                    [
+                        71,
+                        "  vpc_id      = aws_vpc.main.id\n"
+                    ],
+                    [
+                        72,
+                        "\n"
+                    ],
+                    [
+                        73,
+                        "  ingress {\n"
+                    ],
+                    [
+                        74,
+                        "    from_port   = 80\n"
+                    ],
+                    [
+                        75,
+                        "    to_port     = 80\n"
+                    ],
+                    [
+                        76,
+                        "    protocol    = \"tcp\"\n"
+                    ],
+                    [
+                        77,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]\n"
+                    ],
+                    [
+                        78,
+                        "  }\n"
+                    ],
+                    [
+                        79,
+                        "\n"
+                    ],
+                    [
+                        80,
+                        "  ingress {\n"
+                    ],
+                    [
+                        81,
+                        "    from_port   = 443\n"
+                    ],
+                    [
+                        82,
+                        "    to_port     = 443\n"
+                    ],
+                    [
+                        83,
+                        "    protocol    = \"tcp\"\n"
+                    ],
+                    [
+                        84,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]\n"
+                    ],
+                    [
+                        85,
+                        "  }\n"
+                    ],
+                    [
+                        86,
+                        "\n"
+                    ],
+                    [
+                        87,
+                        "  ingress {\n"
+                    ],
+                    [
+                        88,
+                        "    from_port   = 22\n"
+                    ],
+                    [
+                        89,
+                        "    to_port     = 22\n"
+                    ],
+                    [
+                        90,
+                        "    protocol    = \"tcp\"\n"
+                    ],
+                    [
+                        91,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]  # Security issue: too permissive\n"
+                    ],
+                    [
+                        92,
+                        "  }\n"
+                    ],
+                    [
+                        93,
+                        "\n"
+                    ],
+                    [
+                        94,
+                        "  egress {\n"
+                    ],
+                    [
+                        95,
+                        "    from_port   = 0\n"
+                    ],
+                    [
+                        96,
+                        "    to_port     = 0\n"
+                    ],
+                    [
+                        97,
+                        "    protocol    = \"-1\"\n"
+                    ],
+                    [
+                        98,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]\n"
+                    ],
+                    [
+                        99,
+                        "  }\n"
+                    ],
+                    [
+                        100,
+                        "\n"
+                    ],
+                    [
+                        101,
+                        "  tags = {\n"
+                    ],
+                    [
+                        102,
+                        "    Name        = \"${var.environment}-web-sg\"\n"
+                    ],
+                    [
+                        103,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        104,
+                        "  }\n"
+                    ],
+                    [
+                        105,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    69,
+                    105
+                ],
+                "resource": "aws_security_group.web",
+                "evaluations": null,
+                "check_class": "checkov.terraform.checks.resource.aws.SecurityGroupUnrestrictedIngress22",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-web-sg"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-networking-policies/networking-1-port-security",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "name_prefix": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV_AWS_382",
+                "bc_check_id": "BC_AWS_IAM_93",
+                "check_name": "Ensure no security groups allow egress from 0.0.0.0:0 to port -1",
+                "check_result": {
+                    "result": "FAILED",
+                    "evaluated_keys": [
+                        "egress/[0]/from_port",
+                        "egress/[0]/to_port",
+                        "egress/[0]/cidr_blocks",
+                        "egress/[0]/ipv6_cidr_blocks"
+                    ]
+                },
+                "code_block": [
+                    [
+                        69,
+                        "resource \"aws_security_group\" \"web\" {\n"
+                    ],
+                    [
+                        70,
+                        "  name_prefix = \"${var.environment}-web-\"\n"
+                    ],
+                    [
+                        71,
+                        "  vpc_id      = aws_vpc.main.id\n"
+                    ],
+                    [
+                        72,
+                        "\n"
+                    ],
+                    [
+                        73,
+                        "  ingress {\n"
+                    ],
+                    [
+                        74,
+                        "    from_port   = 80\n"
+                    ],
+                    [
+                        75,
+                        "    to_port     = 80\n"
+                    ],
+                    [
+                        76,
+                        "    protocol    = \"tcp\"\n"
+                    ],
+                    [
+                        77,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]\n"
+                    ],
+                    [
+                        78,
+                        "  }\n"
+                    ],
+                    [
+                        79,
+                        "\n"
+                    ],
+                    [
+                        80,
+                        "  ingress {\n"
+                    ],
+                    [
+                        81,
+                        "    from_port   = 443\n"
+                    ],
+                    [
+                        82,
+                        "    to_port     = 443\n"
+                    ],
+                    [
+                        83,
+                        "    protocol    = \"tcp\"\n"
+                    ],
+                    [
+                        84,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]\n"
+                    ],
+                    [
+                        85,
+                        "  }\n"
+                    ],
+                    [
+                        86,
+                        "\n"
+                    ],
+                    [
+                        87,
+                        "  ingress {\n"
+                    ],
+                    [
+                        88,
+                        "    from_port   = 22\n"
+                    ],
+                    [
+                        89,
+                        "    to_port     = 22\n"
+                    ],
+                    [
+                        90,
+                        "    protocol    = \"tcp\"\n"
+                    ],
+                    [
+                        91,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]  # Security issue: too permissive\n"
+                    ],
+                    [
+                        92,
+                        "  }\n"
+                    ],
+                    [
+                        93,
+                        "\n"
+                    ],
+                    [
+                        94,
+                        "  egress {\n"
+                    ],
+                    [
+                        95,
+                        "    from_port   = 0\n"
+                    ],
+                    [
+                        96,
+                        "    to_port     = 0\n"
+                    ],
+                    [
+                        97,
+                        "    protocol    = \"-1\"\n"
+                    ],
+                    [
+                        98,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]\n"
+                    ],
+                    [
+                        99,
+                        "  }\n"
+                    ],
+                    [
+                        100,
+                        "\n"
+                    ],
+                    [
+                        101,
+                        "  tags = {\n"
+                    ],
+                    [
+                        102,
+                        "    Name        = \"${var.environment}-web-sg\"\n"
+                    ],
+                    [
+                        103,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        104,
+                        "  }\n"
+                    ],
+                    [
+                        105,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    69,
+                    105
+                ],
+                "resource": "aws_security_group.web",
+                "evaluations": null,
+                "check_class": "checkov.terraform.checks.resource.aws.SecurityGroupUnrestrictedEgressAny",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-web-sg"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-networking-policies/bc-aws-382",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "name_prefix": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV_AWS_23",
+                "bc_check_id": "BC_AWS_NETWORKING_31",
+                "check_name": "Ensure every security group and rule has a description",
+                "check_result": {
+                    "result": "FAILED",
+                    "evaluated_keys": [
+                        "egress/[0]",
+                        "ingress/[0]"
+                    ]
+                },
+                "code_block": [
+                    [
+                        69,
+                        "resource \"aws_security_group\" \"web\" {\n"
+                    ],
+                    [
+                        70,
+                        "  name_prefix = \"${var.environment}-web-\"\n"
+                    ],
+                    [
+                        71,
+                        "  vpc_id      = aws_vpc.main.id\n"
+                    ],
+                    [
+                        72,
+                        "\n"
+                    ],
+                    [
+                        73,
+                        "  ingress {\n"
+                    ],
+                    [
+                        74,
+                        "    from_port   = 80\n"
+                    ],
+                    [
+                        75,
+                        "    to_port     = 80\n"
+                    ],
+                    [
+                        76,
+                        "    protocol    = \"tcp\"\n"
+                    ],
+                    [
+                        77,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]\n"
+                    ],
+                    [
+                        78,
+                        "  }\n"
+                    ],
+                    [
+                        79,
+                        "\n"
+                    ],
+                    [
+                        80,
+                        "  ingress {\n"
+                    ],
+                    [
+                        81,
+                        "    from_port   = 443\n"
+                    ],
+                    [
+                        82,
+                        "    to_port     = 443\n"
+                    ],
+                    [
+                        83,
+                        "    protocol    = \"tcp\"\n"
+                    ],
+                    [
+                        84,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]\n"
+                    ],
+                    [
+                        85,
+                        "  }\n"
+                    ],
+                    [
+                        86,
+                        "\n"
+                    ],
+                    [
+                        87,
+                        "  ingress {\n"
+                    ],
+                    [
+                        88,
+                        "    from_port   = 22\n"
+                    ],
+                    [
+                        89,
+                        "    to_port     = 22\n"
+                    ],
+                    [
+                        90,
+                        "    protocol    = \"tcp\"\n"
+                    ],
+                    [
+                        91,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]  # Security issue: too permissive\n"
+                    ],
+                    [
+                        92,
+                        "  }\n"
+                    ],
+                    [
+                        93,
+                        "\n"
+                    ],
+                    [
+                        94,
+                        "  egress {\n"
+                    ],
+                    [
+                        95,
+                        "    from_port   = 0\n"
+                    ],
+                    [
+                        96,
+                        "    to_port     = 0\n"
+                    ],
+                    [
+                        97,
+                        "    protocol    = \"-1\"\n"
+                    ],
+                    [
+                        98,
+                        "    cidr_blocks = [\"0.0.0.0/0\"]\n"
+                    ],
+                    [
+                        99,
+                        "  }\n"
+                    ],
+                    [
+                        100,
+                        "\n"
+                    ],
+                    [
+                        101,
+                        "  tags = {\n"
+                    ],
+                    [
+                        102,
+                        "    Name        = \"${var.environment}-web-sg\"\n"
+                    ],
+                    [
+                        103,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        104,
+                        "  }\n"
+                    ],
+                    [
+                        105,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    69,
+                    105
+                ],
+                "resource": "aws_security_group.web",
+                "evaluations": null,
+                "check_class": "checkov.terraform.checks.resource.aws.SecurityGroupRuleDescription",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-web-sg"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-networking-policies/networking-31",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "name_prefix": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV_AWS_126",
+                "bc_check_id": "BC_AWS_LOGGING_26",
+                "check_name": "Ensure that detailed monitoring is enabled for EC2 instances",
+                "check_result": {
+                    "result": "FAILED",
+                    "evaluated_keys": [
+                        "monitoring"
+                    ]
+                },
+                "code_block": [
+                    [
+                        108,
+                        "resource \"aws_instance\" \"web\" {\n"
+                    ],
+                    [
+                        109,
+                        "  ami                    = \"ami-0c55b159cbfafe1d0\"\n"
+                    ],
+                    [
+                        110,
+                        "  instance_type          = var.instance_type\n"
+                    ],
+                    [
+                        111,
+                        "  subnet_id              = aws_subnet.public.id\n"
+                    ],
+                    [
+                        112,
+                        "  vpc_security_group_ids = [aws_security_group.web.id]\n"
+                    ],
+                    [
+                        113,
+                        "\n"
+                    ],
+                    [
+                        114,
+                        "  # Missing metadata_options for IMDS v2 (security issue)\n"
+                    ],
+                    [
+                        115,
+                        "  \n"
+                    ],
+                    [
+                        116,
+                        "  tags = {\n"
+                    ],
+                    [
+                        117,
+                        "    Name        = \"${var.environment}-web-server\"\n"
+                    ],
+                    [
+                        118,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        119,
+                        "  }\n"
+                    ],
+                    [
+                        120,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    108,
+                    120
+                ],
+                "resource": "aws_instance.web",
+                "evaluations": null,
+                "check_class": "checkov.terraform.checks.resource.aws.EC2DetailedMonitoringEnabled",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-web-server"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-logging-policies/ensure-that-detailed-monitoring-is-enabled-for-ec2-instances",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "instance_type": [
+                        {
+                            "type": "variable",
+                            "name": "instance_type",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV_AWS_79",
+                "bc_check_id": "BC_AWS_GENERAL_31",
+                "check_name": "Ensure Instance Metadata Service Version 1 is not enabled",
+                "check_result": {
+                    "result": "FAILED",
+                    "evaluated_keys": [
+                        "metadata_options/[0]/http_tokens"
+                    ]
+                },
+                "code_block": [
+                    [
+                        108,
+                        "resource \"aws_instance\" \"web\" {\n"
+                    ],
+                    [
+                        109,
+                        "  ami                    = \"ami-0c55b159cbfafe1d0\"\n"
+                    ],
+                    [
+                        110,
+                        "  instance_type          = var.instance_type\n"
+                    ],
+                    [
+                        111,
+                        "  subnet_id              = aws_subnet.public.id\n"
+                    ],
+                    [
+                        112,
+                        "  vpc_security_group_ids = [aws_security_group.web.id]\n"
+                    ],
+                    [
+                        113,
+                        "\n"
+                    ],
+                    [
+                        114,
+                        "  # Missing metadata_options for IMDS v2 (security issue)\n"
+                    ],
+                    [
+                        115,
+                        "  \n"
+                    ],
+                    [
+                        116,
+                        "  tags = {\n"
+                    ],
+                    [
+                        117,
+                        "    Name        = \"${var.environment}-web-server\"\n"
+                    ],
+                    [
+                        118,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        119,
+                        "  }\n"
+                    ],
+                    [
+                        120,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    108,
+                    120
+                ],
+                "resource": "aws_instance.web",
+                "evaluations": null,
+                "check_class": "checkov.terraform.checks.resource.aws.IMDSv1Disabled",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-web-server"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-general-policies/bc-aws-general-31",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "instance_type": [
+                        {
+                            "type": "variable",
+                            "name": "instance_type",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV_AWS_135",
+                "bc_check_id": "BC_AWS_GENERAL_68",
+                "check_name": "Ensure that EC2 is EBS optimized",
+                "check_result": {
+                    "result": "FAILED",
+                    "evaluated_keys": [
+                        "ebs_optimized"
+                    ]
+                },
+                "code_block": [
+                    [
+                        108,
+                        "resource \"aws_instance\" \"web\" {\n"
+                    ],
+                    [
+                        109,
+                        "  ami                    = \"ami-0c55b159cbfafe1d0\"\n"
+                    ],
+                    [
+                        110,
+                        "  instance_type          = var.instance_type\n"
+                    ],
+                    [
+                        111,
+                        "  subnet_id              = aws_subnet.public.id\n"
+                    ],
+                    [
+                        112,
+                        "  vpc_security_group_ids = [aws_security_group.web.id]\n"
+                    ],
+                    [
+                        113,
+                        "\n"
+                    ],
+                    [
+                        114,
+                        "  # Missing metadata_options for IMDS v2 (security issue)\n"
+                    ],
+                    [
+                        115,
+                        "  \n"
+                    ],
+                    [
+                        116,
+                        "  tags = {\n"
+                    ],
+                    [
+                        117,
+                        "    Name        = \"${var.environment}-web-server\"\n"
+                    ],
+                    [
+                        118,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        119,
+                        "  }\n"
+                    ],
+                    [
+                        120,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    108,
+                    120
+                ],
+                "resource": "aws_instance.web",
+                "evaluations": null,
+                "check_class": "checkov.terraform.checks.resource.aws.EC2EBSOptimized",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-web-server"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-general-policies/ensure-that-ec2-is-ebs-optimized",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "instance_type": [
+                        {
+                            "type": "variable",
+                            "name": "instance_type",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV_AWS_8",
+                "bc_check_id": "BC_AWS_GENERAL_13",
+                "check_name": "Ensure all data stored in the Launch configuration or instance Elastic Blocks Store is securely encrypted",
+                "check_result": {
+                    "result": "FAILED",
+                    "evaluated_keys": [
+                        "root_block_device"
+                    ]
+                },
+                "code_block": [
+                    [
+                        108,
+                        "resource \"aws_instance\" \"web\" {\n"
+                    ],
+                    [
+                        109,
+                        "  ami                    = \"ami-0c55b159cbfafe1d0\"\n"
+                    ],
+                    [
+                        110,
+                        "  instance_type          = var.instance_type\n"
+                    ],
+                    [
+                        111,
+                        "  subnet_id              = aws_subnet.public.id\n"
+                    ],
+                    [
+                        112,
+                        "  vpc_security_group_ids = [aws_security_group.web.id]\n"
+                    ],
+                    [
+                        113,
+                        "\n"
+                    ],
+                    [
+                        114,
+                        "  # Missing metadata_options for IMDS v2 (security issue)\n"
+                    ],
+                    [
+                        115,
+                        "  \n"
+                    ],
+                    [
+                        116,
+                        "  tags = {\n"
+                    ],
+                    [
+                        117,
+                        "    Name        = \"${var.environment}-web-server\"\n"
+                    ],
+                    [
+                        118,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        119,
+                        "  }\n"
+                    ],
+                    [
+                        120,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    108,
+                    120
+                ],
+                "resource": "aws_instance.web",
+                "evaluations": null,
+                "check_class": "checkov.terraform.checks.resource.aws.LaunchConfigurationEBSEncryption",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-web-server"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-general-policies/general-13",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "instance_type": [
+                        {
+                            "type": "variable",
+                            "name": "instance_type",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV_AWS_18",
+                "bc_check_id": "BC_AWS_S3_13",
+                "check_name": "Ensure the S3 bucket has access logging enabled",
+                "check_result": {
+                    "result": "FAILED",
+                    "entity": {
+                        "aws_s3_bucket": {
+                            "data": {
+                                "__end_line__": 130,
+                                "__start_line__": 123,
+                                "bucket": [
+                                    "dev-data-bucket-${random_id.bucket_suffix.hex}"
+                                ],
+                                "tags": [
+                                    {
+                                        "Environment": "dev",
+                                        "Name": "dev-data-bucket"
+                                    }
+                                ],
+                                "__address__": "aws_s3_bucket.data",
+                                "__provider_address__": "aws.default"
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "resource_type",
+                        "logging"
+                    ]
+                },
+                "code_block": [
+                    [
+                        123,
+                        "resource \"aws_s3_bucket\" \"data\" {\n"
+                    ],
+                    [
+                        124,
+                        "  bucket = \"${var.environment}-data-bucket-${random_id.bucket_suffix.hex}\"\n"
+                    ],
+                    [
+                        125,
+                        "\n"
+                    ],
+                    [
+                        126,
+                        "  tags = {\n"
+                    ],
+                    [
+                        127,
+                        "    Name        = \"${var.environment}-data-bucket\"\n"
+                    ],
+                    [
+                        128,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        129,
+                        "  }\n"
+                    ],
+                    [
+                        130,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    123,
+                    130
+                ],
+                "resource": "aws_s3_bucket.data",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-data-bucket"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/s3-policies/s3-13-enable-logging",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "bucket": [
+                        {
+                            "type": "resource",
+                            "name": "random_id.bucket_suffix",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV2_AWS_61",
+                "bc_check_id": "BC_AWS_LOGGING_35",
+                "check_name": "Ensure that an S3 bucket has a lifecycle configuration",
+                "check_result": {
+                    "result": "FAILED",
+                    "entity": {
+                        "aws_s3_bucket": {
+                            "data": {
+                                "__end_line__": 130,
+                                "__start_line__": 123,
+                                "bucket": [
+                                    "dev-data-bucket-${random_id.bucket_suffix.hex}"
+                                ],
+                                "tags": [
+                                    {
+                                        "Environment": "dev",
+                                        "Name": "dev-data-bucket"
+                                    }
+                                ],
+                                "__address__": "aws_s3_bucket.data",
+                                "__provider_address__": "aws.default"
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "resource_type",
+                        "lifecycle_rule"
+                    ]
+                },
+                "code_block": [
+                    [
+                        123,
+                        "resource \"aws_s3_bucket\" \"data\" {\n"
+                    ],
+                    [
+                        124,
+                        "  bucket = \"${var.environment}-data-bucket-${random_id.bucket_suffix.hex}\"\n"
+                    ],
+                    [
+                        125,
+                        "\n"
+                    ],
+                    [
+                        126,
+                        "  tags = {\n"
+                    ],
+                    [
+                        127,
+                        "    Name        = \"${var.environment}-data-bucket\"\n"
+                    ],
+                    [
+                        128,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        129,
+                        "  }\n"
+                    ],
+                    [
+                        130,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    123,
+                    130
+                ],
+                "resource": "aws_s3_bucket.data",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-data-bucket"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-logging-policies/bc-aws-2-61",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "bucket": [
+                        {
+                            "type": "resource",
+                            "name": "random_id.bucket_suffix",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV_AWS_144",
+                "bc_check_id": "BC_AWS_GENERAL_72",
+                "check_name": "Ensure that S3 bucket has cross-region replication enabled",
+                "check_result": {
+                    "result": "FAILED",
+                    "entity": {
+                        "aws_s3_bucket": {
+                            "data": {
+                                "__end_line__": 130,
+                                "__start_line__": 123,
+                                "bucket": [
+                                    "dev-data-bucket-${random_id.bucket_suffix.hex}"
+                                ],
+                                "tags": [
+                                    {
+                                        "Environment": "dev",
+                                        "Name": "dev-data-bucket"
+                                    }
+                                ],
+                                "__address__": "aws_s3_bucket.data",
+                                "__provider_address__": "aws.default"
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "replication_configuration/rules/*/status",
+                        "resource_type",
+                        "rule/*/status"
+                    ]
+                },
+                "code_block": [
+                    [
+                        123,
+                        "resource \"aws_s3_bucket\" \"data\" {\n"
+                    ],
+                    [
+                        124,
+                        "  bucket = \"${var.environment}-data-bucket-${random_id.bucket_suffix.hex}\"\n"
+                    ],
+                    [
+                        125,
+                        "\n"
+                    ],
+                    [
+                        126,
+                        "  tags = {\n"
+                    ],
+                    [
+                        127,
+                        "    Name        = \"${var.environment}-data-bucket\"\n"
+                    ],
+                    [
+                        128,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        129,
+                        "  }\n"
+                    ],
+                    [
+                        130,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    123,
+                    130
+                ],
+                "resource": "aws_s3_bucket.data",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-data-bucket"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-general-policies/ensure-that-s3-bucket-has-cross-region-replication-enabled",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "bucket": [
+                        {
+                            "type": "resource",
+                            "name": "random_id.bucket_suffix",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV2_AWS_11",
+                "bc_check_id": "BC_AWS_LOGGING_9",
+                "check_name": "Ensure VPC flow logging is enabled in all VPCs",
+                "check_result": {
+                    "result": "FAILED",
+                    "entity": {
+                        "aws_vpc": {
+                            "main": {
+                                "__end_line__": 43,
+                                "__start_line__": 34,
+                                "cidr_block": [
+                                    "10.0.0.0/16"
+                                ],
+                                "enable_dns_hostnames": [
+                                    true
+                                ],
+                                "enable_dns_support": [
+                                    true
+                                ],
+                                "tags": [
+                                    {
+                                        "Environment": "dev",
+                                        "Name": "dev-vpc"
+                                    }
+                                ],
+                                "__address__": "aws_vpc.main",
+                                "__provider_address__": "aws.default"
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "networking",
+                        "resource_type"
+                    ]
+                },
+                "code_block": [
+                    [
+                        34,
+                        "resource \"aws_vpc\" \"main\" {\n"
+                    ],
+                    [
+                        35,
+                        "  cidr_block           = \"10.0.0.0/16\"\n"
+                    ],
+                    [
+                        36,
+                        "  enable_dns_hostnames = true\n"
+                    ],
+                    [
+                        37,
+                        "  enable_dns_support   = true\n"
+                    ],
+                    [
+                        38,
+                        "\n"
+                    ],
+                    [
+                        39,
+                        "  tags = {\n"
+                    ],
+                    [
+                        40,
+                        "    Name        = \"${var.environment}-vpc\"\n"
+                    ],
+                    [
+                        41,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        42,
+                        "  }\n"
+                    ],
+                    [
+                        43,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    34,
+                    43
+                ],
+                "resource": "aws_vpc.main",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-vpc"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-logging-policies/logging-9-enable-vpc-flow-logging",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV2_AWS_12",
+                "bc_check_id": "BC_AWS_NETWORKING_4",
+                "check_name": "Ensure the default security group of every VPC restricts all traffic",
+                "check_result": {
+                    "result": "FAILED",
+                    "entity": {
+                        "aws_vpc": {
+                            "main": {
+                                "__end_line__": 43,
+                                "__start_line__": 34,
+                                "cidr_block": [
+                                    "10.0.0.0/16"
+                                ],
+                                "enable_dns_hostnames": [
+                                    true
+                                ],
+                                "enable_dns_support": [
+                                    true
+                                ],
+                                "tags": [
+                                    {
+                                        "Environment": "dev",
+                                        "Name": "dev-vpc"
+                                    }
+                                ],
+                                "__address__": "aws_vpc.main",
+                                "__provider_address__": "aws.default"
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "egress/from_port",
+                        "resource_type",
+                        "egress/cidr_blocks",
+                        "egress/protocol",
+                        "ingress/protocol",
+                        "ingress/self",
+                        "egress/to_port",
+                        "ingress/to_port",
+                        "ingress/from_port"
+                    ]
+                },
+                "code_block": [
+                    [
+                        34,
+                        "resource \"aws_vpc\" \"main\" {\n"
+                    ],
+                    [
+                        35,
+                        "  cidr_block           = \"10.0.0.0/16\"\n"
+                    ],
+                    [
+                        36,
+                        "  enable_dns_hostnames = true\n"
+                    ],
+                    [
+                        37,
+                        "  enable_dns_support   = true\n"
+                    ],
+                    [
+                        38,
+                        "\n"
+                    ],
+                    [
+                        39,
+                        "  tags = {\n"
+                    ],
+                    [
+                        40,
+                        "    Name        = \"${var.environment}-vpc\"\n"
+                    ],
+                    [
+                        41,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        42,
+                        "  }\n"
+                    ],
+                    [
+                        43,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    34,
+                    43
+                ],
+                "resource": "aws_vpc.main",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-vpc"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-networking-policies/networking-4",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV2_AWS_41",
+                "bc_check_id": "BC_AWS_IAM_69",
+                "check_name": "Ensure an IAM role is attached to EC2 instance",
+                "check_result": {
+                    "result": "FAILED",
+                    "entity": {
+                        "aws_instance": {
+                            "web": {
+                                "__end_line__": 120,
+                                "__start_line__": 108,
+                                "ami": [
+                                    "ami-0c55b159cbfafe1d0"
+                                ],
+                                "instance_type": [
+                                    "t3.micro"
+                                ],
+                                "subnet_id": [
+                                    "aws_subnet.public.id"
+                                ],
+                                "tags": [
+                                    {
+                                        "Environment": "dev",
+                                        "Name": "dev-web-server"
+                                    }
+                                ],
+                                "vpc_security_group_ids": [
+                                    [
+                                        "aws_security_group.web.id"
+                                    ]
+                                ],
+                                "__address__": "aws_instance.web",
+                                "__provider_address__": "aws.default"
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "iam_instance_profile"
+                    ]
+                },
+                "code_block": [
+                    [
+                        108,
+                        "resource \"aws_instance\" \"web\" {\n"
+                    ],
+                    [
+                        109,
+                        "  ami                    = \"ami-0c55b159cbfafe1d0\"\n"
+                    ],
+                    [
+                        110,
+                        "  instance_type          = var.instance_type\n"
+                    ],
+                    [
+                        111,
+                        "  subnet_id              = aws_subnet.public.id\n"
+                    ],
+                    [
+                        112,
+                        "  vpc_security_group_ids = [aws_security_group.web.id]\n"
+                    ],
+                    [
+                        113,
+                        "\n"
+                    ],
+                    [
+                        114,
+                        "  # Missing metadata_options for IMDS v2 (security issue)\n"
+                    ],
+                    [
+                        115,
+                        "  \n"
+                    ],
+                    [
+                        116,
+                        "  tags = {\n"
+                    ],
+                    [
+                        117,
+                        "    Name        = \"${var.environment}-web-server\"\n"
+                    ],
+                    [
+                        118,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        119,
+                        "  }\n"
+                    ],
+                    [
+                        120,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    108,
+                    120
+                ],
+                "resource": "aws_instance.web",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-web-server"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-iam-policies/ensure-an-iam-role-is-attached-to-ec2-instance",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "instance_type": [
+                        {
+                            "type": "variable",
+                            "name": "instance_type",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV_AWS_145",
+                "bc_check_id": "BC_AWS_GENERAL_56",
+                "check_name": "Ensure that S3 buckets are encrypted with KMS by default",
+                "check_result": {
+                    "result": "FAILED",
+                    "entity": {
+                        "aws_s3_bucket": {
+                            "data": {
+                                "__end_line__": 130,
+                                "__start_line__": 123,
+                                "bucket": [
+                                    "dev-data-bucket-${random_id.bucket_suffix.hex}"
+                                ],
+                                "tags": [
+                                    {
+                                        "Environment": "dev",
+                                        "Name": "dev-data-bucket"
+                                    }
+                                ],
+                                "__address__": "aws_s3_bucket.data",
+                                "__provider_address__": "aws.default"
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "server_side_encryption_configuration/rule/apply_server_side_encryption_by_default/sse_algorithm",
+                        "rule/apply_server_side_encryption_by_default/sse_algorithm",
+                        "resource_type"
+                    ]
+                },
+                "code_block": [
+                    [
+                        123,
+                        "resource \"aws_s3_bucket\" \"data\" {\n"
+                    ],
+                    [
+                        124,
+                        "  bucket = \"${var.environment}-data-bucket-${random_id.bucket_suffix.hex}\"\n"
+                    ],
+                    [
+                        125,
+                        "\n"
+                    ],
+                    [
+                        126,
+                        "  tags = {\n"
+                    ],
+                    [
+                        127,
+                        "    Name        = \"${var.environment}-data-bucket\"\n"
+                    ],
+                    [
+                        128,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        129,
+                        "  }\n"
+                    ],
+                    [
+                        130,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    123,
+                    130
+                ],
+                "resource": "aws_s3_bucket.data",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-data-bucket"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-general-policies/ensure-that-s3-buckets-are-encrypted-with-kms-by-default",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "bucket": [
+                        {
+                            "type": "resource",
+                            "name": "random_id.bucket_suffix",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV2_AWS_6",
+                "bc_check_id": "BC_AWS_NETWORKING_52",
+                "check_name": "Ensure that S3 bucket has a Public Access block",
+                "check_result": {
+                    "result": "FAILED",
+                    "entity": {
+                        "aws_s3_bucket": {
+                            "data": {
+                                "__end_line__": 130,
+                                "__start_line__": 123,
+                                "bucket": [
+                                    "dev-data-bucket-${random_id.bucket_suffix.hex}"
+                                ],
+                                "tags": [
+                                    {
+                                        "Environment": "dev",
+                                        "Name": "dev-data-bucket"
+                                    }
+                                ],
+                                "__address__": "aws_s3_bucket.data",
+                                "__provider_address__": "aws.default"
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "block_public_policy",
+                        "block_public_acls",
+                        "resource_type"
+                    ]
+                },
+                "code_block": [
+                    [
+                        123,
+                        "resource \"aws_s3_bucket\" \"data\" {\n"
+                    ],
+                    [
+                        124,
+                        "  bucket = \"${var.environment}-data-bucket-${random_id.bucket_suffix.hex}\"\n"
+                    ],
+                    [
+                        125,
+                        "\n"
+                    ],
+                    [
+                        126,
+                        "  tags = {\n"
+                    ],
+                    [
+                        127,
+                        "    Name        = \"${var.environment}-data-bucket\"\n"
+                    ],
+                    [
+                        128,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        129,
+                        "  }\n"
+                    ],
+                    [
+                        130,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    123,
+                    130
+                ],
+                "resource": "aws_s3_bucket.data",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-data-bucket"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-networking-policies/s3-bucket-should-have-public-access-blocks-defaults-to-false-if-the-public-access-block-is-not-attached",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "bucket": [
+                        {
+                            "type": "resource",
+                            "name": "random_id.bucket_suffix",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV2_AWS_62",
+                "bc_check_id": "BC_AWS_LOGGING_36",
+                "check_name": "Ensure S3 buckets should have event notifications enabled",
+                "check_result": {
+                    "result": "FAILED",
+                    "entity": {
+                        "aws_s3_bucket": {
+                            "data": {
+                                "__end_line__": 130,
+                                "__start_line__": 123,
+                                "bucket": [
+                                    "dev-data-bucket-${random_id.bucket_suffix.hex}"
+                                ],
+                                "tags": [
+                                    {
+                                        "Environment": "dev",
+                                        "Name": "dev-data-bucket"
+                                    }
+                                ],
+                                "__address__": "aws_s3_bucket.data",
+                                "__provider_address__": "aws.default"
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "resource_type"
+                    ]
+                },
+                "code_block": [
+                    [
+                        123,
+                        "resource \"aws_s3_bucket\" \"data\" {\n"
+                    ],
+                    [
+                        124,
+                        "  bucket = \"${var.environment}-data-bucket-${random_id.bucket_suffix.hex}\"\n"
+                    ],
+                    [
+                        125,
+                        "\n"
+                    ],
+                    [
+                        126,
+                        "  tags = {\n"
+                    ],
+                    [
+                        127,
+                        "    Name        = \"${var.environment}-data-bucket\"\n"
+                    ],
+                    [
+                        128,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        129,
+                        "  }\n"
+                    ],
+                    [
+                        130,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    123,
+                    130
+                ],
+                "resource": "aws_s3_bucket.data",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-data-bucket"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/aws-logging-policies/bc-aws-2-62",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "bucket": [
+                        {
+                            "type": "resource",
+                            "name": "random_id.bucket_suffix",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            },
+            {
+                "check_id": "CKV_AWS_21",
+                "bc_check_id": "BC_AWS_S3_16",
+                "check_name": "Ensure all data stored in the S3 bucket have versioning enabled",
+                "check_result": {
+                    "result": "FAILED",
+                    "entity": {
+                        "aws_s3_bucket": {
+                            "data": {
+                                "__end_line__": 130,
+                                "__start_line__": 123,
+                                "bucket": [
+                                    "dev-data-bucket-${random_id.bucket_suffix.hex}"
+                                ],
+                                "tags": [
+                                    {
+                                        "Environment": "dev",
+                                        "Name": "dev-data-bucket"
+                                    }
+                                ],
+                                "__address__": "aws_s3_bucket.data",
+                                "__provider_address__": "aws.default"
+                            }
+                        }
+                    },
+                    "evaluated_keys": [
+                        "versioning/enabled",
+                        "resource_type",
+                        "versioning_configuration/status"
+                    ]
+                },
+                "code_block": [
+                    [
+                        123,
+                        "resource \"aws_s3_bucket\" \"data\" {\n"
+                    ],
+                    [
+                        124,
+                        "  bucket = \"${var.environment}-data-bucket-${random_id.bucket_suffix.hex}\"\n"
+                    ],
+                    [
+                        125,
+                        "\n"
+                    ],
+                    [
+                        126,
+                        "  tags = {\n"
+                    ],
+                    [
+                        127,
+                        "    Name        = \"${var.environment}-data-bucket\"\n"
+                    ],
+                    [
+                        128,
+                        "    Environment = var.environment\n"
+                    ],
+                    [
+                        129,
+                        "  }\n"
+                    ],
+                    [
+                        130,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    123,
+                    130
+                ],
+                "resource": "aws_s3_bucket.data",
+                "evaluations": null,
+                "check_class": "checkov.common.graph.checks_infra.base_check",
+                "fixed_definition": null,
+                "entity_tags": {
+                    "Environment": "dev",
+                    "Name": "dev-data-bucket"
+                },
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,
+                "short_description": null,
+                "vulnerability_details": null,
+                "connected_node": null,
+                "guideline": "https://docs.prismacloud.io/en/enterprise-edition/policy-reference/aws-policies/s3-policies/s3-16-enable-versioning",
+                "details": [],
+                "check_len": null,
+                "definition_context_file_path": "/workspace/main.tf",
+                "breadcrumbs": {
+                    "bucket": [
+                        {
+                            "type": "resource",
+                            "name": "random_id.bucket_suffix",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Environment": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ],
+                    "tags.Name": [
+                        {
+                            "type": "variable",
+                            "name": "environment",
+                            "path": "/workspace/main.tf",
+                            "module_connection": false
+                        }
+                    ]
+                }
+            }
+        ],
+        "skipped_checks": [],
+        "parsing_errors": []
+    },
+    "summary": {
+        "passed": 12,
+        "failed": 19,
+        "skipped": 0,
+        "parsing_errors": 0,
+        "resource_count": 9,
+        "checkov_version": "3.2.447"
+    },
+    "url": "Add an api key '--bc-api-key <api-key>' to see more detailed insights via https://bridgecrew.cloud"
+}

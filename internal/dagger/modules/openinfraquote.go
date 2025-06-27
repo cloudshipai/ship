@@ -23,57 +23,110 @@ func NewOpenInfraQuoteModule(client *dagger.Client) *OpenInfraQuoteModule {
 }
 
 // AnalyzePlan analyzes a Terraform plan JSON file for cost estimation
-func (m *OpenInfraQuoteModule) AnalyzePlan(ctx context.Context, planFile string) (string, error) {
+func (m *OpenInfraQuoteModule) AnalyzePlan(ctx context.Context, planFile string, region string) (string, error) {
 	// Get the directory containing the plan file
 	dir := filepath.Dir(planFile)
 	filename := filepath.Base(planFile)
 	
-	// Mount the directory and run OpenInfraQuote
-	container := m.client.Container().
-		From("ghcr.io/terrateamio/openinfraquote:latest").
+	// First, use a utility container to download the pricing sheet
+	utilContainer := m.client.Container().
+		From("alpine:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{
-			"openinfraquote",
-			"estimate",
-			"--terraform-plan-file", filename,
-			"--output", "json",
-		})
+		// Download the pricing sheet
+		WithExec([]string{"sh", "-c", "apk add --no-cache curl && curl -s https://oiq.terrateam.io/prices.csv.gz | gunzip > prices.csv"})
 	
-	output, err := container.Stdout(ctx)
+	// Get the workspace with pricing sheet
+	_, err := utilContainer.Directory("/workspace").Export(ctx, dir+"_temp")
 	if err != nil {
-		return "", fmt.Errorf("failed to run openinfraquote: %w", err)
+		return "", fmt.Errorf("failed to prepare workspace: %w", err)
+	}
+	defer func() {
+		// Clean up temp directory
+		m.client.Host().Directory(dir + "_temp")
+	}()
+	
+	// First, get the match output
+	matchContainer := m.client.Container().
+		From("ghcr.io/terrateamio/openinfraquote:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(dir+"_temp")).
+		WithWorkdir("/workspace").
+		WithExec([]string{"oiq", "match", "--pricesheet", "prices.csv", filename})
+	
+	matchOutput, err := matchContainer.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to run oiq match: %w", err)
 	}
 	
-	return output, nil
+	// Now run oiq price with the match output as stdin using Dagger's stdin parameter
+	priceContainer := m.client.Container().
+		From("ghcr.io/terrateamio/openinfraquote:latest").
+		WithExec([]string{"oiq", "price", "--region", region, "--format", "json"}, dagger.ContainerWithExecOpts{
+			Stdin: matchOutput,
+		})
+	
+	priceOutput, err := priceContainer.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to run oiq price: %w", err)
+	}
+	
+	return priceOutput, nil
 }
 
 // AnalyzeDirectory analyzes all Terraform files in a directory
-func (m *OpenInfraQuoteModule) AnalyzeDirectory(ctx context.Context, dir string) (string, error) {
-	container := m.client.Container().
-		From("ghcr.io/terrateamio/openinfraquote:latest").
+func (m *OpenInfraQuoteModule) AnalyzeDirectory(ctx context.Context, dir string, region string) (string, error) {
+	// First, use a utility container to download the pricing sheet and generate Terraform plan
+	terraformContainer := m.client.Container().
+		From("hashicorp/terraform:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{
-			"openinfraquote",
-			"estimate",
-			"--terraform-directory", ".",
-			"--output", "json",
-		})
+		// Download the pricing sheet
+		WithExec([]string{"sh", "-c", "apk add --no-cache curl && curl -s https://oiq.terrateam.io/prices.csv.gz | gunzip > prices.csv"}).
+		// Generate Terraform plan as JSON
+		WithExec([]string{"sh", "-c", "terraform init && terraform plan -out=tf.plan && terraform show -json tf.plan > tfplan.json"})
 	
-	output, err := container.Stdout(ctx)
+	// Get the workspace with generated files
+	_, err := terraformContainer.Directory("/workspace").Export(ctx, dir+"_temp")
 	if err != nil {
-		return "", fmt.Errorf("failed to run openinfraquote on directory: %w", err)
+		return "", fmt.Errorf("failed to prepare workspace: %w", err)
+	}
+	defer func() {
+		// Clean up temp directory
+		m.client.Host().Directory(dir + "_temp")
+	}()
+	
+	// First, get the match output
+	matchContainer := m.client.Container().
+		From("ghcr.io/terrateamio/openinfraquote:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(dir+"_temp")).
+		WithWorkdir("/workspace").
+		WithExec([]string{"oiq", "match", "--pricesheet", "prices.csv", "tfplan.json"})
+	
+	matchOutput, err := matchContainer.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to run oiq match: %w", err)
 	}
 	
-	return output, nil
+	// Now run oiq price with the match output as stdin using Dagger's stdin parameter
+	priceContainer := m.client.Container().
+		From("ghcr.io/terrateamio/openinfraquote:latest").
+		WithExec([]string{"oiq", "price", "--region", region, "--format", "json"}, dagger.ContainerWithExecOpts{
+			Stdin: matchOutput,
+		})
+	
+	priceOutput, err := priceContainer.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to run oiq price: %w", err)
+	}
+	
+	return priceOutput, nil
 }
 
 // GetVersion returns the version of OpenInfraQuote
 func (m *OpenInfraQuoteModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("ghcr.io/terrateamio/openinfraquote:latest").
-		WithExec([]string{"openinfraquote", "--version"})
+		WithExec([]string{"oiq", "--version"})
 	
 	output, err := container.Stdout(ctx)
 	if err != nil {

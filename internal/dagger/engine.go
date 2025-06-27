@@ -114,3 +114,13 @@ func (e *Engine) NewCheckovModule() *modules.CheckovModule {
 func (e *Engine) NewInfracostModule() *modules.InfracostModule {
 	return modules.NewInfracostModule(e.client)
 }
+
+// NewSteampipeModule creates a new Steampipe module
+func (e *Engine) NewSteampipeModule() *modules.SteampipeModule {
+	return modules.NewSteampipeModule(e.client)
+}
+
+// NewLLMModule creates a new LLM module
+func (e *Engine) NewLLMModule(provider, model string) *modules.LLMModule {
+	return modules.NewLLMModule(e.client, provider, model)
+}

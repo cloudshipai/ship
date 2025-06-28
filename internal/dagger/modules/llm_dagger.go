@@ -49,19 +49,19 @@ Provide a clear, actionable analysis.
 
 	// Set up the prompt and get response
 	llmWithPrompt := llm.WithPrompt(prompt)
-	
+
 	// Sync to execute the LLM
 	synced, err := llmWithPrompt.Sync(ctx)
 	if err != nil {
 		return "", fmt.Errorf("LLM sync failed: %w", err)
 	}
-	
+
 	// Get the last reply
 	response, err := synced.LastReply(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get LLM response: %w", err)
 	}
-	
+
 	return response, nil
 }
 
@@ -98,12 +98,12 @@ Requirements:
 	if err != nil {
 		return QueryPlan{}, fmt.Errorf("LLM sync failed: %w", err)
 	}
-	
+
 	response, err := synced.LastReply(ctx)
 	if err != nil {
 		return QueryPlan{}, fmt.Errorf("failed to get LLM response: %w", err)
 	}
-	
+
 	// For now, return a simple plan with the response
 	// In production, we'd parse the JSON response
 	plan := QueryPlan{
@@ -112,7 +112,7 @@ Requirements:
 		ExpectedColumns: []string{"*"},
 		FiltersApplied:  []string{},
 	}
-	
+
 	return plan, nil
 }
 
@@ -126,12 +126,12 @@ type QueryPlan struct {
 
 // CreateInvestigationPlan generates a comprehensive investigation plan using Dagger LLM
 func (m *DaggerLLMModule) CreateInvestigationPlan(ctx context.Context, objective string, providers []string) ([]InvestigationStep, error) {
-	_ = ctx // Mark as used
+	_ = ctx           // Mark as used
 	provider := "aws" // Default
 	if len(providers) > 0 {
 		provider = providers[0]
 	}
-	
+
 	promptText := fmt.Sprintf(`
 You are a cloud infrastructure investigator. Create a step-by-step investigation plan for:
 
@@ -158,17 +158,17 @@ Generate exactly 3-5 steps that thoroughly investigate the objective.
 	llmWithPrompt := llm.
 		WithSystemPrompt("You are a cloud infrastructure expert. Always respond with valid JSON arrays when asked for investigation plans.").
 		WithPrompt(promptText)
-	
+
 	synced, err := llmWithPrompt.Sync(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("LLM sync failed: %w", err)
 	}
-	
+
 	_, err = synced.LastReply(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get LLM response: %w", err)
 	}
-	
+
 	// For now, return example steps
 	// In production, we'd parse the JSON response from LLM
 	// TODO: Parse response JSON into []InvestigationStep
@@ -181,6 +181,6 @@ Generate exactly 3-5 steps that thoroughly investigate the objective.
 			ExpectedInsights: "Overview of all resources",
 		},
 	}
-	
+
 	return steps, nil
 }

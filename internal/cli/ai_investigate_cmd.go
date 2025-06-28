@@ -58,7 +58,7 @@ func runAIInvestigate(cmd *cobra.Command, args []string) error {
 		CreateInvestigationPlan(ctx context.Context, objective string, providers []string) ([]modules.InvestigationStep, error)
 		AnalyzeSteampipeResults(ctx context.Context, queryResults string, queryContext string) (string, error)
 	}
-	
+
 	// Try native Dagger LLM first
 	if llmProvider != "" {
 		llmModule = modules.NewDaggerLLMModule(engine.GetClient(), model)
@@ -66,7 +66,7 @@ func runAIInvestigate(cmd *cobra.Command, args []string) error {
 		// Fall back to our custom LLM module
 		llmModule = modules.NewLLMModule(engine.GetClient(), llmProvider, model)
 	}
-	
+
 	steampipeModule := engine.NewSteampipeModule()
 
 	// Step 1: Generate investigation plan

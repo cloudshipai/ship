@@ -36,24 +36,24 @@ Example:
 
 func init() {
 	rootCmd.AddCommand(aiServicesCmd)
-	
+
 	aiServicesCmd.Flags().String("task", "", "Task for the AI to perform")
 	aiServicesCmd.Flags().String("model", "gpt-4", "LLM model to use")
 	aiServicesCmd.Flags().Bool("show-endpoints", false, "Show service endpoints")
 	aiServicesCmd.Flags().Bool("keep-services", false, "Keep services running after completion")
 	aiServicesCmd.Flags().String("export-endpoints", "", "Export service endpoints to file")
-	
+
 	aiServicesCmd.MarkFlagRequired("task")
 }
 
 func runAIServices(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-	
+
 	task, _ := cmd.Flags().GetString("task")
 	model, _ := cmd.Flags().GetString("model")
 	showEndpoints, _ := cmd.Flags().GetBool("show-endpoints")
 	keepServices, _ := cmd.Flags().GetBool("keep-services")
-	
+
 	// Initialize Dagger
 	fmt.Println("🚀 Starting AI Services Investigation...")
 	engine, err := dagger.NewEngine(ctx)
@@ -61,17 +61,17 @@ func runAIServices(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to initialize dagger: %w", err)
 	}
 	defer engine.Close()
-	
+
 	// Create service orchestrator
 	orchestrator := modules.NewLLMServiceOrchestrator(engine.GetClient(), model)
-	
+
 	// Start all tool services
 	fmt.Println("\n🔧 Starting tool services...")
 	endpoints, err := orchestrator.StartToolServices(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to start services: %w", err)
 	}
-	
+
 	// Display service endpoints if requested
 	if showEndpoints {
 		fmt.Println("\n📡 Service Endpoints:")
@@ -79,20 +79,20 @@ func runAIServices(cmd *cobra.Command, args []string) error {
 			fmt.Printf("  • %s: %s\n", name, endpoint)
 		}
 	}
-	
+
 	// Display task
 	fmt.Printf("\n📋 Task: %s\n", task)
 	fmt.Printf("🧠 Model: %s\n", model)
 	fmt.Println("\n" + strings.Repeat("=", 70))
-	
+
 	// Execute investigation with services
 	fmt.Println("\n🔍 Starting service-based investigation...\n")
-	
+
 	report, err := orchestrator.ExecuteWithServices(ctx, task)
 	if err != nil {
 		return fmt.Errorf("investigation failed: %w", err)
 	}
-	
+
 	// Display tool usage
 	if len(report.ToolUses) > 0 {
 		fmt.Println("\n🛠️  Tools Used:")
@@ -114,13 +114,13 @@ func runAIServices(cmd *cobra.Command, args []string) error {
 			}
 		}
 	}
-	
+
 	// Display analysis
 	fmt.Println("\n" + strings.Repeat("=", 70))
 	fmt.Println("\n📊 Analysis:")
 	fmt.Println(report.Analysis)
 	fmt.Println("\n" + strings.Repeat("=", 70))
-	
+
 	// Service management
 	if keepServices {
 		fmt.Println("\n⚡ Services kept running. Endpoints:")
@@ -131,13 +131,13 @@ func runAIServices(cmd *cobra.Command, args []string) error {
 	} else {
 		fmt.Println("\n🛑 Shutting down services...")
 	}
-	
+
 	// Export endpoints if requested
 	if exportFile, _ := cmd.Flags().GetString("export-endpoints"); exportFile != "" {
 		// Save endpoints to file
 		fmt.Printf("\n💾 Endpoints exported to: %s\n", exportFile)
 	}
-	
+
 	// Show benefits of service approach
 	green := color.New(color.FgGreen)
 	green.Println("\n✨ Benefits of Service-Based Architecture:")
@@ -145,6 +145,6 @@ func runAIServices(cmd *cobra.Command, args []string) error {
 	fmt.Println("  • Services can be scaled separately")
 	fmt.Println("  • Clear HTTP APIs for integration")
 	fmt.Println("  • Services can be reused by other tools")
-	
+
 	return nil
 }

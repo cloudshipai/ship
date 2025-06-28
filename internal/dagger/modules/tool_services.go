@@ -67,7 +67,7 @@ func NewTerraformDocsService(client *dagger.Client) *dagger.Service {
 func NewToolRegistryService(client *dagger.Client, services map[string]*dagger.Service) *dagger.Service {
 	// Create a registry that knows about all services
 	registryCode := generateRegistryCode(services)
-	
+
 	container := client.Container().
 		From("golang:1.21-alpine").
 		WithNewFile("/app/registry.go", dagger.ContainerWithNewFileOpts{
@@ -88,10 +88,10 @@ func NewToolRegistryService(client *dagger.Client, services map[string]*dagger.S
 
 // LLMWithServiceTools creates an LLM that can call services as tools
 type LLMWithServiceTools struct {
-	client          *dagger.Client
-	model           string
-	toolRegistry    *dagger.Service
-	services        map[string]*dagger.Service
+	client       *dagger.Client
+	model        string
+	toolRegistry *dagger.Service
+	services     map[string]*dagger.Service
 }
 
 // NewLLMWithServiceTools creates an LLM with access to tool services
@@ -153,7 +153,7 @@ You can make multiple requests to gather information.
 
 	// Execute investigation with service calls
 	// The LLM would generate curl commands or HTTP requests to the services
-	
+
 	return &ServiceInvestigationReport{
 		Task:         task,
 		ServicesUsed: []string{"steampipe", "openinfraquote"},

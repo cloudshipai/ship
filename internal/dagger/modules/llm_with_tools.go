@@ -10,11 +10,11 @@ import (
 
 // LLMWithToolsModule extends LLM with ability to use other modules as tools
 type LLMWithToolsModule struct {
-	client           *dagger.Client
-	model            string
-	steampipeModule  *SteampipeModule
-	openInfraModule  *OpenInfraQuoteModule
-	terraformDocs    *TerraformDocsModule
+	client          *dagger.Client
+	model           string
+	steampipeModule *SteampipeModule
+	openInfraModule *OpenInfraQuoteModule
+	terraformDocs   *TerraformDocsModule
 }
 
 // NewLLMWithToolsModule creates an LLM that can use other modules as tools
@@ -52,7 +52,7 @@ After receiving results, you can use more tools or provide final analysis.
 
 	// Initial prompt with objective and available tools
 	systemPrompt := "You are an infrastructure investigator with access to real tools. " + toolsPrompt
-	
+
 	// Create LLM with tool-use system prompt
 	llm := m.client.LLM(dagger.LLMOpts{
 		Model: m.model,
@@ -60,7 +60,7 @@ After receiving results, you can use more tools or provide final analysis.
 
 	// Start investigation
 	conversation := llm.WithPrompt(fmt.Sprintf("Investigate: %s\n\nFirst, plan what tools you'll use.", objective))
-	
+
 	// Execute up to 5 tool uses
 	var toolResults []ToolResult
 	for i := 0; i < 5; i++ {
@@ -69,12 +69,12 @@ After receiving results, you can use more tools or provide final analysis.
 		if err != nil {
 			return nil, fmt.Errorf("LLM sync failed: %w", err)
 		}
-		
+
 		response, err := synced.LastReply(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get LLM response: %w", err)
 		}
-		
+
 		// Check if response contains tool request
 		var toolRequest ToolRequest
 		if err := json.Unmarshal([]byte(response), &toolRequest); err == nil {
@@ -85,36 +85,36 @@ After receiving results, you can use more tools or provide final analysis.
 				conversation = conversation.WithPrompt(fmt.Sprintf("Tool error: %v", err))
 				continue
 			}
-			
+
 			toolResults = append(toolResults, result)
-			
+
 			// Feed results back to LLM
 			conversation = conversation.WithPrompt(fmt.Sprintf(
-				"Tool '%s' returned:\n%s\n\nWhat would you like to do next?", 
+				"Tool '%s' returned:\n%s\n\nWhat would you like to do next?",
 				toolRequest.Tool, result.Output,
 			))
 		} else {
 			// LLM provided final analysis
 			return &InvestigationReport{
-				Objective:   objective,
-				ToolsUsed:   toolResults,
-				Analysis:    response,
+				Objective: objective,
+				ToolsUsed: toolResults,
+				Analysis:  response,
 			}, nil
 		}
 	}
-	
+
 	// Ask for final summary
 	finalConv := conversation.WithPrompt("Please provide a final summary of your investigation findings.")
 	synced, err := finalConv.Sync(ctx)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	analysis, err := synced.LastReply(ctx)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &InvestigationReport{
 		Objective: objective,
 		ToolsUsed: toolResults,
@@ -129,7 +129,7 @@ func (m *LLMWithToolsModule) executeTool(ctx context.Context, request ToolReques
 		// Execute Steampipe query
 		provider := request.Params["provider"]
 		sql := request.Params["sql"]
-		
+
 		output, err := m.steampipeModule.RunQuery(ctx, provider, sql, nil)
 		return ToolResult{
 			Tool:   "steampipe",
@@ -137,7 +137,7 @@ func (m *LLMWithToolsModule) executeTool(ctx context.Context, request ToolReques
 			Output: output,
 			Error:  err,
 		}, err
-		
+
 	case "openinfraquote":
 		// Run cost analysis
 		file := request.Params["file"]
@@ -145,7 +145,7 @@ func (m *LLMWithToolsModule) executeTool(ctx context.Context, request ToolReques
 		if region == "" {
 			region = "us-east-1"
 		}
-		
+
 		output, err := m.openInfraModule.AnalyzePlan(ctx, file, region)
 		return ToolResult{
 			Tool:   "openinfraquote",
@@ -153,11 +153,11 @@ func (m *LLMWithToolsModule) executeTool(ctx context.Context, request ToolReques
 			Output: output,
 			Error:  err,
 		}, err
-		
+
 	case "terraform-docs":
 		// Generate documentation
 		path := request.Params["path"]
-		
+
 		output, err := m.terraformDocs.GenerateMarkdown(ctx, path)
 		return ToolResult{
 			Tool:   "terraform-docs",
@@ -165,7 +165,7 @@ func (m *LLMWithToolsModule) executeTool(ctx context.Context, request ToolReques
 			Output: output,
 			Error:  err,
 		}, err
-		
+
 	default:
 		return ToolResult{}, fmt.Errorf("unknown tool: %s", request.Tool)
 	}
@@ -208,13 +208,13 @@ Perform a comprehensive security audit of %s infrastructure:
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Parse findings into structured report
 	return &SecurityAuditReport{
-		Provider:       provider,
-		ToolsExecuted:  len(report.ToolsUsed),
-		Findings:       report.Analysis,
-		Timestamp:      ctx.Value("timestamp").(string),
+		Provider:      provider,
+		ToolsExecuted: len(report.ToolsUsed),
+		Findings:      report.Analysis,
+		Timestamp:     ctx.Value("timestamp").(string),
 	}, nil
 }
 
@@ -240,7 +240,7 @@ Analyze infrastructure costs and provide optimization recommendations:
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &CostReport{
 		PlanFile:        tfplanPath,
 		Analysis:        report.Analysis,

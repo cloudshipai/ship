@@ -30,27 +30,27 @@ func NewLLMServiceOrchestrator(client *dagger.Client, model string) *LLMServiceO
 // StartToolServices starts all tool services and returns their endpoints
 func (o *LLMServiceOrchestrator) StartToolServices(ctx context.Context) (map[string]string, error) {
 	endpoints := make(map[string]string)
-	
+
 	// Start Steampipe service
 	steampipeService := o.createSteampipeService()
 	o.services["steampipe"] = steampipeService
 	endpoints["steampipe"] = "http://steampipe:8001"
-	
-	// Start OpenInfraQuote service  
+
+	// Start OpenInfraQuote service
 	costService := o.createCostAnalysisService()
 	o.services["cost-analysis"] = costService
 	endpoints["cost-analysis"] = "http://cost-analysis:8002"
-	
+
 	// Start Terraform Docs service
 	docsService := o.createDocsService()
 	o.services["terraform-docs"] = docsService
 	endpoints["terraform-docs"] = "http://terraform-docs:8003"
-	
+
 	// Start Security Scan service
 	securityService := o.createSecurityScanService()
 	o.services["security-scan"] = securityService
 	endpoints["security-scan"] = "http://security-scan:8004"
-	
+
 	return endpoints, nil
 }
 
@@ -202,21 +202,21 @@ func (o *LLMServiceOrchestrator) ExecuteWithServices(ctx context.Context, task s
 	if err != nil {
 		return nil, fmt.Errorf("failed to start services: %w", err)
 	}
-	
+
 	// Create a container that can access all services
 	orchestratorContainer := o.client.Container().
 		From("alpine:latest").
 		WithExec([]string{"apk", "add", "--no-cache", "curl", "jq"})
-	
+
 	// Bind all services to the orchestrator
 	for name, service := range o.services {
 		orchestratorContainer = orchestratorContainer.
 			WithServiceBinding(name, service)
 	}
-	
+
 	// Create LLM with knowledge of service endpoints
 	toolsDescription := o.generateToolsDescription(endpoints)
-	
+
 	llm := o.client.LLM(dagger.LLMOpts{
 		Model: o.model,
 	}).
@@ -235,7 +235,7 @@ Format your tool requests as JSON:
 
 After each tool use, analyze the results and decide next steps.`, toolsDescription)).
 		WithPrompt(fmt.Sprintf("Task: %s\n\nBegin your investigation.", task))
-	
+
 	// Execute investigation loop
 	var toolUses []ToolUse
 	for i := 0; i < 5; i++ {
@@ -244,12 +244,12 @@ After each tool use, analyze the results and decide next steps.`, toolsDescripti
 		if err != nil {
 			return nil, err
 		}
-		
+
 		response, err := synced.LastReply(ctx)
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Check if LLM wants to use a tool
 		if strings.Contains(response, `"tool":`) {
 			// Parse tool request
@@ -262,7 +262,7 @@ After each tool use, analyze the results and decide next steps.`, toolsDescripti
 				if err := json.Unmarshal([]byte(jsonStr), &toolRequest); err == nil {
 					// Execute tool via HTTP in the orchestrator container
 					result, err := o.executeToolInContainer(ctx, orchestratorContainer, toolRequest, endpoints)
-					
+
 					toolUse := ToolUse{
 						Tool:     toolRequest.Tool,
 						Endpoint: toolRequest.Endpoint,
@@ -270,7 +270,7 @@ After each tool use, analyze the results and decide next steps.`, toolsDescripti
 						Error:    err,
 					}
 					toolUses = append(toolUses, toolUse)
-					
+
 					// Feed result back to LLM
 					llm = llm.WithPrompt(fmt.Sprintf("Tool result:\n%s\n\nContinue investigation.", result))
 				}
@@ -285,12 +285,12 @@ After each tool use, analyze the results and decide next steps.`, toolsDescripti
 			}, nil
 		}
 	}
-	
+
 	// Get final analysis
 	finalLLM := llm.WithPrompt("Provide your final analysis and recommendations.")
 	synced, _ := finalLLM.Sync(ctx)
 	analysis, _ := synced.LastReply(ctx)
-	
+
 	return &ServiceExecutionReport{
 		Task:      task,
 		ToolUses:  toolUses,
@@ -310,7 +310,7 @@ func (o *LLMServiceOrchestrator) executeToolInContainer(
 	if endpoint == "" {
 		return "", fmt.Errorf("unknown tool: %s", request.Tool)
 	}
-	
+
 	// Build curl command
 	dataJSON, _ := json.Marshal(request.Data)
 	curlCmd := []string{
@@ -319,12 +319,12 @@ func (o *LLMServiceOrchestrator) executeToolInContainer(
 		"-d", string(dataJSON),
 		endpoint + request.Endpoint,
 	}
-	
+
 	// Execute in container with service bindings
 	result, err := container.
 		WithExec(curlCmd).
 		Stdout(ctx)
-	
+
 	return result, err
 }
 

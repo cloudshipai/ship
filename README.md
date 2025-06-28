@@ -101,6 +101,10 @@ ship terraform-tools generate-docs > README.md
 
 ### 3. AI-Powered Infrastructure Investigation
 
+Ship CLI offers multiple AI-powered approaches to analyze and investigate your infrastructure:
+
+#### Basic AI Investigation
+
 Query your live cloud infrastructure using natural language with Steampipe-powered analysis:
 
 ```bash
@@ -119,18 +123,58 @@ ship ai-investigate --prompt "Show me any unused or idle resources that might be
 ship ai-investigate --prompt "Find all publicly accessible RDS instances" --execute
 ```
 
+#### Autonomous AI Agent
+
+Let the AI agent autonomously investigate your infrastructure using multiple tools:
+
+```bash
+# Run a comprehensive security audit with autonomous decision-making
+ship ai-agent --task "Perform complete security audit of AWS infrastructure"
+
+# Cost optimization with detailed analysis
+ship ai-agent --task "Optimize costs for our production environment" --max-steps 15
+
+# Documentation and compliance check
+ship ai-agent --task "Document all Terraform modules and check for compliance issues"
+
+# Interactive mode - approve each tool use
+ship ai-agent --task "Analyze security posture and fix critical issues" --approve-each
+```
+
+#### Microservices-Based AI Investigation
+
+Run AI investigation with each tool as a separate scalable service:
+
+```bash
+# Launch AI with microservices architecture
+ship ai-services --task "Audit security across all AWS resources"
+
+# Show service endpoints for debugging
+ship ai-services --task "Generate cost report with optimization recommendations" --show-endpoints
+
+# Keep services running for other tools to use
+ship ai-services --task "Document infrastructure and analyze patterns" --keep-services
+
+# Export service endpoints for integration
+ship ai-services --task "Full infrastructure analysis" --export-endpoints services.json
+```
+
 #### How it works:
 1. **Natural Language Processing**: Ship analyzes your prompt to understand what you're looking for
 2. **Dynamic Query Generation**: Automatically generates appropriate Steampipe SQL queries
 3. **Multi-Step Investigation**: Creates comprehensive investigation plans with multiple related queries
 4. **Real-Time Analysis**: Executes queries against your live cloud infrastructure
 5. **Intelligent Insights**: Provides security findings, cost optimization tips, and actionable recommendations
+6. **Tool Orchestration**: AI agents can autonomously use Steampipe, OpenInfraQuote, Terraform-docs, and security scanners
+7. **Service Architecture**: Optional microservices mode for enterprise-scale deployments
 
-#### Supported Prompts:
+#### Supported AI Capabilities:
 - **Security Analysis**: "Check for security vulnerabilities", "Find open security groups", "Show unencrypted resources"
 - **Cost Optimization**: "Find unused resources", "Show expensive instances", "Identify idle resources"
 - **Resource Inventory**: "List all S3 buckets", "Show running instances", "Find RDS databases"
 - **Compliance Checks**: "Check encryption status", "Verify MFA settings", "Audit logging configuration"
+- **Autonomous Investigation**: AI agent can chain multiple tools to solve complex problems
+- **Service-Based Architecture**: Run tools as HTTP services for better scalability
 
 ### 4. AI Assistant Integration (MCP)
 

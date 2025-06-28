@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 
 	"dagger.io/dagger"
@@ -60,8 +58,7 @@ func (o *LLMServiceOrchestrator) createSteampipeService() *dagger.Service {
 	return o.client.Container().
 		From("turbot/steampipe:latest").
 		WithExec([]string{"steampipe", "plugin", "install", "aws"}).
-		WithNewFile("/app/api.py", dagger.ContainerWithNewFileOpts{
-			Contents: `
+		WithNewFile("/app/api.py", `
 import json
 import subprocess
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -91,8 +88,7 @@ class SteampipeHandler(BaseHTTPRequestHandler):
 httpd = HTTPServer(('0.0.0.0', 8001), SteampipeHandler)
 print('Steampipe API running on :8001')
 httpd.serve_forever()
-`,
-		}).
+`).
 		WithExec([]string{"python3", "/app/api.py"}).
 		WithExposedPort(8001).
 		AsService()
@@ -102,8 +98,7 @@ httpd.serve_forever()
 func (o *LLMServiceOrchestrator) createCostAnalysisService() *dagger.Service {
 	return o.client.Container().
 		From("ghcr.io/terrateamio/openinfraquote:latest").
-		WithNewFile("/app/api.py", dagger.ContainerWithNewFileOpts{
-			Contents: `
+		WithNewFile("/app/api.py", `
 import json
 import subprocess
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -133,8 +128,7 @@ class CostHandler(BaseHTTPRequestHandler):
 httpd = HTTPServer(('0.0.0.0', 8002), CostHandler)
 print('Cost Analysis API running on :8002')
 httpd.serve_forever()
-`,
-		}).
+`).
 		WithExec([]string{"python3", "/app/api.py"}).
 		WithExposedPort(8002).
 		AsService()
@@ -144,13 +138,12 @@ httpd.serve_forever()
 func (o *LLMServiceOrchestrator) createDocsService() *dagger.Service {
 	return o.client.Container().
 		From("quay.io/terraform-docs/terraform-docs:latest").
-		WithNewFile("/app/api.sh", dagger.ContainerWithNewFileOpts{
-			Contents: `#!/bin/sh
+		WithNewFile("/app/api.sh", `#!/bin/sh
 # Simple HTTP API for terraform-docs
 while true; do
   echo -e "HTTP/1.1 200 OK\n\n{\"docs\": \"Generated documentation\"}" | nc -l -p 8003
 done
-`,
+`, dagger.ContainerWithNewFileOpts{
 			Permissions: 0755,
 		}).
 		WithExec([]string{"/app/api.sh"}).
@@ -162,8 +155,7 @@ done
 func (o *LLMServiceOrchestrator) createSecurityScanService() *dagger.Service {
 	return o.client.Container().
 		From("bridgecrew/checkov:latest").
-		WithNewFile("/app/api.py", dagger.ContainerWithNewFileOpts{
-			Contents: `
+		WithNewFile("/app/api.py", `
 import json
 import subprocess
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -188,8 +180,7 @@ class SecurityHandler(BaseHTTPRequestHandler):
 httpd = HTTPServer(('0.0.0.0', 8004), SecurityHandler)
 print('Security Scan API running on :8004')
 httpd.serve_forever()
-`,
-		}).
+`).
 		WithExec([]string{"python", "/app/api.py"}).
 		WithExposedPort(8004).
 		AsService()

@@ -46,7 +46,7 @@ func runAIAgent(cmd *cobra.Command, args []string) error {
 	task, _ := cmd.Flags().GetString("task")
 	llmProvider, _ := cmd.Flags().GetString("llm-provider")
 	model, _ := cmd.Flags().GetString("model")
-	maxSteps, _ := cmd.Flags().GetInt("max-steps")
+	_, _ = cmd.Flags().GetInt("max-steps") // TODO: Use for limiting tool iterations
 	approveEach, _ := cmd.Flags().GetBool("approve-each")
 
 	// Initialize Dagger engine
@@ -69,7 +69,8 @@ func runAIAgent(cmd *cobra.Command, args []string) error {
 	}
 
 	// Execute the investigation
-	fmt.Println("🔍 Starting investigation...\n")
+	fmt.Println("🔍 Starting investigation...")
+	fmt.Println()
 
 	report, err := agent.InvestigateWithTools(ctx, task)
 	if err != nil {

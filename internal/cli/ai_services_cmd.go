@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -86,7 +85,9 @@ func runAIServices(cmd *cobra.Command, args []string) error {
 	fmt.Println("\n" + strings.Repeat("=", 70))
 
 	// Execute investigation with services
-	fmt.Println("\n🔍 Starting service-based investigation...\n")
+	fmt.Println()
+	fmt.Println("🔍 Starting service-based investigation...")
+	fmt.Println()
 
 	report, err := orchestrator.ExecuteWithServices(ctx, task)
 	if err != nil {

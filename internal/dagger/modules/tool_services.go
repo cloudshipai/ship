@@ -2,9 +2,7 @@ package modules
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
 
 	"dagger.io/dagger"
 )
@@ -22,9 +20,7 @@ func NewSteampipeService(client *dagger.Client) *dagger.Service {
 	container := client.Container().
 		From("golang:1.21-alpine").
 		WithExec([]string{"apk", "add", "--no-cache", "curl"}).
-		WithNewFile("/app/server.go", dagger.ContainerWithNewFileOpts{
-			Contents: steampipeServerCode,
-		}).
+		WithNewFile("/app/server.go", steampipeServerCode).
 		WithExec([]string{"go", "run", "/app/server.go"}).
 		WithExposedPort(8001).
 		WithEnvVariable("SERVICE_NAME", "steampipe").
@@ -37,9 +33,7 @@ func NewSteampipeService(client *dagger.Client) *dagger.Service {
 func NewOpenInfraQuoteService(client *dagger.Client) *dagger.Service {
 	container := client.Container().
 		From("golang:1.21-alpine").
-		WithNewFile("/app/server.go", dagger.ContainerWithNewFileOpts{
-			Contents: costAnalysisServerCode,
-		}).
+		WithNewFile("/app/server.go", costAnalysisServerCode).
 		WithExec([]string{"go", "run", "/app/server.go"}).
 		WithExposedPort(8002).
 		WithEnvVariable("SERVICE_NAME", "openinfraquote").
@@ -52,9 +46,7 @@ func NewOpenInfraQuoteService(client *dagger.Client) *dagger.Service {
 func NewTerraformDocsService(client *dagger.Client) *dagger.Service {
 	container := client.Container().
 		From("golang:1.21-alpine").
-		WithNewFile("/app/server.go", dagger.ContainerWithNewFileOpts{
-			Contents: terraformDocsServerCode,
-		}).
+		WithNewFile("/app/server.go", terraformDocsServerCode).
 		WithExec([]string{"go", "run", "/app/server.go"}).
 		WithExposedPort(8003).
 		WithEnvVariable("SERVICE_NAME", "terraform-docs").
@@ -68,22 +60,19 @@ func NewToolRegistryService(client *dagger.Client, services map[string]*dagger.S
 	// Create a registry that knows about all services
 	registryCode := generateRegistryCode(services)
 
-	container := client.Container().
+	registryContainer := client.Container().
 		From("golang:1.21-alpine").
-		WithNewFile("/app/registry.go", dagger.ContainerWithNewFileOpts{
-			Contents: registryCode,
-		}).
+		WithNewFile("/app/registry.go", registryCode).
 		WithExec([]string{"go", "run", "/app/registry.go"}).
-		WithExposedPort(8000).
-		AsService()
+		WithExposedPort(8000)
 
 	// Bind all services to the registry container
 	for name, service := range services {
-		container = client.Container().
+		registryContainer = registryContainer.
 			WithServiceBinding(name, service)
 	}
 
-	return container.AsService()
+	return registryContainer.AsService()
 }
 
 // LLMWithServiceTools creates an LLM that can call services as tools
@@ -145,7 +134,7 @@ You can make multiple requests to gather information.
 `
 
 	// Create LLM that can make HTTP calls to services
-	llm := m.client.LLM(dagger.LLMOpts{
+	_ = m.client.LLM(dagger.LLMOpts{
 		Model: m.model,
 	}).
 		WithSystemPrompt(systemPrompt).

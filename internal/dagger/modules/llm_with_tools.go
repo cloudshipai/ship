@@ -76,7 +76,7 @@ After receiving results, you can use more tools or provide final analysis.
 		}
 
 		// Check if response contains tool request
-		var toolRequest ToolRequest
+		var toolRequest LLMToolRequest
 		if err := json.Unmarshal([]byte(response), &toolRequest); err == nil {
 			// Execute the requested tool
 			result, err := m.executeTool(ctx, toolRequest)
@@ -123,7 +123,7 @@ After receiving results, you can use more tools or provide final analysis.
 }
 
 // executeTool runs the requested tool and returns results
-func (m *LLMWithToolsModule) executeTool(ctx context.Context, request ToolRequest) (ToolResult, error) {
+func (m *LLMWithToolsModule) executeTool(ctx context.Context, request LLMToolRequest) (ToolResult, error) {
 	switch request.Tool {
 	case "steampipe":
 		// Execute Steampipe query
@@ -171,8 +171,8 @@ func (m *LLMWithToolsModule) executeTool(ctx context.Context, request ToolReques
 	}
 }
 
-// ToolRequest represents a tool use request from the LLM
-type ToolRequest struct {
+// LLMToolRequest represents a tool use request from the LLM
+type LLMToolRequest struct {
 	Tool   string            `json:"tool"`
 	Action string            `json:"action"`
 	Params map[string]string `json:"params"`

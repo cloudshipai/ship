@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -52,14 +53,42 @@ func runAIInvestigate(cmd *cobra.Command, args []string) error {
 	defer engine.Close()
 
 	// Create modules
-	_ = modules.NewLLMModule(engine.GetClient(), llmProvider, model) // Will be used for actual LLM calls in production
+	// Use native Dagger LLM module if available, otherwise fall back to custom implementation
+	var llmModule interface {
+		CreateInvestigationPlan(ctx context.Context, objective string, providers []string) ([]modules.InvestigationStep, error)
+		AnalyzeSteampipeResults(ctx context.Context, queryResults string, queryContext string) (string, error)
+	}
+	
+	// Try native Dagger LLM first
+	if llmProvider != "" {
+		llmModule = modules.NewDaggerLLMModule(engine.GetClient(), model)
+	} else {
+		// Fall back to our custom LLM module
+		llmModule = modules.NewLLMModule(engine.GetClient(), llmProvider, model)
+	}
+	
 	steampipeModule := engine.NewSteampipeModule()
 
 	// Step 1: Generate investigation plan
 	fmt.Printf("\n🤖 AI: Creating investigation plan for: %s\n", prompt)
 
-	// Generate dynamic investigation plan based on the prompt
-	investigationSteps := GenerateInvestigationPlan(ctx, prompt, provider)
+	// Generate investigation plan using LLM if available
+	var investigationSteps []modules.InvestigationStep
+	if llmProvider != "" && model != "" {
+		// Try to use LLM module for smarter plan generation
+		steps, err := llmModule.CreateInvestigationPlan(ctx, prompt, []string{provider})
+		if err == nil && len(steps) > 0 {
+			investigationSteps = steps
+			fmt.Println("✨ Using AI-generated investigation plan")
+		} else {
+			// Fallback to hardcoded logic
+			investigationSteps = GenerateInvestigationPlan(ctx, prompt, provider)
+			fmt.Println("📋 Using rule-based investigation plan")
+		}
+	} else {
+		// Use hardcoded logic when no LLM configured
+		investigationSteps = GenerateInvestigationPlan(ctx, prompt, provider)
+	}
 
 	// Display the plan
 	fmt.Println("\n📋 Investigation Plan:")
@@ -125,8 +154,24 @@ func runAIInvestigate(cmd *cobra.Command, args []string) error {
 	// Step 3: AI Analysis
 	fmt.Println("\n🧠 AI Analysis:")
 
-	// Generate insights based on actual results
-	insights := ParseQueryResults(allResults, prompt)
+	// Try to use LLM for deeper analysis if available
+	var insights string
+	if llmProvider != "" && model != "" && len(allResults) > 0 {
+		// Convert results to JSON for LLM analysis
+		resultsJSON, _ := json.Marshal(allResults)
+		llmInsights, err := llmModule.AnalyzeSteampipeResults(ctx, string(resultsJSON), prompt)
+		if err == nil && llmInsights != "" {
+			insights = llmInsights
+			fmt.Println("✨ Using AI-powered analysis")
+		} else {
+			// Fallback to rule-based analysis
+			insights = ParseQueryResults(allResults, prompt)
+			fmt.Println("📋 Using rule-based analysis")
+		}
+	} else {
+		// Use hardcoded analysis when no LLM configured
+		insights = ParseQueryResults(allResults, prompt)
+	}
 
 	if insights != "" {
 		fmt.Println("\n📊 Summary of Findings:")

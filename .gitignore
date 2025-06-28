@@ -34,3 +34,4 @@ go.work.sum
 # Ship CLI binary
 ship
 dist/
+test-fresh/

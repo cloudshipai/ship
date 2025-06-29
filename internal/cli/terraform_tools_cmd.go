@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cloudship/ship/internal/dagger"
-	"github.com/cloudship/ship/internal/dagger/modules"
+	"github.com/cloudshipai/ship/internal/dagger"
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )

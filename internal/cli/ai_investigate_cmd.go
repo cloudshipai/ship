@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/cloudship/ship/internal/dagger"
-	"github.com/cloudship/ship/internal/dagger/modules"
+	"github.com/cloudshipai/ship/internal/dagger"
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/spf13/cobra"
 )
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cloudship/ship/internal/dagger/modules"
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 )
 
 // QueryTemplate represents a template for generating Steampipe queries

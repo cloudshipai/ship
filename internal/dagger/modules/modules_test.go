@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"dagger.io/dagger"
-	"github.com/cloudship/ship/internal/dagger/modules"
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

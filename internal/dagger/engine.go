@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"dagger.io/dagger"
-	"github.com/cloudship/ship/internal/dagger/modules"
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 )
 
 // Engine manages the Dagger client and provides methods to run Dagger pipelines

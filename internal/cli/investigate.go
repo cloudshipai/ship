@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cloudship/ship/internal/dagger"
+	"github.com/cloudshipai/ship/internal/dagger"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )

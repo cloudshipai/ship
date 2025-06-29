@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cloudship/ship/internal/cli"
+	"github.com/cloudshipai/ship/internal/cli"
 )
 
 var (

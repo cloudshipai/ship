@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cloudship/ship/internal/config"
+	"github.com/cloudshipai/ship/internal/config"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )

@@ -7,7 +7,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/cloudship/ship/internal/modules"
+	"github.com/cloudshipai/ship/internal/modules"
 	"github.com/spf13/cobra"
 )
 

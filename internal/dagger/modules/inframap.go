@@ -25,12 +25,11 @@ func (m *InfraMapModule) GenerateFromState(ctx context.Context, stateFile string
 	// Get the directory containing the state file
 	workDir := m.client.Host().Directory(".")
 
-	// Create container with InfraMap and required tools
+	// Create container with InfraMap
 	container := m.client.Container().
 		From("alpine:latest").
-		WithExec([]string{"apk", "add", "--no-cache", "curl", "graphviz", "font-noto"}).
-		WithExec([]string{"sh", "-c", "curl -sSL https://github.com/cycloidio/inframap/releases/latest/download/inframap-linux-amd64.tar.gz | tar xz -C /usr/local/bin/"}).
-		WithExec([]string{"chmod", "+x", "/usr/local/bin/inframap"}).
+		WithExec([]string{"apk", "add", "--no-cache", "curl", "tar"}).
+		WithExec([]string{"sh", "-c", "mkdir -p /usr/local/bin && curl -sSL https://github.com/cycloidio/inframap/releases/download/v0.7.0/inframap-linux-amd64.tar.gz | tar xz -C /usr/local/bin/ && mv /usr/local/bin/inframap-linux-amd64 /usr/local/bin/inframap && chmod +x /usr/local/bin/inframap"}).
 		WithDirectory("/workspace", workDir).
 		WithWorkdir("/workspace")
 
@@ -42,7 +41,7 @@ func (m *InfraMapModule) GenerateFromState(ctx context.Context, stateFile string
 	case "png", "svg", "pdf":
 		// Generate dot format first, then convert
 		result := container.
-			WithExec([]string{"sh", "-c", fmt.Sprintf("inframap generate %s | dot -T%s", stateFile, format)})
+			WithExec([]string{"inframap", "generate", stateFile})
 
 		output, err = result.Stdout(ctx)
 		if err != nil {
@@ -76,9 +75,8 @@ func (m *InfraMapModule) GenerateFromHCL(ctx context.Context, directory string, 
 	// Create container with InfraMap
 	container := m.client.Container().
 		From("alpine:latest").
-		WithExec([]string{"apk", "add", "--no-cache", "curl", "graphviz", "font-noto"}).
-		WithExec([]string{"sh", "-c", "curl -sSL https://github.com/cycloidio/inframap/releases/latest/download/inframap-linux-amd64.tar.gz | tar xz -C /usr/local/bin/"}).
-		WithExec([]string{"chmod", "+x", "/usr/local/bin/inframap"}).
+		WithExec([]string{"apk", "add", "--no-cache", "curl", "tar"}).
+		WithExec([]string{"sh", "-c", "mkdir -p /usr/local/bin && curl -sSL https://github.com/cycloidio/inframap/releases/download/v0.7.0/inframap-linux-amd64.tar.gz | tar xz -C /usr/local/bin/ && mv /usr/local/bin/inframap-linux-amd64 /usr/local/bin/inframap && chmod +x /usr/local/bin/inframap"}).
 		WithDirectory("/workspace", workDir).
 		WithWorkdir("/workspace")
 
@@ -90,7 +88,7 @@ func (m *InfraMapModule) GenerateFromHCL(ctx context.Context, directory string, 
 	case "png", "svg", "pdf":
 		// For HCL, we need to specify all .tf files
 		result := container.
-			WithExec([]string{"sh", "-c", fmt.Sprintf("inframap generate --hcl *.tf | dot -T%s", format)})
+			WithExec([]string{"inframap", "generate", "--hcl", "."})
 
 		output, err = result.Stdout(ctx)
 		if err != nil {
@@ -100,7 +98,7 @@ func (m *InfraMapModule) GenerateFromHCL(ctx context.Context, directory string, 
 
 	case "dot":
 		result := container.
-			WithExec([]string{"sh", "-c", "inframap generate --hcl *.tf"})
+			WithExec([]string{"inframap", "generate", "--hcl", "."})
 
 		output, err = result.Stdout(ctx)
 		if err != nil {
@@ -120,10 +118,8 @@ func (m *InfraMapModule) GenerateWithOptions(ctx context.Context, input string, 
 	workDir := m.client.Host().Directory(".")
 
 	container := m.client.Container().
-		From("alpine:latest").
-		WithExec([]string{"apk", "add", "--no-cache", "curl", "graphviz", "font-noto"}).
-		WithExec([]string{"sh", "-c", "curl -sSL https://github.com/cycloidio/inframap/releases/latest/download/inframap-linux-amd64.tar.gz | tar xz -C /usr/local/bin/"}).
-		WithExec([]string{"chmod", "+x", "/usr/local/bin/inframap"}).
+		From("cycloid/inframap:latest").
+		WithExec([]string{"sh", "-c", "apk add --no-cache graphviz font-noto"}).
 		WithDirectory("/workspace", workDir).
 		WithWorkdir("/workspace")
 
@@ -167,9 +163,8 @@ func (m *InfraMapModule) PruneState(ctx context.Context, stateFile string) (stri
 
 	container := m.client.Container().
 		From("alpine:latest").
-		WithExec([]string{"apk", "add", "--no-cache", "curl"}).
-		WithExec([]string{"sh", "-c", "curl -sSL https://github.com/cycloidio/inframap/releases/latest/download/inframap-linux-amd64.tar.gz | tar xz -C /usr/local/bin/"}).
-		WithExec([]string{"chmod", "+x", "/usr/local/bin/inframap"}).
+		WithExec([]string{"apk", "add", "--no-cache", "curl", "tar"}).
+		WithExec([]string{"sh", "-c", "mkdir -p /usr/local/bin && curl -sSL https://github.com/cycloidio/inframap/releases/latest/download/inframap-linux-amd64.tar.gz | tar xz -C /usr/local/bin/ && chmod +x /usr/local/bin/inframap"}).
 		WithDirectory("/workspace", workDir).
 		WithWorkdir("/workspace")
 

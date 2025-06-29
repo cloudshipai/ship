@@ -192,13 +192,14 @@ ship ai-services --task "Full infrastructure analysis" --export-endpoints servic
 3. **Multi-Step Investigation**: Creates comprehensive investigation plans with multiple related queries
 4. **Real-Time Analysis**: Executes queries against your live cloud infrastructure
 5. **Intelligent Insights**: Provides security findings, cost optimization tips, and actionable recommendations
-6. **Tool Orchestration**: AI agents can autonomously use Steampipe, OpenInfraQuote, Terraform-docs, and security scanners
+6. **Tool Orchestration**: AI agents can autonomously use Steampipe, OpenInfraQuote, Terraform-docs, InfraMap, and security scanners
 7. **Service Architecture**: Optional microservices mode for enterprise-scale deployments
 
 #### Supported AI Capabilities:
 - **Security Analysis**: "Check for security vulnerabilities", "Find open security groups", "Show unencrypted resources"
 - **Cost Optimization**: "Find unused resources", "Show expensive instances", "Identify idle resources"
 - **Resource Inventory**: "List all S3 buckets", "Show running instances", "Find RDS databases"
+- **Infrastructure Visualization**: "Generate infrastructure diagram", "Create visual documentation", "Diagram dependencies"
 - **Compliance Checks**: "Check encryption status", "Verify MFA settings", "Audit logging configuration"
 - **Autonomous Investigation**: AI agent can chain multiple tools to solve complex problems
 - **Service-Based Architecture**: Run tools as HTTP services for better scalability

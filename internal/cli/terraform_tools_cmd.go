@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/cloudship/ship/internal/dagger"
+	"github.com/cloudship/ship/internal/dagger/modules"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
@@ -58,6 +59,15 @@ var infracostCmd = &cobra.Command{
 	RunE:  runInfracost,
 }
 
+var infraMapCmd = &cobra.Command{
+	Use:   "generate-diagram [input]",
+	Short: "Generate infrastructure diagram using InfraMap",
+	Long: `Generate visual infrastructure diagrams from Terraform state files or HCL configurations.
+InfraMap creates human-readable graphs showing infrastructure dependencies and relationships.`,
+	Args: cobra.MaximumNArgs(1),
+	RunE: runInfraMap,
+}
+
 func init() {
 	rootCmd.AddCommand(terraformToolsCmd)
 	terraformToolsCmd.AddCommand(costAnalysisCmd)
@@ -66,6 +76,7 @@ func init() {
 	terraformToolsCmd.AddCommand(lintCmd)
 	terraformToolsCmd.AddCommand(checkovScanCmd)
 	terraformToolsCmd.AddCommand(infracostCmd)
+	terraformToolsCmd.AddCommand(infraMapCmd)
 
 	// Add output file flags
 	generateDocsCmd.Flags().StringP("output", "o", "", "Output file to save documentation (default: print to stdout)")
@@ -86,6 +97,13 @@ func init() {
 
 	infracostCmd.Flags().StringP("output", "o", "", "Output file to save cost estimation (default: print to stdout)")
 	infracostCmd.Flags().StringP("format", "", "table", "Output format: json, table, html")
+
+	infraMapCmd.Flags().StringP("output", "o", "", "Output file to save diagram (default: print to stdout)")
+	infraMapCmd.Flags().StringP("format", "", "png", "Output format: png, svg, pdf, dot")
+	infraMapCmd.Flags().Bool("hcl", false, "Generate from HCL files instead of state file")
+	infraMapCmd.Flags().Bool("raw", false, "Show all resources without InfraMap logic")
+	infraMapCmd.Flags().Bool("no-clean", false, "Don't remove unconnected nodes")
+	infraMapCmd.Flags().String("provider", "", "Filter by specific provider (aws, google, azurerm)")
 }
 
 // saveOrPrintOutput saves output to a file or prints to stdout
@@ -371,4 +389,82 @@ func runInfracost(cmd *cobra.Command, args []string) error {
 
 	// Save or print output
 	return saveOrPrintOutput(output, outputFile, "Cost estimation completed!")
+}
+
+func runInfraMap(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
+
+	// Default to terraform.tfstate or current directory
+	input := "terraform.tfstate"
+	if len(args) > 0 {
+		input = args[0]
+	}
+
+	// Get flags
+	format, _ := cmd.Flags().GetString("format")
+	isHCL, _ := cmd.Flags().GetBool("hcl")
+	raw, _ := cmd.Flags().GetBool("raw")
+	noClean, _ := cmd.Flags().GetBool("no-clean")
+	provider, _ := cmd.Flags().GetString("provider")
+
+	// Initialize Dagger engine
+	fmt.Println("Initializing Dagger engine...")
+	engine, err := dagger.NewEngine(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize dagger: %w", err)
+	}
+	defer engine.Close()
+
+	// Create InfraMap module
+	module := engine.NewInfraMapModule()
+
+	// Generate the diagram
+	var output string
+
+	if isHCL {
+		// For HCL, input is a directory
+		if _, err := os.Stat(input); err != nil {
+			return fmt.Errorf("directory does not exist: %s", input)
+		}
+		fmt.Printf("Generating infrastructure diagram from HCL in: %s\n", input)
+		output, err = module.GenerateFromHCL(ctx, input, format)
+	} else if raw || noClean || provider != "" {
+		// Use custom options
+		options := modules.InfraMapOptions{
+			Raw:      raw,
+			Clean:    !noClean,
+			Provider: provider,
+			Format:   format,
+		}
+		fmt.Printf("Generating infrastructure diagram from: %s\n", input)
+		output, err = module.GenerateWithOptions(ctx, input, options)
+	} else {
+		// Simple state file generation
+		if _, err := os.Stat(input); err != nil {
+			return fmt.Errorf("state file does not exist: %s", input)
+		}
+		fmt.Printf("Generating infrastructure diagram from state: %s\n", input)
+		output, err = module.GenerateFromState(ctx, input, format)
+	}
+
+	if err != nil {
+		return fmt.Errorf("diagram generation failed: %w", err)
+	}
+
+	// Get output flag
+	outputFile, _ := cmd.Flags().GetString("output")
+
+	// For binary formats, we need to write as binary
+	if format != "dot" && outputFile != "" {
+		// Write binary output
+		if err := os.WriteFile(outputFile, []byte(output), 0644); err != nil {
+			return fmt.Errorf("failed to write output file: %w", err)
+		}
+		color.Green("✓ Infrastructure diagram generated!")
+		fmt.Printf("Output saved to: %s\n", outputFile)
+		return nil
+	}
+
+	// For text formats or stdout
+	return saveOrPrintOutput(output, outputFile, "Infrastructure diagram generated!")
 }

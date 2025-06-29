@@ -49,6 +49,11 @@ func (o *LLMServiceOrchestrator) StartToolServices(ctx context.Context) (map[str
 	o.services["security-scan"] = securityService
 	endpoints["security-scan"] = "http://security-scan:8004"
 
+	// Start InfraMap service
+	infraMapService := o.createInfraMapService()
+	o.services["inframap"] = infraMapService
+	endpoints["inframap"] = "http://inframap:8005"
+
 	return endpoints, nil
 }
 
@@ -183,6 +188,80 @@ httpd.serve_forever()
 `).
 		WithExec([]string{"python", "/app/api.py"}).
 		WithExposedPort(8004).
+		AsService()
+}
+
+// createInfraMapService creates a real InfraMap service
+func (o *LLMServiceOrchestrator) createInfraMapService() *dagger.Service {
+	return o.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "curl", "graphviz", "font-noto", "python3", "py3-pip"}).
+		WithExec([]string{"sh", "-c", "curl -sSL https://github.com/cycloidio/inframap/releases/latest/download/inframap-linux-amd64.tar.gz | tar xz -C /usr/local/bin/"}).
+		WithExec([]string{"chmod", "+x", "/usr/local/bin/inframap"}).
+		WithNewFile("/app/api.py", `
+import json
+import subprocess
+from http.server import HTTPServer, BaseHTTPRequestHandler
+
+class InfraMapHandler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        if self.path == '/diagram':
+            content_length = int(self.headers['Content-Length'])
+            body = self.rfile.read(content_length)
+            data = json.loads(body)
+            
+            # Build inframap command
+            cmd = ['inframap', 'generate']
+            
+            if data.get('raw', False):
+                cmd.append('--raw')
+            if data.get('provider'):
+                cmd.extend(['--provider', data['provider']])
+            if data.get('is_hcl', False):
+                cmd.append('--hcl')
+                
+            cmd.append(data.get('input', 'terraform.tfstate'))
+            
+            # Add output format conversion if needed
+            format = data.get('format', 'dot')
+            if format != 'dot':
+                # Pipe to dot for conversion
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                if result.returncode == 0:
+                    dot_cmd = ['dot', f'-T{format}']
+                    final_result = subprocess.run(dot_cmd, input=result.stdout, capture_output=True, text=True)
+                    output = final_result.stdout
+                    error = final_result.stderr
+                else:
+                    output = result.stdout
+                    error = result.stderr
+            else:
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                output = result.stdout
+                error = result.stderr
+            
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            response = {
+                'success': result.returncode == 0,
+                'output': output,
+                'error': error
+            }
+            self.wfile.write(json.dumps(response).encode())
+
+    def do_GET(self):
+        if self.path == '/health':
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b'InfraMap service healthy')
+
+httpd = HTTPServer(('0.0.0.0', 8005), InfraMapHandler)
+print('InfraMap API running on :8005')
+httpd.serve_forever()
+`).
+		WithExec([]string{"python3", "/app/api.py"}).
+		WithExposedPort(8005).
 		AsService()
 }
 
@@ -337,11 +416,16 @@ func (o *LLMServiceOrchestrator) generateToolsDescription(endpoints map[string]s
 
 4. Security Scan Service (%s)
    POST /scan - Scan for security issues
-   Body: {"path": "/code/path", "framework": "terraform"}`,
+   Body: {"path": "/code/path", "framework": "terraform"}
+
+5. InfraMap Diagram Service (%s)
+   POST /diagram - Generate infrastructure diagrams
+   Body: {"input": "terraform.tfstate", "format": "png", "is_hcl": false, "raw": false}`,
 		endpoints["steampipe"],
 		endpoints["cost-analysis"],
 		endpoints["terraform-docs"],
-		endpoints["security-scan"])
+		endpoints["security-scan"],
+		endpoints["inframap"])
 }
 
 // ToolRequest represents an LLM's request to use a tool

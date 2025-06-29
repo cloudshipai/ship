@@ -124,3 +124,8 @@ func (e *Engine) NewSteampipeModule() *modules.SteampipeModule {
 func (e *Engine) NewLLMModule(provider, model string) *modules.LLMModule {
 	return modules.NewLLMModule(e.client, provider, model)
 }
+
+// NewInfraMapModule creates a new InfraMap module
+func (e *Engine) NewInfraMapModule() *modules.InfraMapModule {
+	return modules.NewInfraMapModule(e.client)
+}

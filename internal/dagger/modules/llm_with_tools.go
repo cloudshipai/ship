@@ -15,6 +15,7 @@ type LLMWithToolsModule struct {
 	steampipeModule *SteampipeModule
 	openInfraModule *OpenInfraQuoteModule
 	terraformDocs   *TerraformDocsModule
+	infraMapModule  *InfraMapModule
 }
 
 // NewLLMWithToolsModule creates an LLM that can use other modules as tools
@@ -25,6 +26,7 @@ func NewLLMWithToolsModule(client *dagger.Client, model string) *LLMWithToolsMod
 		steampipeModule: NewSteampipeModule(client),
 		openInfraModule: NewOpenInfraQuoteModule(client),
 		terraformDocs:   NewTerraformDocsModule(client),
+		infraMapModule:  NewInfraMapModule(client),
 	}
 }
 
@@ -35,16 +37,20 @@ func (m *LLMWithToolsModule) InvestigateWithTools(ctx context.Context, objective
 You have access to the following tools:
 
 1. STEAMPIPE_QUERY: Execute SQL queries against cloud infrastructure
-   Usage: {"tool": "steampipe", "action": "query", "provider": "aws", "sql": "SELECT ..."}
+   Usage: {"tool": "steampipe", "action": "query", "params": {"provider": "aws", "sql": "SELECT ..."}}
 
 2. COST_ANALYSIS: Analyze costs of Terraform plans  
-   Usage: {"tool": "openinfraquote", "action": "analyze", "file": "path/to/tfplan.json"}
+   Usage: {"tool": "openinfraquote", "action": "analyze", "params": {"file": "path/to/tfplan.json", "region": "us-east-1"}}
 
 3. TERRAFORM_DOCS: Generate documentation for Terraform modules
-   Usage: {"tool": "terraform-docs", "action": "generate", "path": "path/to/module"}
+   Usage: {"tool": "terraform-docs", "action": "generate", "params": {"path": "path/to/module"}}
 
 4. SECURITY_SCAN: Scan for security issues
-   Usage: {"tool": "checkov", "action": "scan", "path": "path/to/code"}
+   Usage: {"tool": "checkov", "action": "scan", "params": {"path": "path/to/code"}}
+
+5. INFRAMAP_DIAGRAM: Generate infrastructure diagrams from Terraform state or HCL
+   Usage: {"tool": "inframap", "action": "diagram", "params": {"input": "terraform.tfstate", "format": "png"}}
+   Or for HCL: {"tool": "inframap", "action": "diagram-hcl", "params": {"path": ".", "format": "svg"}}
 
 To use a tool, respond with a JSON object containing the tool request.
 After receiving results, you can use more tools or provide final analysis.
@@ -165,6 +171,43 @@ func (m *LLMWithToolsModule) executeTool(ctx context.Context, request LLMToolReq
 			Output: output,
 			Error:  err,
 		}, err
+
+	case "inframap":
+		// Generate infrastructure diagram
+		switch request.Action {
+		case "diagram":
+			input := request.Params["input"]
+			format := request.Params["format"]
+			if format == "" {
+				format = "png"
+			}
+
+			output, err := m.infraMapModule.GenerateFromState(ctx, input, format)
+			return ToolResult{
+				Tool:   "inframap",
+				Action: request.Action,
+				Output: output,
+				Error:  err,
+			}, err
+
+		case "diagram-hcl":
+			path := request.Params["path"]
+			format := request.Params["format"]
+			if format == "" {
+				format = "png"
+			}
+
+			output, err := m.infraMapModule.GenerateFromHCL(ctx, path, format)
+			return ToolResult{
+				Tool:   "inframap",
+				Action: request.Action,
+				Output: output,
+				Error:  err,
+			}, err
+
+		default:
+			return ToolResult{}, fmt.Errorf("unknown inframap action: %s", request.Action)
+		}
 
 	default:
 		return ToolResult{}, fmt.Errorf("unknown tool: %s", request.Tool)

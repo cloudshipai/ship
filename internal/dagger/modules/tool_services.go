@@ -55,6 +55,19 @@ func NewTerraformDocsService(client *dagger.Client) *dagger.Service {
 	return container
 }
 
+// InfraMapService exposes infrastructure diagram generation as a service
+func NewInfraMapService(client *dagger.Client) *dagger.Service {
+	container := client.Container().
+		From("golang:1.21-alpine").
+		WithNewFile("/app/server.go", infraMapServerCode).
+		WithExec([]string{"go", "run", "/app/server.go"}).
+		WithExposedPort(8005).
+		WithEnvVariable("SERVICE_NAME", "inframap").
+		AsService()
+
+	return container
+}
+
 // ToolRegistryService provides a registry of all available tools for the LLM
 func NewToolRegistryService(client *dagger.Client, services map[string]*dagger.Service) *dagger.Service {
 	// Create a registry that knows about all services
@@ -265,6 +278,69 @@ func main() {
 }
 `
 
+const infraMapServerCode = `
+package main
+
+import (
+	"encoding/json"
+	"net/http"
+	"os/exec"
+)
+
+type DiagramRequest struct {
+	Input    string ` + "`json:\"input\"`" + `
+	Format   string ` + "`json:\"format\"`" + `
+	IsHCL    bool   ` + "`json:\"is_hcl\"`" + `
+	Raw      bool   ` + "`json:\"raw\"`" + `
+	Provider string ` + "`json:\"provider,omitempty\"`" + `
+}
+
+type DiagramResponse struct {
+	Success bool   ` + "`json:\"success\"`" + `
+	Output  string ` + "`json:\"output\"`" + `
+	Error   string ` + "`json:\"error,omitempty\"`" + `
+}
+
+func main() {
+	http.HandleFunc("/diagram", func(w http.ResponseWriter, r *http.Request) {
+		var req DiagramRequest
+		json.NewDecoder(r.Body).Decode(&req)
+		
+		// Build inframap command
+		args := []string{"inframap", "generate"}
+		
+		if req.Raw {
+			args = append(args, "--raw")
+		}
+		if req.Provider != "" {
+			args = append(args, "--provider", req.Provider)
+		}
+		if req.IsHCL {
+			args = append(args, "--hcl")
+		}
+		
+		args = append(args, req.Input)
+		
+		// Execute inframap
+		cmd := exec.Command(args[0], args[1:]...)
+		output, err := cmd.Output()
+		
+		result := DiagramResponse{Success: err == nil}
+		if err != nil {
+			result.Error = err.Error()
+		} else {
+			result.Output = string(output)
+		}
+		
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(result)
+	})
+	
+	fmt.Println("InfraMap service running on :8005")
+	http.ListenAndServe(":8005", nil)
+}
+`
+
 func generateRegistryCode(services map[string]*dagger.Service) string {
 	// Generate registry code that knows about all services
 	return `
@@ -281,6 +357,7 @@ func main() {
 			"steampipe": "http://steampipe:8001",
 			"openinfraquote": "http://openinfraquote:8002", 
 			"terraform-docs": "http://terraform-docs:8003",
+			"inframap": "http://inframap:8005",
 		}
 		
 		w.Header().Set("Content-Type", "application/json")

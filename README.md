@@ -8,6 +8,7 @@ CloudshipAI CLI - A powerful command-line tool that brings enterprise-grade infr
 - **🛡️ Security Scanning**: Multi-cloud security analysis with Checkov and Trivy
 - **💰 Cost Estimation**: Estimate infrastructure costs with Infracost and OpenInfraQuote
 - **📝 Documentation Generation**: Auto-generate beautiful Terraform module documentation
+- **📊 Infrastructure Diagrams**: Visualize your infrastructure with InfraMap integration
 - **🧠 AI-Powered Infrastructure Investigation**: Query your cloud infrastructure using natural language
 - **🔎 Real-time Cloud Analysis**: Investigate live AWS, Azure, and GCP resources with Steampipe
 - **🤖 AI Assistant Integration**: Built-in MCP server for Claude Desktop, Cursor, and other AI tools
@@ -97,9 +98,35 @@ ship terraform-tools checkov-scan
 ship terraform-tools security-scan
 ship terraform-tools cost-estimate
 ship terraform-tools generate-docs > README.md
+ship terraform-tools generate-diagram . --hcl -o infrastructure.png
 ```
 
-### 3. AI-Powered Infrastructure Investigation
+### 3. Generate Infrastructure Diagrams
+
+Visualize your infrastructure with InfraMap integration:
+
+```bash
+# Generate diagram from Terraform files (no state file needed!)
+ship terraform-tools generate-diagram . --hcl --format png -o infrastructure.png
+
+# Generate from existing state file
+ship terraform-tools generate-diagram terraform.tfstate -o current-state.png
+
+# Generate SVG for web documentation
+ship terraform-tools generate-diagram . --hcl --format svg -o architecture.svg
+
+# Filter by provider (AWS only)
+ship terraform-tools generate-diagram terraform.tfstate --provider aws -o aws-resources.png
+
+# Show all resources without filtering (raw mode)
+ship terraform-tools generate-diagram . --hcl --raw -o complete-diagram.png
+
+# Real-world example
+cd /path/to/your/terraform/project
+ship terraform-tools generate-diagram . --hcl -o docs/infrastructure-diagram.png
+```
+
+### 4. AI-Powered Infrastructure Investigation
 
 Ship CLI offers multiple AI-powered approaches to analyze and investigate your infrastructure:
 

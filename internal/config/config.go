@@ -9,10 +9,12 @@ import (
 )
 
 type Config struct {
-	Token      string          `mapstructure:"token"`
+	Token      string          `mapstructure:"token"`      // Deprecated, use APIKey
+	APIKey     string          `mapstructure:"api_key"`
 	OrgID      string          `mapstructure:"org_id"`
 	DefaultEnv string          `mapstructure:"default_env"`
 	BaseURL    string          `mapstructure:"base_url"`
+	FleetID    string          `mapstructure:"fleet_id"`    // Default fleet ID for push operations
 	Telemetry  TelemetryConfig `mapstructure:"telemetry"`
 }
 
@@ -51,12 +53,27 @@ func GetConfigPath() string {
 }
 
 func Load() (*Config, error) {
-	// Check environment variable first
-	if token := os.Getenv("SHIP_TOKEN"); token != "" {
-		return &Config{
-			Token:   token,
-			BaseURL: getBaseURL(),
-		}, nil
+	// Check environment variables first
+	cfg := &Config{
+		BaseURL: getBaseURL(),
+	}
+	
+	// Check for API key in environment
+	if apiKey := os.Getenv("CLOUDSHIP_API_KEY"); apiKey != "" {
+		cfg.APIKey = apiKey
+	} else if token := os.Getenv("SHIP_TOKEN"); token != "" {
+		// Fallback to old env var for backwards compatibility
+		cfg.APIKey = token
+	}
+	
+	// Check for fleet ID in environment
+	if fleetID := os.Getenv("CLOUDSHIP_FLEET_ID"); fleetID != "" {
+		cfg.FleetID = fleetID
+	}
+	
+	// If we have env vars, return early
+	if cfg.APIKey != "" {
+		return cfg, nil
 	}
 
 	// Create a new viper instance for loading
@@ -80,12 +97,27 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to read config: %w", err)
 	}
 
-	var cfg Config
-	if err := v.Unmarshal(&cfg); err != nil {
+	var fileCfg Config
+	if err := v.Unmarshal(&fileCfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
-	return &cfg, nil
+	// Merge file config with env config (env takes precedence)
+	if cfg.APIKey == "" {
+		cfg.APIKey = fileCfg.APIKey
+	}
+	if cfg.FleetID == "" {
+		cfg.FleetID = fileCfg.FleetID
+	}
+	if cfg.OrgID == "" {
+		cfg.OrgID = fileCfg.OrgID
+	}
+	if cfg.DefaultEnv == "" {
+		cfg.DefaultEnv = fileCfg.DefaultEnv
+	}
+	cfg.Telemetry = fileCfg.Telemetry
+
+	return cfg, nil
 }
 
 func Save(cfg *Config) error {
@@ -100,9 +132,11 @@ func Save(cfg *Config) error {
 
 	// Set all config values
 	v.Set("token", cfg.Token)
+	v.Set("api_key", cfg.APIKey)
 	v.Set("org_id", cfg.OrgID)
 	v.Set("default_env", cfg.DefaultEnv)
 	v.Set("base_url", cfg.BaseURL)
+	v.Set("fleet_id", cfg.FleetID)
 	v.Set("telemetry.enabled", cfg.Telemetry.Enabled)
 	v.Set("telemetry.session_id", cfg.Telemetry.SessionID)
 
@@ -134,7 +168,10 @@ func Clear() error {
 }
 
 func getBaseURL() string {
-	if url := os.Getenv("SHIP_API_URL"); url != "" {
+	if url := os.Getenv("CLOUDSHIP_API_URL"); url != "" {
+		return url
+	} else if url := os.Getenv("SHIP_API_URL"); url != "" {
+		// Fallback to old env var for backwards compatibility
 		return url
 	}
 	return defaultBaseURL

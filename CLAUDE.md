@@ -89,16 +89,20 @@ ship/
 
 ## Architecture Notes
 
-The project implements four main commands:
+The project implements five main commands:
 
-1. **`ship auth`** - Manages authentication tokens and config files
-2. **`ship push`** - Uploads artifacts (tfplan, SBOM, etc.) for analysis
+1. **`ship auth`** - Manages CloudShip API authentication
+2. **`ship push`** - Uploads artifacts to CloudShip for analysis
 3. **`ship investigate`** - Runs Steampipe queries via Dagger containers
 4. **`ship mcp`** - Starts MCP server for LLM tool integrations
 5. **`ship terraform-tools`** - Runs Terraform analysis tools via Dagger:
    - `cost-analysis` - Estimates costs using OpenInfraQuote
-   - `security-scan` - Scans for security issues using Trivy
+   - `security-scan` - Scans for security issues using InfraScan
    - `generate-docs` - Generates documentation using terraform-docs
+   - `lint` - Lints Terraform code using TFLint
+   - `checkov-scan` - Scans for security issues using Checkov
+   - `cost-estimate` - Estimates costs using Infracost
+   - `generate-diagram` - Generates infrastructure diagrams using InfraMap
 
 Key architectural decisions:
 - Uses Cobra for CLI framework
@@ -107,6 +111,8 @@ Key architectural decisions:
 - Max file upload size: 100MB
 - Supports AWS, Cloudflare, and Heroku providers
 - Dagger modules run containerized tools without local installation
+- All terraform-tools commands support --push flag for automatic CloudShip upload
+- CloudShip API authentication via API keys (from https://app.cloudshipai.com/settings/api-keys)
 
 ## Project Documentation
 

@@ -103,7 +103,27 @@ ship terraform-tools generate-docs > README.md
 ship terraform-tools generate-diagram . --hcl -o infrastructure.png
 ```
 
-### 3. Generate Infrastructure Diagrams
+### 3. CloudShip Integration
+
+Authenticate and push analysis results to CloudShip:
+
+```bash
+# Authenticate with CloudShip
+ship auth --api-key YOUR_API_KEY
+
+# Set your default fleet ID (optional)
+export CLOUDSHIP_FLEET_ID=your-fleet-id
+
+# Push results automatically to CloudShip
+ship terraform-tools security-scan --push
+ship terraform-tools cost-estimate --push --push-tags "production,aws"
+
+# Or push manually
+ship terraform-tools lint -o lint-results.json
+ship push lint-results.json --type lint_results --fleet-id your-fleet-id
+```
+
+### 4. Generate Infrastructure Diagrams
 
 Visualize your infrastructure with InfraMap integration:
 
@@ -128,7 +148,7 @@ cd /path/to/your/terraform/project
 ship terraform-tools generate-diagram . --hcl -o docs/infrastructure-diagram.png
 ```
 
-### 4. AI-Powered Infrastructure Investigation
+### 5. AI-Powered Infrastructure Investigation
 
 Ship CLI offers multiple AI-powered approaches to analyze and investigate your infrastructure:
 
@@ -206,7 +226,7 @@ ship ai-services --task "Full infrastructure analysis" --export-endpoints servic
 - **Autonomous Investigation**: AI agent can chain multiple tools to solve complex problems
 - **Service-Based Architecture**: Run tools as HTTP services for better scalability
 
-### 4. AI Assistant Integration (MCP)
+### 6. AI Assistant Integration (MCP)
 
 Ship CLI includes a built-in MCP (Model Context Protocol) server that makes all functionality available to AI assistants like Claude Desktop and Cursor:
 
@@ -249,7 +269,7 @@ ship mcp
 
 See the [MCP Integration Guide](docs/mcp-integration.md) for complete setup instructions.
 
-### 5. CI/CD Integration
+### 7. CI/CD Integration
 
 ```yaml
 # GitHub Actions Example

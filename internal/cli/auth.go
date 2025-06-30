@@ -2,8 +2,10 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
+	"github.com/cloudshipai/ship/internal/cloudship"
 	"github.com/cloudshipai/ship/internal/config"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -16,15 +18,28 @@ var (
 
 var authCmd = &cobra.Command{
 	Use:   "auth",
-	Short: "Authenticate with Cloudship",
-	Long:  `Authenticate with Cloudship using an API token`,
+	Short: "Authenticate with CloudShip",
+	Long:  `Authenticate with CloudShip using an API key from your CloudShip settings page.
+	
+Get your API key from: https://app.cloudshipai.com/settings/api-keys
+
+Example:
+  ship auth --api-key your-api-key-here
+  
+You can also set the API key via environment variable:
+  export CLOUDSHIP_API_KEY=your-api-key-here`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if logout {
 			return handleLogout()
 		}
 
+		// Check for API key from flag or environment
 		if authToken == "" {
-			return fmt.Errorf("--token flag is required")
+			authToken = os.Getenv("CLOUDSHIP_API_KEY")
+		}
+
+		if authToken == "" {
+			return fmt.Errorf("--api-key flag is required or set CLOUDSHIP_API_KEY environment variable")
 		}
 
 		return handleAuth(authToken)
@@ -34,8 +49,12 @@ var authCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(authCmd)
 
-	authCmd.Flags().StringVar(&authToken, "token", "", "API token (required)")
+	authCmd.Flags().StringVar(&authToken, "api-key", "", "CloudShip API key")
 	authCmd.Flags().BoolVar(&logout, "logout", false, "Log out and clear stored credentials")
+	
+	// Keep old flag for backwards compatibility
+	authCmd.Flags().StringVar(&authToken, "token", "", "API token (deprecated, use --api-key)")
+	authCmd.Flags().MarkDeprecated("token", "use --api-key instead")
 }
 
 func handleAuth(token string) error {
@@ -45,25 +64,33 @@ func handleAuth(token string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// For now, skip validation since we don't have a real API endpoint
-	// In production, uncomment this:
-	/*
-		// Validate token
-		fmt.Println("Validating token...")
-		authClient := auth.NewClient(cfg.BaseURL)
-		authResp, err := authClient.ValidateToken(token)
-		if err != nil {
-			return fmt.Errorf("authentication failed: %w", err)
+	// Validate API key by attempting a simple API call
+	fmt.Println("Validating API key...")
+	client := cloudship.NewClient(token)
+	
+	// Try to list artifacts with a dummy fleet ID to validate the API key
+	// The API will return 401 if the key is invalid
+	testReq := &cloudship.ListArtifactsRequest{
+		FleetID: "test",
+		Limit:   1,
+	}
+	
+	_, err = client.ListArtifacts(testReq)
+	if err != nil {
+		// Check if it's an auth error
+		if strings.Contains(err.Error(), "401") || strings.Contains(err.Error(), "unauthorized") {
+			return fmt.Errorf("invalid API key - please check your key and try again")
 		}
+		// Other errors might be OK (e.g., fleet not found)
+		// For now, we'll accept the key if it's not explicitly unauthorized
+	}
 
-		// Update config with validated info
-		cfg.Token = token
-		cfg.OrgID = authResp.OrgID
-	*/
-
-	// For development, just save the token
-	cfg.Token = token
-	cfg.OrgID = "dev-org" // Mock org ID
+	// Update config with API key
+	cfg.APIKey = token
+	cfg.BaseURL = os.Getenv("CLOUDSHIP_API_URL")
+	if cfg.BaseURL == "" {
+		cfg.BaseURL = cloudship.DefaultAPIURL
+	}
 
 	// Save config
 	if err := config.Save(cfg); err != nil {
@@ -72,12 +99,13 @@ func handleAuth(token string) error {
 
 	// Success message
 	green := color.New(color.FgGreen)
-	green.Printf("✓ Successfully authenticated!\n")
+	green.Printf("✓ Successfully authenticated with CloudShip!\n")
 	fmt.Printf("Configuration saved to: %s\n", config.GetConfigPath())
 
 	// Show masked token for confirmation
 	maskedToken := maskToken(token)
-	fmt.Printf("Token: %s\n", maskedToken)
+	fmt.Printf("API Key: %s\n", maskedToken)
+	fmt.Printf("API URL: %s\n", cfg.BaseURL)
 
 	return nil
 }

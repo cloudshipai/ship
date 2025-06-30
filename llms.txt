@@ -91,6 +91,36 @@ ship ai-agent --task "Optimize costs for our production environment"
 ship ai-agent --task "Document all Terraform modules and check for compliance"
 ```
 
+## CloudShip Integration
+
+Ship CLI can push analysis results to CloudShip for centralized management and AI-powered insights.
+
+### Authentication
+```bash
+# Get your API key from https://app.cloudshipai.com/settings/api-keys
+ship auth --api-key YOUR_API_KEY
+
+# Or use environment variable
+export CLOUDSHIP_API_KEY=your-api-key
+export CLOUDSHIP_FLEET_ID=your-fleet-id
+```
+
+### Automatic Push
+All terraform-tools commands support automatic push to CloudShip:
+```bash
+# Push results automatically after analysis
+ship terraform-tools security-scan --push
+ship terraform-tools cost-estimate --push --push-tags "production,aws"
+ship terraform-tools lint --push --push-metadata "environment=prod,team=infrastructure"
+```
+
+### Manual Push
+```bash
+# Generate analysis and push manually
+ship terraform-tools checkov-scan -o scan-results.json
+ship push scan-results.json --type security_scan --fleet-id your-fleet-id --tags "critical,production"
+```
+
 ## MCP Server Setup for AI Assistants
 
 Ship CLI includes a built-in MCP server that makes all functionality available to AI assistants like Claude Desktop, Cursor, and other MCP-compatible tools.

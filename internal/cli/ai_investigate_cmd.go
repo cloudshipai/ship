@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -45,7 +46,7 @@ func runAIInvestigate(cmd *cobra.Command, args []string) error {
 	awsRegion, _ := cmd.Flags().GetString("aws-region")
 
 	// Initialize Dagger engine
-	fmt.Println("Initializing Dagger engine...")
+	slog.Info("Initializing Dagger engine...")
 	engine, err := dagger.NewEngine(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize dagger: %w", err)
@@ -70,7 +71,7 @@ func runAIInvestigate(cmd *cobra.Command, args []string) error {
 	steampipeModule := engine.NewSteampipeModule()
 
 	// Step 1: Generate investigation plan
-	fmt.Printf("\n🤖 AI: Creating investigation plan for: %s\n", prompt)
+	slog.Info("Creating investigation plan", "prompt", prompt)
 
 	// Generate investigation plan using LLM if available
 	var investigationSteps []modules.InvestigationStep
@@ -79,11 +80,11 @@ func runAIInvestigate(cmd *cobra.Command, args []string) error {
 		steps, err := llmModule.CreateInvestigationPlan(ctx, prompt, []string{provider})
 		if err == nil && len(steps) > 0 {
 			investigationSteps = steps
-			fmt.Println("✨ Using AI-generated investigation plan")
+			slog.Info("Using AI-generated investigation plan")
 		} else {
 			// Fallback to hardcoded logic
 			investigationSteps = GenerateInvestigationPlan(ctx, prompt, provider)
-			fmt.Println("📋 Using rule-based investigation plan")
+			slog.Info("Using rule-based investigation plan")
 		}
 	} else {
 		// Use hardcoded logic when no LLM configured
@@ -91,23 +92,23 @@ func runAIInvestigate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Display the plan
-	fmt.Println("\n📋 Investigation Plan:")
+	slog.Info("Investigation Plan:")
 	for _, step := range investigationSteps {
-		fmt.Printf("\n%d. %s\n", step.StepNumber, step.Description)
-		fmt.Printf("   Provider: %s\n", step.Provider)
-		fmt.Printf("   Expected insights: %s\n", step.ExpectedInsights)
+		slog.Info("step", "number", step.StepNumber, "description", step.Description)
+		slog.Info("  ", "provider", step.Provider)
+		slog.Info("  ", "insights", step.ExpectedInsights)
 		if !execute {
-			fmt.Printf("   Query: %s\n", truncateQuery(step.Query))
+			slog.Info("  ", "query", truncateQuery(step.Query))
 		}
 	}
 
 	if !execute {
-		fmt.Println("\n💡 To execute this investigation, add the --execute flag")
+		slog.Info("To execute this investigation, add the --execute flag")
 		return nil
 	}
 
 	// Step 2: Execute queries
-	fmt.Println("\n🔍 Executing investigation...")
+	slog.Info("Executing investigation...")
 
 	// Prepare credentials with profile and region
 	credentials := getProviderCredentials(provider)
@@ -123,12 +124,12 @@ func runAIInvestigate(cmd *cobra.Command, args []string) error {
 	allResults := make(map[string]interface{})
 
 	for _, step := range investigationSteps {
-		fmt.Printf("\nStep %d: %s\n", step.StepNumber, step.Description)
+		slog.Info("Executing step", "number", step.StepNumber, "description", step.Description)
 
 		// Execute query
 		result, err := steampipeModule.RunQuery(ctx, provider, step.Query, credentials)
 		if err != nil {
-			fmt.Printf("❌ Error: %v\n", err)
+			slog.Error("error executing query", "error", err)
 			continue
 		}
 
@@ -136,13 +137,13 @@ func runAIInvestigate(cmd *cobra.Command, args []string) error {
 		var queryResults []map[string]interface{}
 		if err := json.Unmarshal([]byte(result), &queryResults); err == nil {
 			allResults[fmt.Sprintf("step_%d", step.StepNumber)] = queryResults
-			fmt.Printf("✓ Found %d results\n", len(queryResults))
+			slog.Info("query finished", "found", len(queryResults))
 
 			// Show sample results
 			if len(queryResults) > 0 && len(queryResults[0]) > 0 {
-				fmt.Println("   Sample finding:")
+				slog.Info("Sample finding:")
 				for k, v := range queryResults[0] {
-					fmt.Printf("   - %s: %v\n", k, v)
+					slog.Info("  ", k, v)
 					if len(fmt.Sprintf("   - %s: %v\n", k, v)) > 3 {
 						break // Show only first 3 fields
 					}
@@ -152,7 +153,7 @@ func runAIInvestigate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Step 3: AI Analysis
-	fmt.Println("\n🧠 AI Analysis:")
+	slog.Info("AI Analysis:")
 
 	// Try to use LLM for deeper analysis if available
 	var insights string
@@ -162,11 +163,11 @@ func runAIInvestigate(cmd *cobra.Command, args []string) error {
 		llmInsights, err := llmModule.AnalyzeSteampipeResults(ctx, string(resultsJSON), prompt)
 		if err == nil && llmInsights != "" {
 			insights = llmInsights
-			fmt.Println("✨ Using AI-powered analysis")
+			slog.Info("Using AI-powered analysis")
 		} else {
 			// Fallback to rule-based analysis
 			insights = ParseQueryResults(allResults, prompt)
-			fmt.Println("📋 Using rule-based analysis")
+			slog.Info("Using rule-based analysis")
 		}
 	} else {
 		// Use hardcoded analysis when no LLM configured
@@ -174,31 +175,31 @@ func runAIInvestigate(cmd *cobra.Command, args []string) error {
 	}
 
 	if insights != "" {
-		fmt.Println("\n📊 Summary of Findings:")
-		fmt.Println(insights)
+		slog.Info("Summary of Findings:")
+		slog.Info(insights)
 	} else {
-		fmt.Println("\n✅ Investigation completed. No significant issues found based on your query.")
+		slog.Info("Investigation completed. No significant issues found based on your query.")
 	}
 
 	// Provide contextual recommendations based on the prompt
-	fmt.Println("\n💡 Recommendations:")
+	slog.Info("Recommendations:")
 	if strings.Contains(strings.ToLower(prompt), "s3") {
-		fmt.Println("- Review S3 bucket policies and access controls")
-		fmt.Println("- Enable versioning and encryption for sensitive buckets")
-		fmt.Println("- Consider implementing S3 lifecycle policies")
+		slog.Info("- Review S3 bucket policies and access controls")
+		slog.Info("- Enable versioning and encryption for sensitive buckets")
+		slog.Info("- Consider implementing S3 lifecycle policies")
 	} else if strings.Contains(strings.ToLower(prompt), "security") {
-		fmt.Println("- Review and restrict security group rules")
-		fmt.Println("- Enable encryption for all data at rest")
-		fmt.Println("- Implement least privilege access policies")
+		slog.Info("- Review and restrict security group rules")
+		slog.Info("- Enable encryption for all data at rest")
+		slog.Info("- Implement least privilege access policies")
 	} else if strings.Contains(strings.ToLower(prompt), "cost") {
-		fmt.Println("- Remove unused resources to reduce costs")
-		fmt.Println("- Consider using reserved instances for long-running workloads")
-		fmt.Println("- Implement auto-scaling to optimize resource usage")
+		slog.Info("- Remove unused resources to reduce costs")
+		slog.Info("- Consider using reserved instances for long-running workloads")
+		slog.Info("- Implement auto-scaling to optimize resource usage")
 	}
 
-	fmt.Println("\n📝 Next Steps:")
-	fmt.Println("- Run 'ship terraform-tools checkov-scan' for detailed security analysis")
-	fmt.Println("- Use 'ship push' to analyze your infrastructure with Cloudship AI")
+	slog.Info("Next Steps:")
+	slog.Info("- Run 'ship terraform-tools checkov-scan' for detailed security analysis")
+	slog.Info("- Use 'ship push' to analyze your infrastructure with Cloudship AI")
 
 	return nil
 }
@@ -218,7 +219,7 @@ func getProviderCredentials(provider string) map[string]string {
 		// AWS credentials from environment
 		if v := getEnvVar("AWS_ACCESS_KEY_ID"); v != "" {
 			creds["AWS_ACCESS_KEY_ID"] = v
-			fmt.Println("✓ Using AWS credentials from environment variables")
+			slog.Info("Using AWS credentials from environment variables")
 		}
 		if v := getEnvVar("AWS_SECRET_ACCESS_KEY"); v != "" {
 			creds["AWS_SECRET_ACCESS_KEY"] = v

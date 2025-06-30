@@ -4,17 +4,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/viper"
 )
 
 type Config struct {
-	Token      string          `mapstructure:"token"`      // Deprecated, use APIKey
 	APIKey     string          `mapstructure:"api_key"`
 	OrgID      string          `mapstructure:"org_id"`
 	DefaultEnv string          `mapstructure:"default_env"`
 	BaseURL    string          `mapstructure:"base_url"`
-	FleetID    string          `mapstructure:"fleet_id"`    // Default fleet ID for push operations
+	FleetID    string          `mapstructure:"fleet_id"`
 	Telemetry  TelemetryConfig `mapstructure:"telemetry"`
 }
 
@@ -30,11 +30,14 @@ const (
 )
 
 var (
+	v          *viper.Viper
 	configDir  string
 	configPath string
 )
 
 func init() {
+	v = viper.New()
+
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		panic(fmt.Errorf("failed to get home directory: %w", err))
@@ -42,6 +45,24 @@ func init() {
 
 	configDir = filepath.Join(homeDir, ".ship")
 	configPath = filepath.Join(configDir, "config.yaml")
+
+	v.SetConfigName(configFileName)
+	v.SetConfigType(configFileType)
+	v.AddConfigPath(configDir)
+
+	// Set defaults
+	v.SetDefault("base_url", defaultBaseURL)
+	v.SetDefault("telemetry.enabled", false)
+
+	// Environment variable binding
+	v.SetEnvPrefix("SHIP")
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	v.AutomaticEnv()
+
+	// Backwards compatibility for env vars
+	v.BindEnv("api_key", "CLOUDSHIP_API_KEY")
+	v.BindEnv("base_url", "SHIP_API_URL", "CLOUDSHIP_API_URL")
+	v.BindEnv("fleet_id", "CLOUDSHIP_FLEET_ID")
 }
 
 func GetConfigDir() string {
@@ -53,85 +74,38 @@ func GetConfigPath() string {
 }
 
 func Load() (*Config, error) {
-	// Check environment variables first
-	cfg := &Config{
-		BaseURL: getBaseURL(),
-	}
-	
-	// Check for API key in environment
-	if apiKey := os.Getenv("CLOUDSHIP_API_KEY"); apiKey != "" {
-		cfg.APIKey = apiKey
-	} else if token := os.Getenv("SHIP_TOKEN"); token != "" {
-		// Fallback to old env var for backwards compatibility
-		cfg.APIKey = token
-	}
-	
-	// Check for fleet ID in environment
-	if fleetID := os.Getenv("CLOUDSHIP_FLEET_ID"); fleetID != "" {
-		cfg.FleetID = fleetID
-	}
-	
-	// If we have env vars, return early
-	if cfg.APIKey != "" {
-		return cfg, nil
-	}
+	return loadViper(v)
+}
 
-	// Create a new viper instance for loading
-	v := viper.New()
-	v.SetConfigName(configFileName)
-	v.SetConfigType(configFileType)
-	v.AddConfigPath(configDir)
-
-	// Set defaults
-	v.SetDefault("base_url", defaultBaseURL)
-	v.SetDefault("telemetry.enabled", false)
-
-	// Read config file
+func loadViper(v *viper.Viper) (*Config, error) {
 	if err := v.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			// Config file not found; return empty config
-			return &Config{
-				BaseURL: defaultBaseURL,
-			}, nil
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return nil, fmt.Errorf("failed to read config: %w", err)
 		}
-		return nil, fmt.Errorf("failed to read config: %w", err)
 	}
 
-	var fileCfg Config
-	if err := v.Unmarshal(&fileCfg); err != nil {
+	var cfg Config
+	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
-	// Merge file config with env config (env takes precedence)
-	if cfg.APIKey == "" {
-		cfg.APIKey = fileCfg.APIKey
+	// Backwards compatibility for `token` field
+	if token := v.GetString("token"); token != "" && cfg.APIKey == "" {
+		cfg.APIKey = token
 	}
-	if cfg.FleetID == "" {
-		cfg.FleetID = fileCfg.FleetID
-	}
-	if cfg.OrgID == "" {
-		cfg.OrgID = fileCfg.OrgID
-	}
-	if cfg.DefaultEnv == "" {
-		cfg.DefaultEnv = fileCfg.DefaultEnv
-	}
-	cfg.Telemetry = fileCfg.Telemetry
 
-	return cfg, nil
+	return &cfg, nil
 }
 
 func Save(cfg *Config) error {
-	// Create config directory if it doesn't exist
+	return saveViper(v, cfg)
+}
+
+func saveViper(v *viper.Viper, cfg *Config) error {
 	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	// Create a new viper instance for saving
-	v := viper.New()
-	v.SetConfigType(configFileType)
-
-	// Set all config values
-	v.Set("token", cfg.Token)
 	v.Set("api_key", cfg.APIKey)
 	v.Set("org_id", cfg.OrgID)
 	v.Set("default_env", cfg.DefaultEnv)
@@ -140,12 +114,13 @@ func Save(cfg *Config) error {
 	v.Set("telemetry.enabled", cfg.Telemetry.Enabled)
 	v.Set("telemetry.session_id", cfg.Telemetry.SessionID)
 
-	// Write config file
+	// Remove deprecated `token` field
+	v.Set("token", nil)
+
 	if err := v.WriteConfigAs(configPath); err != nil {
 		return fmt.Errorf("failed to write config: %w", err)
 	}
 
-	// Set secure permissions (owner read/write only)
 	if err := os.Chmod(configPath, 0600); err != nil {
 		return fmt.Errorf("failed to set config permissions: %w", err)
 	}
@@ -157,22 +132,15 @@ func Clear() error {
 	if err := os.Remove(configPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove config file: %w", err)
 	}
-
-	// Also remove cache directory if it exists
 	cacheDir := filepath.Join(configDir, "cache")
 	if err := os.RemoveAll(cacheDir); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove cache directory: %w", err)
 	}
-
 	return nil
 }
 
 func getBaseURL() string {
-	if url := os.Getenv("CLOUDSHIP_API_URL"); url != "" {
-		return url
-	} else if url := os.Getenv("SHIP_API_URL"); url != "" {
-		// Fallback to old env var for backwards compatibility
-		return url
-	}
-	return defaultBaseURL
+	// This function is no longer needed as Viper handles it.
+	// Kept for reference during refactoring.
+	return ""
 }

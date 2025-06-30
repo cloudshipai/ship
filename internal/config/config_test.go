@@ -3,8 +3,27 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/spf13/viper"
 )
+
+func newTestViper(tempDir string) *viper.Viper {
+	v := viper.New()
+	v.SetConfigName(configFileName)
+	v.SetConfigType(configFileType)
+	v.AddConfigPath(tempDir)
+	v.SetDefault("base_url", defaultBaseURL)
+	v.SetDefault("telemetry.enabled", false)
+	v.SetEnvPrefix("SHIP")
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	v.AutomaticEnv()
+	v.BindEnv("api_key", "CLOUDSHIP_API_KEY")
+	v.BindEnv("base_url", "SHIP_API_URL", "CLOUDSHIP_API_URL")
+	v.BindEnv("fleet_id", "CLOUDSHIP_FLEET_ID")
+	return v
+}
 
 func TestConfig(t *testing.T) {
 	// Create temp directory for test config
@@ -23,7 +42,8 @@ func TestConfig(t *testing.T) {
 	}()
 
 	t.Run("Load empty config", func(t *testing.T) {
-		cfg, err := Load()
+		v := newTestViper(tempDir)
+		cfg, err := loadViper(v)
 		if err != nil {
 			t.Fatalf("Failed to load empty config: %v", err)
 		}
@@ -32,14 +52,15 @@ func TestConfig(t *testing.T) {
 			t.Errorf("Expected base URL %s, got %s", defaultBaseURL, cfg.BaseURL)
 		}
 
-		if cfg.Token != "" {
-			t.Errorf("Expected empty token, got %s", cfg.Token)
+		if cfg.APIKey != "" {
+			t.Errorf("Expected empty token, got %s", cfg.APIKey)
 		}
 	})
 
 	t.Run("Save and load config", func(t *testing.T) {
+		v := newTestViper(tempDir)
 		testCfg := &Config{
-			Token:      "test-token",
+			APIKey:     "test-token",
 			OrgID:      "org-123",
 			DefaultEnv: "prod",
 			BaseURL:    "https://test.api.com",
@@ -50,7 +71,7 @@ func TestConfig(t *testing.T) {
 		}
 
 		// Save config
-		if err := Save(testCfg); err != nil {
+		if err := saveViper(v, testCfg); err != nil {
 			t.Fatalf("Failed to save config: %v", err)
 		}
 
@@ -69,14 +90,14 @@ func TestConfig(t *testing.T) {
 		t.Logf("Saved config content: %s", savedContent)
 
 		// Load config
-		loadedCfg, err := Load()
+		loadedCfg, err := loadViper(v)
 		if err != nil {
 			t.Fatalf("Failed to load config: %v", err)
 		}
 
 		// Verify loaded config
-		if loadedCfg.Token != testCfg.Token {
-			t.Errorf("Expected token %s, got %s", testCfg.Token, loadedCfg.Token)
+		if loadedCfg.APIKey != testCfg.APIKey {
+			t.Errorf("Expected token %s, got %s", testCfg.APIKey, loadedCfg.APIKey)
 		}
 
 		if loadedCfg.OrgID != testCfg.OrgID {
@@ -97,24 +118,26 @@ func TestConfig(t *testing.T) {
 	})
 
 	t.Run("Environment variable override", func(t *testing.T) {
+		v := newTestViper(tempDir)
 		// Set environment variable
-		os.Setenv("SHIP_TOKEN", "env-token")
-		defer os.Unsetenv("SHIP_TOKEN")
+		os.Setenv("SHIP_API_KEY", "env-token")
+		defer os.Unsetenv("SHIP_API_KEY")
 
-		cfg, err := Load()
+		cfg, err := loadViper(v)
 		if err != nil {
 			t.Fatalf("Failed to load config with env var: %v", err)
 		}
 
-		if cfg.Token != "env-token" {
-			t.Errorf("Expected token from env var, got %s", cfg.Token)
+		if cfg.APIKey != "env-token" {
+			t.Errorf("Expected token from env var, got %s", cfg.APIKey)
 		}
 	})
 
 	t.Run("Clear config", func(t *testing.T) {
+		v := newTestViper(tempDir)
 		// Create a config file
-		testCfg := &Config{Token: "test"}
-		if err := Save(testCfg); err != nil {
+		testCfg := &Config{APIKey: "test"}
+		if err := saveViper(v, testCfg); err != nil {
 			t.Fatalf("Failed to save config: %v", err)
 		}
 

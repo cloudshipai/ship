@@ -2,6 +2,8 @@ package cli
 
 import (
 	"github.com/spf13/cobra"
+
+	"github.com/cloudshipai/ship/internal/logger"
 )
 
 var (
@@ -30,4 +32,16 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.Version = version
+
+	// Set up logging
+	rootCmd.PersistentFlags().String("log-level", "info", "Log level (debug, info, warn, error)")
+	rootCmd.PersistentFlags().String("log-file", "", "Log file path")
+	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		// Read log level and log file from flags
+		logLevel, _ := cmd.Flags().GetString("log-level")
+		logFile, _ := cmd.Flags().GetString("log-file")
+
+		// Configure logger
+		return logger.Init(logLevel, logFile)
+	}
 }

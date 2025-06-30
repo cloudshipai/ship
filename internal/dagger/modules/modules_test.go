@@ -12,7 +12,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func checkDocker(t *testing.T) {
+	if _, err := os.Stat("/var/run/docker.sock"); os.IsNotExist(err) {
+		t.Skip("Docker is not running, skipping Dagger tests")
+	}
+}
+
 func TestOpenInfraQuoteModule(t *testing.T) {
+	checkDocker(t)
 	if testing.Short() {
 		t.Skip("Skipping integration test")
 	}
@@ -75,6 +82,7 @@ func TestOpenInfraQuoteModule(t *testing.T) {
 }
 
 func TestInfraScanModule(t *testing.T) {
+	checkDocker(t)
 	if testing.Short() {
 		t.Skip("Skipping integration test")
 	}
@@ -132,6 +140,7 @@ func TestInfraScanModule(t *testing.T) {
 }
 
 func TestTerraformDocsModule(t *testing.T) {
+	checkDocker(t)
 	if testing.Short() {
 		t.Skip("Skipping integration test")
 	}
@@ -223,6 +232,7 @@ func TestTerraformDocsModule(t *testing.T) {
 }
 
 func TestTFLintModule(t *testing.T) {
+	checkDocker(t)
 	if testing.Short() {
 		t.Skip("Skipping integration test")
 	}
@@ -282,6 +292,7 @@ func TestTFLintModule(t *testing.T) {
 }
 
 func TestCheckovModule(t *testing.T) {
+	checkDocker(t)
 	if testing.Short() {
 		t.Skip("Skipping integration test")
 	}
@@ -360,6 +371,7 @@ func TestCheckovModule(t *testing.T) {
 }
 
 func TestInfracostModule(t *testing.T) {
+	checkDocker(t)
 	if testing.Short() {
 		t.Skip("Skipping integration test")
 	}

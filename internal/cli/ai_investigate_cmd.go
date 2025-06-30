@@ -30,12 +30,17 @@ func init() {
 	aiInvestigateCmd.Flags().Bool("execute", false, "Execute the generated queries")
 	aiInvestigateCmd.Flags().String("aws-profile", "", "AWS profile to use (from ~/.aws/config)")
 	aiInvestigateCmd.Flags().String("aws-region", "", "AWS region to use")
+	aiInvestigateCmd.Flags().String("log-level", "info", "Log level for Dagger engine")
 
 	aiInvestigateCmd.MarkFlagRequired("prompt")
 }
 
 func runAIInvestigate(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
+
+	if err := checkDockerRunning(); err != nil {
+		return err
+	}
 
 	prompt, _ := cmd.Flags().GetString("prompt")
 	provider, _ := cmd.Flags().GetString("provider")
@@ -44,10 +49,11 @@ func runAIInvestigate(cmd *cobra.Command, args []string) error {
 	execute, _ := cmd.Flags().GetBool("execute")
 	awsProfile, _ := cmd.Flags().GetString("aws-profile")
 	awsRegion, _ := cmd.Flags().GetString("aws-region")
+	logLevel, _ := cmd.Flags().GetString("log-level")
 
 	// Initialize Dagger engine
 	slog.Info("Initializing Dagger engine...")
-	engine, err := dagger.NewEngine(ctx)
+	engine, err := dagger.NewEngine(ctx, logLevel)
 	if err != nil {
 		return fmt.Errorf("failed to initialize dagger: %w", err)
 	}
@@ -76,19 +82,27 @@ func runAIInvestigate(cmd *cobra.Command, args []string) error {
 	// Generate investigation plan using LLM if available
 	var investigationSteps []modules.InvestigationStep
 	if llmProvider != "" && model != "" {
-		// Try to use LLM module for smarter plan generation
 		steps, err := llmModule.CreateInvestigationPlan(ctx, prompt, []string{provider})
-		if err == nil && len(steps) > 0 {
-			investigationSteps = steps
-			slog.Info("Using AI-generated investigation plan")
-		} else {
-			// Fallback to hardcoded logic
-			investigationSteps = GenerateInvestigationPlan(ctx, prompt, provider)
-			slog.Info("Using rule-based investigation plan")
+		if err != nil {
+			errorMsg := "AI failed to generate an investigation plan"
+			if strings.Contains(err.Error(), "authentication") {
+				errorMsg = "AI authentication failed. Please check your LLM provider API key and configuration."
+			} else if strings.Contains(err.Error(), "model not found") {
+				errorMsg = fmt.Sprintf("Model '%s' not found. You may not have access to it.", model)
+				if model == "gpt-4" {
+					errorMsg += " Try using '--model gpt-3.5-turbo' as an alternative."
+				}
+			}
+			return fmt.Errorf("%s\n\nOriginal error: %w\n\n💡 You can also try rephrasing your prompt or use the 'ship query' command for direct execution.", errorMsg, err)
 		}
+
+		if len(steps) == 0 {
+			return fmt.Errorf("AI generated an empty or invalid investigation plan. Please try rephrasing your prompt")
+		}
+		investigationSteps = steps
+		slog.Info("Using AI-generated investigation plan")
 	} else {
-		// Use hardcoded logic when no LLM configured
-		investigationSteps = GenerateInvestigationPlan(ctx, prompt, provider)
+		return fmt.Errorf("LLM provider and model must be specified to generate an investigation plan. Use --llm-provider and --model flags, or use 'ship query' for direct execution.")
 	}
 
 	// Display the plan
@@ -127,7 +141,7 @@ func runAIInvestigate(cmd *cobra.Command, args []string) error {
 		slog.Info("Executing step", "number", step.StepNumber, "description", step.Description)
 
 		// Execute query
-		result, err := steampipeModule.RunQuery(ctx, provider, step.Query, credentials)
+		result, err := steampipeModule.RunQuery(ctx, provider, step.Query, credentials, "json")
 		if err != nil {
 			slog.Error("error executing query", "error", err)
 			continue
@@ -152,54 +166,14 @@ func runAIInvestigate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Step 3: AI Analysis
-	slog.Info("AI Analysis:")
+	// Step 3: AI Analysis is removed in favor of direct query execution.
+	// The raw results are now available for the user to analyze.
 
-	// Try to use LLM for deeper analysis if available
-	var insights string
-	if llmProvider != "" && model != "" && len(allResults) > 0 {
-		// Convert results to JSON for LLM analysis
-		resultsJSON, _ := json.Marshal(allResults)
-		llmInsights, err := llmModule.AnalyzeSteampipeResults(ctx, string(resultsJSON), prompt)
-		if err == nil && llmInsights != "" {
-			insights = llmInsights
-			slog.Info("Using AI-powered analysis")
-		} else {
-			// Fallback to rule-based analysis
-			insights = ParseQueryResults(allResults, prompt)
-			slog.Info("Using rule-based analysis")
-		}
-	} else {
-		// Use hardcoded analysis when no LLM configured
-		insights = ParseQueryResults(allResults, prompt)
-	}
+	slog.Info("Investigation finished.")
 
-	if insights != "" {
-		slog.Info("Summary of Findings:")
-		slog.Info(insights)
-	} else {
-		slog.Info("Investigation completed. No significant issues found based on your query.")
-	}
-
-	// Provide contextual recommendations based on the prompt
-	slog.Info("Recommendations:")
-	if strings.Contains(strings.ToLower(prompt), "s3") {
-		slog.Info("- Review S3 bucket policies and access controls")
-		slog.Info("- Enable versioning and encryption for sensitive buckets")
-		slog.Info("- Consider implementing S3 lifecycle policies")
-	} else if strings.Contains(strings.ToLower(prompt), "security") {
-		slog.Info("- Review and restrict security group rules")
-		slog.Info("- Enable encryption for all data at rest")
-		slog.Info("- Implement least privilege access policies")
-	} else if strings.Contains(strings.ToLower(prompt), "cost") {
-		slog.Info("- Remove unused resources to reduce costs")
-		slog.Info("- Consider using reserved instances for long-running workloads")
-		slog.Info("- Implement auto-scaling to optimize resource usage")
-	}
-
-	slog.Info("Next Steps:")
-	slog.Info("- Run 'ship terraform-tools checkov-scan' for detailed security analysis")
-	slog.Info("- Use 'ship push' to analyze your infrastructure with Cloudship AI")
+	fmt.Println("\n📝 Next Steps:")
+	fmt.Println("- Run 'ship terraform-tools checkov-scan' for detailed security analysis")
+	fmt.Println("- Use 'ship push' to analyze your infrastructure with Cloudship AI")
 
 	return nil
 }

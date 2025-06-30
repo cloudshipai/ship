@@ -25,7 +25,12 @@ func NewSteampipeModule(client *dagger.Client) *SteampipeModule {
 }
 
 // RunQuery executes a Steampipe query with the specified plugin
-func (m *SteampipeModule) RunQuery(ctx context.Context, plugin string, query string, credentials map[string]string) (string, error) {
+func (m *SteampipeModule) RunQuery(ctx context.Context, plugin string, query string, credentials map[string]string, outputFormat ...string) (string, error) {
+	output := "json"
+	if len(outputFormat) > 0 {
+		output = outputFormat[0]
+	}
+
 	// Start with base Steampipe container
 	container := m.client.Container().
 		From("turbot/steampipe:latest")
@@ -63,15 +68,15 @@ func (m *SteampipeModule) RunQuery(ctx context.Context, plugin string, query str
 
 	// Execute the query
 	container = container.WithExec([]string{
-		"steampipe", "query", query, "--output", "json",
+		"steampipe", "query", query, "--output", output,
 	})
 
-	output, err := container.Stdout(ctx)
+	stdout, err := container.Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to run steampipe query: %w", err)
 	}
 
-	return output, nil
+	return stdout, nil
 }
 
 // RunMultipleQueries executes multiple Steampipe queries

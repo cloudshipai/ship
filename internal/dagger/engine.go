@@ -3,6 +3,7 @@ package dagger
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 
 	"dagger.io/dagger"
@@ -16,9 +17,14 @@ type Engine struct {
 }
 
 // NewEngine creates a new Dagger engine instance
-func NewEngine(ctx context.Context) (*Engine, error) {
+func NewEngine(ctx context.Context, logLevel ...string) (*Engine, error) {
+	var logOutput io.Writer = io.Discard
+	if len(logLevel) > 0 && logLevel[0] == "debug" {
+		logOutput = os.Stderr
+	}
+
 	// Initialize Dagger client
-	client, err := dagger.Connect(ctx, dagger.WithLogOutput(os.Stderr))
+	client, err := dagger.Connect(ctx, dagger.WithLogOutput(logOutput))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to dagger: %w", err)
 	}

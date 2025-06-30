@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -72,6 +74,8 @@ func (c *Client) UploadArtifact(req *UploadArtifactRequest) (*UploadArtifactResp
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
+	artifactID := uuid.New().String()
+	httpReq.Header.Set("X-Artifact-ID", artifactID)
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.apiKey))
 	httpReq.Header.Set("Content-Type", "application/json")
 

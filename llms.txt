@@ -1,0 +1,317 @@
+# Ship CLI - LLM Instructions
+
+This file contains comprehensive instructions for Large Language Models (LLMs) on how to use, install, and integrate with the Ship CLI tool.
+
+## What is Ship CLI?
+
+Ship CLI is a powerful command-line tool that brings enterprise-grade infrastructure analysis tools to your fingertips. It's designed specifically to work well with AI assistants and LLMs through its built-in MCP (Model Context Protocol) server and AI-powered investigation capabilities.
+
+## Installation
+
+### Method 1: Go Install (Recommended)
+```bash
+# Clear Go module cache first (if you've tried installing before)
+go clean -modcache
+
+# Install latest version
+go install github.com/cloudshipai/ship/cmd/ship@main
+
+# Verify installation
+ship version
+```
+
+### Method 2: Binary Download
+```bash
+# Linux/macOS - Auto-detect architecture
+wget -qO- https://github.com/cloudshipai/ship/releases/latest/download/ship_$(uname -s)_$(uname -m).tar.gz | tar xz && sudo mv ship /usr/local/bin/
+
+# Verify installation
+ship version
+```
+
+### Method 3: Build from Source
+```bash
+git clone https://github.com/cloudshipai/ship.git
+cd ship
+go build -o ship ./cmd/ship
+sudo mv ship /usr/local/bin/
+```
+
+## Core Capabilities
+
+Ship CLI provides these main functionalities:
+
+1. **Terraform Analysis**: Linting, security scanning, cost estimation, documentation generation
+2. **Infrastructure Diagrams**: Visual representation of Terraform configurations using InfraMap
+3. **AI-Powered Investigation**: Natural language queries against cloud infrastructure
+4. **Real-time Cloud Analysis**: Live AWS/Azure/GCP resource investigation with Steampipe
+5. **MCP Server**: Built-in server for AI assistant integration
+6. **Containerized Tools**: All tools run in containers - no local installations needed
+
+## Quick Start Examples
+
+### Basic Terraform Operations
+```bash
+# Lint Terraform files
+ship terraform-tools lint
+
+# Security scan
+ship terraform-tools security-scan
+
+# Generate documentation
+ship terraform-tools generate-docs > README.md
+
+# Estimate costs
+ship terraform-tools cost-estimate
+
+# Generate infrastructure diagram
+ship terraform-tools generate-diagram . --hcl --format png -o infrastructure.png
+```
+
+### AI-Powered Infrastructure Investigation
+```bash
+# Set up AWS credentials first
+export AWS_PROFILE=your-profile
+
+# Ask questions about your infrastructure
+ship ai-investigate --prompt "Show me all my S3 buckets with their creation dates" --execute
+
+ship ai-investigate --prompt "Check for security issues in my AWS account" --execute
+
+ship ai-investigate --prompt "List all running EC2 instances with their costs" --execute
+```
+
+### Autonomous AI Agent
+```bash
+# Let AI agent investigate and fix issues automatically
+ship ai-agent --task "Perform complete security audit of AWS infrastructure"
+
+ship ai-agent --task "Optimize costs for our production environment"
+
+ship ai-agent --task "Document all Terraform modules and check for compliance"
+```
+
+## MCP Server Setup for AI Assistants
+
+Ship CLI includes a built-in MCP server that makes all functionality available to AI assistants like Claude Desktop, Cursor, and other MCP-compatible tools.
+
+### Configuration for Claude Desktop
+
+Add this to your Claude Desktop MCP settings file:
+
+**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "ship-cli": {
+      "command": "ship",
+      "args": ["mcp"],
+      "env": {
+        "AWS_PROFILE": "your-aws-profile"
+      }
+    }
+  }
+}
+```
+
+### Configuration for Cursor
+
+Add to your Cursor MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "ship-cli": {
+      "command": "ship",
+      "args": ["mcp"],
+      "env": {
+        "AWS_PROFILE": "your-aws-profile"
+      }
+    }
+  }
+}
+```
+
+### Available MCP Tools
+
+Once configured, these tools become available to your AI assistant:
+
+- `steampipe_query`: Execute SQL queries against cloud infrastructure
+- `terraform_lint`: Lint Terraform files for errors and best practices
+- `terraform_docs`: Generate documentation for Terraform modules
+- `security_scan`: Scan for security vulnerabilities
+- `cost_analysis`: Estimate infrastructure costs
+- `inframap_diagram`: Generate visual infrastructure diagrams
+
+## Common LLM Use Cases
+
+### 1. Infrastructure Analysis
+Ask your AI assistant:
+- "Use Ship CLI to analyze the security posture of my AWS account"
+- "Generate a cost report for my Terraform infrastructure"
+- "Create documentation for all my Terraform modules"
+- "Show me a visual diagram of my infrastructure"
+
+### 2. Troubleshooting
+- "Help me find why my Terraform plan is failing using Ship CLI"
+- "Use Ship CLI to identify security issues in my cloud resources"
+- "Check if there are any unused resources costing money"
+
+### 3. Automation
+- "Create a Ship CLI command to automatically document my infrastructure"
+- "Set up a security scan workflow using Ship CLI"
+- "Generate a complete infrastructure audit report"
+
+## Advanced AI Integration
+
+### Microservices Architecture
+```bash
+# Run Ship tools as separate HTTP services
+ship ai-services --task "Complete infrastructure analysis" --show-endpoints
+
+# Keep services running for other tools to use
+ship ai-services --task "Security audit" --keep-services
+
+# Export service endpoints for integration
+ship ai-services --task "Cost analysis" --export-endpoints services.json
+```
+
+### Service Endpoints Available
+When running in microservices mode, these HTTP endpoints become available:
+- `http://steampipe:8001` - Cloud infrastructure queries
+- `http://cost-analysis:8002` - Cost estimation
+- `http://terraform-docs:8003` - Documentation generation
+- `http://security-scan:8004` - Security scanning
+- `http://inframap:8005` - Infrastructure diagrams
+
+## Configuration
+
+### AWS Setup
+```bash
+# Configure AWS credentials (Ship CLI will use existing AWS config)
+aws configure
+
+# Or set environment variables
+export AWS_ACCESS_KEY_ID=your-key
+export AWS_SECRET_ACCESS_KEY=your-secret
+export AWS_REGION=us-east-1
+```
+
+### OpenAI API (for AI features)
+```bash
+export OPENAI_API_KEY=your-openai-key
+```
+
+### Anthropic API (alternative)
+```bash
+export ANTHROPIC_API_KEY=your-anthropic-key
+```
+
+## Troubleshooting
+
+### Installation Issues
+If you get module path errors:
+```bash
+go clean -modcache
+GOPROXY=direct go install github.com/cloudshipai/ship/cmd/ship@main
+```
+
+### Docker/Dagger Issues
+Ship CLI uses Dagger for containerized execution. Ensure Docker is running:
+```bash
+docker --version
+systemctl status docker  # Linux
+```
+
+### AWS Connection Issues
+```bash
+# Test AWS connectivity
+ship aws-steampipe-test
+
+# Simple Steampipe test
+ship steampipe-simple-test
+```
+
+## Available Commands Reference
+
+### Core Commands
+- `ship auth` - Authenticate with Cloudship platform
+- `ship terraform-tools` - Terraform analysis tools
+- `ship ai-investigate` - AI-powered infrastructure investigation
+- `ship ai-agent` - Autonomous AI agent
+- `ship ai-services` - Microservices-based AI investigation
+- `ship investigate` - Manual Steampipe investigations
+- `ship modules` - Manage Ship CLI modules
+
+### Terraform Tools Subcommands
+- `lint` - TFLint validation
+- `security-scan` - Checkov and Trivy security scanning
+- `cost-estimate` - Infracost analysis
+- `generate-docs` - terraform-docs documentation
+- `generate-diagram` - InfraMap infrastructure diagrams
+
+### AI Tools Features
+- Natural language cloud resource queries
+- Autonomous security auditing
+- Cost optimization recommendations
+- Infrastructure documentation generation
+- Visual diagram creation
+- Compliance checking
+
+## Integration Examples for LLMs
+
+### Example 1: Security Audit Workflow
+```bash
+# Step 1: Run comprehensive security scan
+ship ai-agent --task "Perform security audit of AWS infrastructure and provide actionable recommendations"
+
+# Step 2: Generate documentation for findings
+ship terraform-tools generate-docs
+
+# Step 3: Create visual infrastructure overview
+ship terraform-tools generate-diagram . --hcl --format svg -o security-audit-diagram.svg
+```
+
+### Example 2: Cost Optimization
+```bash
+# Step 1: Analyze current costs
+ship ai-investigate --prompt "Find all resources that might be costing money unnecessarily" --execute
+
+# Step 2: Generate detailed cost estimate
+ship terraform-tools cost-estimate
+
+# Step 3: Get AI recommendations
+ship ai-agent --task "Analyze infrastructure costs and suggest optimizations"
+```
+
+### Example 3: Documentation Generation
+```bash
+# Step 1: Generate all Terraform docs
+ship terraform-tools generate-docs
+
+# Step 2: Create infrastructure diagrams
+ship terraform-tools generate-diagram . --hcl --format png -o architecture.png
+
+# Step 3: AI analysis and documentation
+ship ai-agent --task "Document infrastructure architecture and create comprehensive overview"
+```
+
+## Best Practices for LLMs
+
+1. **Always test connectivity first**: Use `ship version` to verify installation
+2. **Set up AWS credentials**: Most features require cloud access
+3. **Use specific prompts**: Be clear about what analysis you want
+4. **Combine tools**: Use multiple Ship CLI commands for comprehensive analysis
+5. **Save outputs**: Use `-o` flags to save diagrams and reports
+6. **Check prerequisites**: Ensure Docker is running for containerized tools
+
+## Support and Resources
+
+- **GitHub Repository**: https://github.com/cloudshipai/ship
+- **Issues and Bug Reports**: https://github.com/cloudshipai/ship/issues
+- **Documentation**: Check the README.md in the repository
+- **MCP Protocol**: https://modelcontextprotocol.io/
+
+This tool is designed to be LLM-friendly and provides extensive AI integration capabilities. All tools run in containers, making it safe and isolated for automated use by AI assistants.

@@ -468,8 +468,59 @@ go test -v ./internal/dagger/modules/
 go test -v -run TestTFLintModule ./internal/dagger/modules/
 ```
 
+## 🧩 Creating Custom Modules (Community Extensions)
+
+Ship CLI is designed to be extensible! You can create custom Dagger modules to add new tools and capabilities.
+
+### Quick Example: Create Your Own Tool
+
+```go
+// my-tool/main.go
+package main
+
+import (
+    "context"
+    "dagger.io/dagger"
+)
+
+type MyTool struct{}
+
+func (m *MyTool) Analyze(ctx context.Context, source *dagger.Directory) (string, error) {
+    return dag.Container().
+        From("alpine:latest").
+        WithMountedDirectory("/src", source).
+        WithExec([]string{"analyze-command"}).
+        Stdout(ctx)
+}
+```
+
+### 📚 Full Documentation
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for a complete guide on:
+- Creating custom Dagger modules
+- Module structure and metadata
+- AI/LLM integration for your tools
+- Testing and publishing modules
+- Joining the community registry
+
+### 🎯 Module Ideas We'd Love to See
+
+- **Cloud Security Scanner**: Deep security analysis for AWS/Azure/GCP
+- **Kubernetes Analyzer**: K8s manifest validation and cluster analysis
+- **Database Tools**: Schema validation, migration checks, documentation
+- **Performance Profiler**: Infrastructure performance analysis
+- **Compliance Checkers**: SOC2, HIPAA, PCI-DSS validators
+- **Custom Cost Analyzers**: Organization-specific cost allocation
+
+### 🤝 Community
+
+- **Submit Your Module**: Add to our [community registry](https://github.com/cloudshipai/community-modules)
+- **Get Help**: Join our [Discord](https://discord.gg/cloudship)
+- **Share Ideas**: Open an [issue](https://github.com/cloudshipai/ship/issues)
+
 ## 📈 Roadmap
 
+- [ ] Dynamic module discovery and installation (`ship modules install`)
 - [ ] Support for Atlantis integration
 - [ ] Policy as Code with Open Policy Agent
 - [ ] Custom tool configurations

@@ -307,11 +307,61 @@ ship ai-agent --task "Document infrastructure architecture and create comprehens
 5. **Save outputs**: Use `-o` flags to save diagrams and reports
 6. **Check prerequisites**: Ensure Docker is running for containerized tools
 
+## Creating Custom Modules for Ship CLI
+
+Ship CLI supports community-created Dagger modules to extend functionality. Here's how to create one:
+
+### Basic Module Structure
+```go
+package main
+
+import (
+    "context"
+    "dagger.io/dagger"
+)
+
+type YourModule struct{}
+
+func (m *YourModule) YourFunction(ctx context.Context, source *dagger.Directory) (string, error) {
+    return dag.Container().
+        From("your-image:latest").
+        WithMountedDirectory("/workspace", source).
+        WithExec([]string{"your-command"}).
+        Stdout(ctx)
+}
+```
+
+### Module Metadata (module.yaml)
+```yaml
+apiVersion: ship.cloudship.ai/v1
+kind: Module
+metadata:
+  name: your-module
+  description: "Your module description"
+spec:
+  type: dagger
+  ai_tools:
+    - name: "your_tool"
+      description: "Tool description for AI"
+      usage: |
+        {"tool": "your-module", "action": "analyze", "params": {"path": "."}}
+```
+
+### Publishing Modules
+1. Create GitHub repository with your module
+2. Tag a release (e.g., v1.0.0)
+3. Submit to community registry: https://github.com/cloudshipai/community-modules
+
+### Full Documentation
+See CONTRIBUTING.md for complete guide on creating modules.
+
 ## Support and Resources
 
 - **GitHub Repository**: https://github.com/cloudshipai/ship
 - **Issues and Bug Reports**: https://github.com/cloudshipai/ship/issues
 - **Documentation**: Check the README.md in the repository
+- **Contributing Guide**: CONTRIBUTING.md for creating modules
+- **Community Registry**: https://github.com/cloudshipai/community-modules
 - **MCP Protocol**: https://modelcontextprotocol.io/
 
 This tool is designed to be LLM-friendly and provides extensive AI integration capabilities. All tools run in containers, making it safe and isolated for automated use by AI assistants.

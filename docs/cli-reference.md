@@ -18,9 +18,73 @@ sudo mv ship /usr/local/bin/
 
 ## Commands
 
+### auth
+
+Authenticate with CloudShip using an API key:
+
+```bash
+# Authenticate with API key
+ship auth --api-key YOUR_API_KEY
+
+# Using environment variable
+export CLOUDSHIP_API_KEY=your-api-key
+ship auth
+
+# Log out
+ship auth --logout
+```
+
+Get your API key from: https://app.cloudshipai.com/settings/api-keys
+
+### push
+
+Upload artifacts to CloudShip for analysis:
+
+```bash
+# Push a file with metadata
+ship push analysis.json --type security_scan --fleet-id your-fleet-id
+
+# Push with tags
+ship push results.json --type cost_analysis --tags "production,aws"
+
+# Push with custom metadata
+ship push terraform.tfplan --type terraform_plan --metadata "region=us-east-1,account=123456789"
+
+# Using environment variables
+export CLOUDSHIP_FLEET_ID=your-fleet-id
+ship push scan.json --type security_scan
+
+# Pipe data from another command
+ship terraform-tools lint | ship push - --type lint_results
+```
+
 ### terraform-tools
 
 The `terraform-tools` command provides various Terraform analysis capabilities.
+
+#### Common Flags for All Subcommands
+
+All terraform-tools subcommands support automatic push to CloudShip:
+
+```bash
+# Push results automatically after analysis
+--push                           # Automatically push results to CloudShip
+--push-fleet-id string          # Fleet ID for push (overrides config/env)
+--push-tags strings             # Tags for the pushed artifact
+--push-metadata stringToString  # Additional metadata as key=value pairs
+```
+
+Examples:
+```bash
+# Run security scan and push results
+ship terraform-tools security-scan --push
+
+# Cost analysis with tags
+ship terraform-tools cost-estimate --push --push-tags "production,aws"
+
+# Lint with metadata
+ship terraform-tools lint --push --push-metadata "environment=prod,team=infrastructure"
+```
 
 #### Cost Analysis
 

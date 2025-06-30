@@ -4,64 +4,96 @@
 
 ### Base URL
 ```
-https://api.cloudship.ai/v1
+https://staging.cloudshipai.com/api/v1
 ```
 
 ### Authentication
 
-All API requests require authentication using a bearer token:
+All API requests require authentication using an API key as a bearer token:
 
 ```bash
-Authorization: Bearer sk_prod_xxxxxxxxxxxx
+Authorization: Bearer your-api-key
 ```
+
+Get your API key from: https://app.cloudshipai.com/settings/api-keys
 
 ### Endpoints
 
-#### 1. Validate Token
+#### 1. Upload Artifact
 ```http
-POST /auth/validate
-Authorization: Bearer {token}
+POST /artifacts/upload
+Authorization: Bearer {api-key}
+Content-Type: application/json
+
+Request Body:
+{
+  "fleet_id": "your-fleet-id",
+  "file_name": "analysis.json",
+  "file_type": "application/json",
+  "content": "base64-encoded-content",
+  "metadata": {
+    "scan_type": "security_scan",
+    "scan_timestamp": "2025-01-30T10:00:00Z",
+    "source": "ship-cli/v0.3.5",
+    "tags": ["production", "aws"],
+    "custom_field": "custom_value"
+  }
+}
 
 Response 200:
 {
-  "org_id": "org_123abc",
-  "user_id": "user_456def",
-  "permissions": ["push", "investigate", "mcp"],
-  "valid": true
-}
-
-Response 401:
-{
-  "error": "invalid_token",
-  "message": "Token is invalid or expired"
+  "artifact_id": "art_123abc",
+  "download_url": "https://...",
+  "version": 1,
+  "created_at": "2025-01-30T10:00:00Z"
 }
 ```
 
-#### 2. Push Artifact
+#### 2. List Artifacts
 ```http
-POST /artifacts
-Authorization: Bearer {token}
-Content-Type: multipart/form-data
+GET /artifacts?fleet_id={fleet-id}&limit=50&offset=0&type=security_scan
+Authorization: Bearer {api-key}
 
-Form Data:
-- file: (binary)
-- kind: "tfplan" | "sbom" | "csv" | "steampipe"
-- env: "prod" | "staging" | "dev"
-- tags: {"key": "value", ...}
-- sha256: "abc123..."
-
-Response 201:
+Response 200:
 {
-  "id": "art_789ghi",
-  "sha256": "abc123...",
-  "size": 1048576,
-  "kind": "tfplan",
-  "env": "prod",
-  "url": "https://app.cloudship.ai/artifacts/art_789ghi",
-  "created_at": "2025-01-24T12:00:00Z"
+  "artifacts": [
+    {
+      "id": "art_123abc",
+      "file_name": "analysis.json",
+      "file_type": "application/json",
+      "file_size": 1024,
+      "version": 1,
+      "created_at": "2025-01-30T10:00:00Z",
+      "metadata": {...}
+    }
+  ],
+  "total": 100,
+  "limit": 50,
+  "offset": 0
 }
+```
 
-Response 413:
+#### 3. Download Artifact
+```http
+GET /artifacts/{artifact-id}/download
+Authorization: Bearer {api-key}
+
+Response 200:
+(Binary file content)
+```
+
+### Error Responses
+
+#### 401 Unauthorized
+```json
+{
+  "error": "Unauthorized", 
+  "message": "Invalid API key"
+}
+```
+
+#### 413 Payload Too Large
+```json
 {
   "error": "file_too_large",
   "message": "File size exceeds 100MB limit",
@@ -69,208 +101,70 @@ Response 413:
 }
 ```
 
-#### 3. Get Goals
-```http
-GET /goals?env={env}&panels=enabled
-Authorization: Bearer {token}
+### File Size Limits
 
-Response 200:
-{
-  "goals": [
-    {
-      "id": "goal_cost_optimization",
-      "name": "Cost Optimization",
-      "description": "Identify cost saving opportunities",
-      "panels": ["unused_resources", "rightsizing"],
-      "provider": "aws",
-      "priority": 1
-    },
-    {
-      "id": "goal_security_hardening",
-      "name": "Security Hardening",
-      "description": "Improve security posture",
-      "panels": ["public_exposure", "encryption_status"],
-      "provider": "aws",
-      "priority": 2
-    }
-  ],
-  "environment": "prod",
-  "total": 15
-}
-```
+- Maximum file size: 100MB (104,857,600 bytes)
+- Content is base64 encoded, so actual file size limit is ~75MB before encoding
 
-#### 4. Get Artifact Status
-```http
-GET /artifacts/{sha256}
-Authorization: Bearer {token}
+### Supported Artifact Types
 
-Response 200:
-{
-  "id": "art_789ghi",
-  "sha256": "abc123...",
-  "status": "processed",
-  "insights": {
-    "cost_impact": "+$1,234/month",
-    "security_findings": 3,
-    "performance_score": 85
-  },
-  "created_at": "2025-01-24T12:00:00Z",
-  "processed_at": "2025-01-24T12:05:00Z"
-}
-```
-
-### Error Responses
-
-All errors follow this format:
-
-```json
-{
-  "error": "error_code",
-  "message": "Human readable message",
-  "details": {
-    "field": "additional context"
-  }
-}
-```
-
-Common error codes:
-- `invalid_token` - Authentication failed
-- `rate_limited` - Too many requests
-- `file_too_large` - Upload exceeds size limit
-- `invalid_kind` - Unsupported artifact type
-- `org_suspended` - Organization access suspended
-- `server_error` - Internal server error
-
-### Rate Limits
-
-- Authentication: 10 requests/minute
-- Push: 100 requests/hour
-- Goals: 60 requests/minute
-- General: 1000 requests/hour
-
-Rate limit headers:
-```
-X-RateLimit-Limit: 100
-X-RateLimit-Remaining: 95
-X-RateLimit-Reset: 1706102400
-```
+The `scan_type` in metadata can be any of:
+- `terraform_plan` - Terraform plan files
+- `security_scan` - Security scan results (Trivy, Checkov, etc.)
+- `cost_analysis` - Cost analysis results
+- `cost_estimate` - Cost estimation results (Infracost)
+- `lint_results` - Linting results (TFLint)
+- `terraform_docs` - Generated documentation
+- `infrastructure_diagram` - Infrastructure diagrams
+- `checkov_scan` - Checkov security scan results
+- `infracost_estimate` - Infracost cost estimates
 
 ## MCP Protocol
 
-### Tool Schemas
+Ship CLI includes a built-in MCP (Model Context Protocol) server that exposes all CLI functionality to AI assistants.
 
-#### goal.list
+### Starting the MCP Server
+
+```bash
+ship mcp
+```
+
+### Available Tools
+
+The MCP server exposes the following tools to AI assistants:
+
+1. **terraform_lint** - Lint Terraform code
+2. **terraform_security_scan** - Security scan using multiple tools
+3. **terraform_cost_estimate** - Cost estimation and analysis
+4. **terraform_generate_docs** - Generate documentation
+5. **terraform_generate_diagram** - Generate infrastructure diagrams
+6. **ai_investigate** - Natural language infrastructure queries
+7. **cloudship_push** - Push artifacts to CloudShip
+
+### MCP Configuration
+
+#### Claude Desktop
+Add to `claude_desktop_config.json`:
 ```json
 {
-  "name": "goal.list",
-  "description": "List available goals for an environment",
-  "parameters": {
-    "type": "object",
-    "properties": {
+  "mcpServers": {
+    "ship-cli": {
+      "command": "ship",
+      "args": ["mcp"],
       "env": {
-        "type": "string",
-        "enum": ["prod", "staging", "dev"],
-        "description": "Environment to query"
+        "AWS_PROFILE": "your-profile",
+        "CLOUDSHIP_API_KEY": "your-api-key",
+        "CLOUDSHIP_FLEET_ID": "your-fleet-id"
       }
-    },
-    "required": ["env"]
-  }
-}
-```
-
-#### goal.run
-```json
-{
-  "name": "goal.run",
-  "description": "Execute investigation for a specific goal",
-  "parameters": {
-    "type": "object",
-    "properties": {
-      "goal_id": {
-        "type": "string",
-        "description": "Goal ID to execute"
-      },
-      "env": {
-        "type": "string",
-        "enum": ["prod", "staging", "dev"],
-        "description": "Environment to investigate"
-      },
-      "provider": {
-        "type": "string",
-        "enum": ["aws", "cloudflare", "heroku"],
-        "description": "Cloud provider"
-      }
-    },
-    "required": ["goal_id", "env", "provider"]
-  }
-}
-```
-
-#### steampipe.query
-```json
-{
-  "name": "steampipe.query",
-  "description": "Execute a raw Steampipe SQL query",
-  "parameters": {
-    "type": "object",
-    "properties": {
-      "sql": {
-        "type": "string",
-        "description": "SQL query to execute"
-      },
-      "provider": {
-        "type": "string",
-        "enum": ["aws", "cloudflare", "heroku"],
-        "description": "Provider context for the query"
-      }
-    },
-    "required": ["sql", "provider"]
-  }
-}
-```
-
-### MCP Communication
-
-#### JSON-RPC Request
-```json
-{
-  "jsonrpc": "2.0",
-  "id": "1",
-  "method": "goal.list",
-  "params": {
-    "env": "prod"
-  }
-}
-```
-
-#### JSON-RPC Response
-```json
-{
-  "jsonrpc": "2.0",
-  "id": "1",
-  "result": {
-    "goals": [
-      {
-        "id": "goal_cost_optimization",
-        "name": "Cost Optimization",
-        "panels": ["unused_resources", "rightsizing"]
-      }
-    ]
-  }
-}
-```
-
-#### Error Response
-```json
-{
-  "jsonrpc": "2.0",
-  "id": "1",
-  "error": {
-    "code": -32601,
-    "message": "Method not found",
-    "data": {
-      "method": "invalid.method"
     }
   }
 }
 ```
+
+#### Environment Variables
+
+The MCP server respects the following environment variables:
+- `AWS_PROFILE` - AWS profile for cloud access
+- `CLOUDSHIP_API_KEY` - CloudShip API key for authentication
+- `CLOUDSHIP_FLEET_ID` - Default fleet ID for artifact uploads
+- `INFRACOST_API_KEY` - Infracost API key for detailed cost estimates

@@ -1,11 +1,13 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/cloudshipai/ship/internal/dagger"
 	"github.com/spf13/cobra"
@@ -26,10 +28,15 @@ func init() {
 	queryCmd.Flags().String("aws-profile", "", "AWS profile to use (from ~/.aws/config)")
 	queryCmd.Flags().String("aws-region", "", "AWS region to use")
 	queryCmd.Flags().String("log-level", "info", "Log level (debug, info, warn, error)")
+	queryCmd.Flags().Int("timeout", 10, "Timeout in minutes for the query")
 }
 
 func runQuery(cmd *cobra.Command, args []string) error {
-	ctx := cmd.Context()
+	// Get timeout from flags
+	timeoutMinutes, _ := cmd.Flags().GetInt("timeout")
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMinutes)*time.Minute)
+	defer cancel()
+	
 	query := args[0]
 
 	if err := checkDockerRunning(); err != nil {
@@ -102,8 +109,11 @@ func runQuery(cmd *cobra.Command, args []string) error {
 		if awsProfile != "" {
 			credentials["AWS_PROFILE"] = awsProfile
 		}
+		// Set AWS region, defaulting to us-east-1 if not specified
 		if awsRegion != "" {
 			credentials["AWS_REGION"] = awsRegion
+		} else if credentials["AWS_REGION"] == "" {
+			credentials["AWS_REGION"] = "us-east-1"
 		}
 	}
 

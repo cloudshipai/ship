@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/cloudshipai/ship/internal/dagger"
 	"github.com/cloudshipai/ship/internal/dagger/modules"
@@ -31,12 +32,16 @@ func init() {
 	aiInvestigateCmd.Flags().String("aws-profile", "", "AWS profile to use (from ~/.aws/config)")
 	aiInvestigateCmd.Flags().String("aws-region", "", "AWS region to use")
 	aiInvestigateCmd.Flags().String("log-level", "info", "Log level for Dagger engine")
+	aiInvestigateCmd.Flags().Int("timeout", 15, "Timeout in minutes for the investigation")
 
 	aiInvestigateCmd.MarkFlagRequired("prompt")
 }
 
 func runAIInvestigate(cmd *cobra.Command, args []string) error {
-	ctx := cmd.Context()
+	// Get timeout from flags
+	timeoutMinutes, _ := cmd.Flags().GetInt("timeout")
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMinutes)*time.Minute)
+	defer cancel()
 
 	if err := checkDockerRunning(); err != nil {
 		return err
@@ -130,8 +135,11 @@ func runAIInvestigate(cmd *cobra.Command, args []string) error {
 		if awsProfile != "" {
 			credentials["AWS_PROFILE"] = awsProfile
 		}
+		// Set AWS region, defaulting to us-east-1 if not specified
 		if awsRegion != "" {
 			credentials["AWS_REGION"] = awsRegion
+		} else if credentials["AWS_REGION"] == "" {
+			credentials["AWS_REGION"] = "us-east-1"
 		}
 	}
 

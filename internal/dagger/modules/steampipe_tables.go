@@ -74,11 +74,12 @@ func GetCommonSteampipeTables(provider string) []string {
 func GetSteampipeTableExamples(provider string) map[string]string {
 	examples := map[string]map[string]string{
 		"aws": {
-			"List EC2 instances":         "SELECT instance_id, instance_type, instance_state FROM aws_ec2_instance",
-			"Check S3 bucket encryption": "SELECT name, server_side_encryption_configuration FROM aws_s3_bucket",
-			"Find public S3 buckets":     "SELECT name, acl FROM aws_s3_bucket WHERE acl->>'Permission' = 'READ'",
-			"List IAM users":            "SELECT name, create_date, password_last_used FROM aws_iam_user",
-			"Check security groups":      "SELECT group_id, group_name, description FROM aws_vpc_security_group WHERE description LIKE '%open%'",
+			"Count S3 buckets":          "SELECT COUNT(*) as bucket_count FROM aws_s3_bucket",
+			"List S3 buckets":           "SELECT name, region FROM aws_s3_bucket LIMIT 10",
+			"Check S3 encryption":       "SELECT name, server_side_encryption_configuration FROM aws_s3_bucket LIMIT 5",
+			"Count EC2 instances":       "SELECT COUNT(*) as instance_count FROM aws_ec2_instance",
+			"List IAM users":            "SELECT name, create_date FROM aws_iam_user LIMIT 10",
+			"Check account info":        "SELECT account_id, arn FROM aws_account",
 		},
 		"azure": {
 			"List VMs":                   "SELECT name, location, vm_size FROM azure_compute_virtual_machine",

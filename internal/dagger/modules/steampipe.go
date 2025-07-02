@@ -3,8 +3,6 @@ package modules
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"dagger.io/dagger"
@@ -39,6 +37,12 @@ func (m *SteampipeModule) RunQuery(ctx context.Context, plugin string, query str
 	if plugin != "" {
 		container = container.WithExec([]string{"steampipe", "plugin", "install", plugin})
 	}
+	
+	// Configure Steampipe directories
+	container = container.WithExec([]string{
+		"sh", "-c", 
+		"mkdir -p /home/steampipe/.steampipe/config",
+	})
 
 	// For AWS, we'll use environment variables only (no profile mounting)
 	// This avoids the "failed to get shared config profile" error
@@ -51,14 +55,32 @@ func (m *SteampipeModule) RunQuery(ctx context.Context, plugin string, query str
 		}
 	}
 
-	// For AWS, check the Steampipe connection status
+	// For AWS, configure region-specific connection to avoid scanning all regions
 	if plugin == "aws" {
+		// Get the AWS region from credentials or default to us-east-1
+		awsRegion := credentials["AWS_REGION"]
+		if awsRegion == "" {
+			awsRegion = "us-east-1"
+		}
+
+		// Create AWS connection config with specific region
+		awsConfig := fmt.Sprintf(`connection "aws" {
+  plugin = "aws"
+  regions = ["%s"]
+}`, awsRegion)
+
+		// Write the config file
+		container = container.WithExec([]string{
+			"sh", "-c", 
+			fmt.Sprintf("echo '%s' > /home/steampipe/.steampipe/config/aws.spc", awsConfig),
+		})
+
 		// Check Steampipe AWS plugin connection
 		checkContainer := container.WithExec([]string{
 			"sh", "-c", "steampipe plugin list && echo '---' && steampipe connection list",
 		})
 		connectionStatus, _ := checkContainer.Stdout(ctx)
-		fmt.Printf("Steampipe AWS connection status:\n%s\n", connectionStatus)
+		fmt.Printf("Steampipe AWS connection status (region: %s):\n%s\n", awsRegion, connectionStatus)
 	}
 	
 	// Execute the query with explicit timeout and error capture
@@ -91,34 +113,38 @@ func (m *SteampipeModule) RunMultipleQueries(ctx context.Context, plugin string,
 	// Install the required plugin
 	container = container.WithExec([]string{"steampipe", "plugin", "install", plugin})
 
-	// Mount AWS credentials from host if available and plugin is AWS
-	if plugin == "aws" {
-		if homeDir := os.Getenv("HOME"); homeDir != "" {
-			awsCredsPath := filepath.Join(homeDir, ".aws")
-			if _, err := os.Stat(awsCredsPath); err == nil {
-				awsCreds := m.client.Host().Directory(awsCredsPath)
-				// Mount to both /root/.aws and /home/steampipe/.aws since Steampipe runs as steampipe user
-				container = container.WithDirectory("/home/steampipe/.aws", awsCreds)
-				
-				// Always set AWS SDK environment variables when credentials are mounted
-				// This ensures the AWS SDK knows to look for the mounted credential files
-				container = container.WithEnvVariable("AWS_SDK_LOAD_CONFIG", "1")
-				container = container.WithEnvVariable("AWS_SHARED_CREDENTIALS_FILE", "/home/steampipe/.aws/credentials")
-				container = container.WithEnvVariable("AWS_CONFIG_FILE", "/home/steampipe/.aws/config")
-				
-				// If no AWS_PROFILE is explicitly set, default to "default" profile
-				if awsProfile, hasProfile := credentials["AWS_PROFILE"]; !hasProfile || awsProfile == "" {
-					container = container.WithEnvVariable("AWS_PROFILE", "default")
-				}
-			}
-		}
-	}
+	// Configure Steampipe directories
+	container = container.WithExec([]string{
+		"sh", "-c", 
+		"mkdir -p /home/steampipe/.steampipe/config",
+	})
 
 	// Set environment variables for credentials
 	for key, value := range credentials {
 		if value != "" {
 			container = container.WithEnvVariable(key, value)
 		}
+	}
+
+	// For AWS, configure region-specific connection to avoid scanning all regions
+	if plugin == "aws" {
+		// Get the AWS region from credentials or default to us-east-1
+		awsRegion := credentials["AWS_REGION"]
+		if awsRegion == "" {
+			awsRegion = "us-east-1"
+		}
+
+		// Create AWS connection config with specific region
+		awsConfig := fmt.Sprintf(`connection "aws" {
+  plugin = "aws"
+  regions = ["%s"]
+}`, awsRegion)
+
+		// Write the config file
+		container = container.WithExec([]string{
+			"sh", "-c", 
+			fmt.Sprintf("echo '%s' > /home/steampipe/.steampipe/config/aws.spc", awsConfig),
+		})
 	}
 
 	// Execute each query

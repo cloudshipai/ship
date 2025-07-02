@@ -219,18 +219,24 @@ NEVER use made-up table names. Only use the tables listed above.
 		return steps, nil
 	}
 	
+	previewLen := 200
+	if len(responseText) < previewLen {
+		previewLen = len(responseText)
+	}
+	slog.Debug("LLM raw response received", "response_length", len(responseText), "response_preview", responseText[:previewLen])
+	
 	// Clean up the response - remove markdown code blocks if present
 	cleanedResponse := responseText
 	if strings.Contains(responseText, "```json") {
-		start := strings.Index(responseText, "```json") + 7
+		start := strings.Index(responseText, "```json") + 8 // +8 to skip "```json\n"
 		end := strings.LastIndex(responseText, "```")
-		if start > 7 && end > start {
+		if start > 8 && end > start {
 			cleanedResponse = strings.TrimSpace(responseText[start:end])
 		}
 	} else if strings.Contains(responseText, "```") {
-		start := strings.Index(responseText, "```") + 3
+		start := strings.Index(responseText, "```") + 4 // +4 to skip "```\n"
 		end := strings.LastIndex(responseText, "```")
-		if start > 3 && end > start {
+		if start > 4 && end > start {
 			cleanedResponse = strings.TrimSpace(responseText[start:end])
 		}
 	}
@@ -238,7 +244,7 @@ NEVER use made-up table names. Only use the tables listed above.
 	// Try to parse the JSON response
 	var steps []InvestigationStep
 	if err := json.Unmarshal([]byte(cleanedResponse), &steps); err != nil {
-		slog.Warn("Failed to parse LLM JSON response", "error", err, "response", cleanedResponse)
+		slog.Debug("Failed to parse LLM JSON response", "error", err, "cleaned_response", cleanedResponse)
 		
 		// Try to extract a query from the response text
 		// This is a simple fallback - in production you'd want more robust parsing

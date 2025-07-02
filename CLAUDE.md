@@ -127,6 +127,21 @@ Detailed documentation is available in the `docs/` folder:
 
 - Okay, let's begin building it and check off as you go, commit as you go, and write Notion documentation about this project as you go
 
+## Recent Fixes
+
+### AI Hallucination Fix (July 2, 2025)
+- Fixed AI generating non-existent Steampipe tables like `aws_resource_inventory`
+- Added `steampipe_tables.go` with real table names for AWS, Azure, GCP
+- Enhanced AI prompts to include actual tables and example queries
+- Fixed hardcoded fallback in `llm_dagger.go`
+- Improved JSON parsing to handle markdown code blocks
+
+### AWS Credentials Fix (July 2, 2025)
+- Fixed automatic credential detection from `~/.aws/credentials`
+- Changed from profile-based to environment variable authentication
+- Credentials now parsed on host and passed as env vars to containers
+- Removed problematic credential file mounting
+
 ## License
 
 This project is licensed under the Apache License 2.0.

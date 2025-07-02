@@ -1,0 +1,100 @@
+package modules
+
+// GetCommonSteampipeTables returns common Steampipe table names for each provider
+func GetCommonSteampipeTables(provider string) []string {
+	tables := map[string][]string{
+		"aws": {
+			"aws_account",
+			"aws_ec2_instance",
+			"aws_s3_bucket",
+			"aws_iam_user",
+			"aws_iam_role",
+			"aws_iam_policy",
+			"aws_lambda_function",
+			"aws_rds_db_instance",
+			"aws_vpc",
+			"aws_vpc_security_group",
+			"aws_vpc_subnet",
+			"aws_cloudwatch_log_group",
+			"aws_cloudtrail_trail",
+			"aws_config_configuration_recorder",
+			"aws_ebs_volume",
+			"aws_ebs_snapshot",
+			"aws_ecs_cluster",
+			"aws_ecs_service",
+			"aws_eks_cluster",
+			"aws_elasticache_cluster",
+			"aws_kinesis_stream",
+			"aws_sns_topic",
+			"aws_sqs_queue",
+			"aws_dynamodb_table",
+			"aws_api_gateway_rest_api",
+			"aws_cloudfront_distribution",
+			"aws_route53_zone",
+			"aws_acm_certificate",
+			"aws_kms_key",
+			"aws_secretsmanager_secret",
+		},
+		"azure": {
+			"azure_subscription",
+			"azure_compute_virtual_machine",
+			"azure_storage_account",
+			"azure_storage_container",
+			"azure_app_service_web_app",
+			"azure_sql_database",
+			"azure_key_vault",
+			"azure_network_virtual_network",
+			"azure_network_security_group",
+			"azure_cosmosdb_account",
+			"azure_kubernetes_cluster",
+		},
+		"gcp": {
+			"gcp_project",
+			"gcp_compute_instance",
+			"gcp_storage_bucket",
+			"gcp_sql_database_instance",
+			"gcp_kubernetes_cluster",
+			"gcp_compute_network",
+			"gcp_compute_firewall",
+			"gcp_iam_service_account",
+			"gcp_bigquery_dataset",
+			"gcp_pubsub_topic",
+		},
+	}
+	
+	if providerTables, ok := tables[provider]; ok {
+		return providerTables
+	}
+	
+	// Default return empty if provider not found
+	return []string{}
+}
+
+// GetSteampipeTableExamples returns example queries for common use cases
+func GetSteampipeTableExamples(provider string) map[string]string {
+	examples := map[string]map[string]string{
+		"aws": {
+			"List EC2 instances":         "SELECT instance_id, instance_type, instance_state FROM aws_ec2_instance",
+			"Check S3 bucket encryption": "SELECT name, server_side_encryption_configuration FROM aws_s3_bucket",
+			"Find public S3 buckets":     "SELECT name, acl FROM aws_s3_bucket WHERE acl->>'Permission' = 'READ'",
+			"List IAM users":            "SELECT name, create_date, password_last_used FROM aws_iam_user",
+			"Check security groups":      "SELECT group_id, group_name, description FROM aws_vpc_security_group WHERE description LIKE '%open%'",
+		},
+		"azure": {
+			"List VMs":                   "SELECT name, location, vm_size FROM azure_compute_virtual_machine",
+			"Check storage encryption":   "SELECT name, encryption FROM azure_storage_account",
+			"List SQL databases":         "SELECT name, edition, service_level_objective FROM azure_sql_database",
+		},
+		"gcp": {
+			"List compute instances":     "SELECT name, machine_type, status FROM gcp_compute_instance",
+			"Check bucket permissions":   "SELECT name, location, storage_class FROM gcp_storage_bucket",
+			"List Kubernetes clusters":   "SELECT name, location, status FROM gcp_kubernetes_cluster",
+		},
+	}
+	
+	if providerExamples, ok := examples[provider]; ok {
+		return providerExamples
+	}
+	
+	return map[string]string{}
+}

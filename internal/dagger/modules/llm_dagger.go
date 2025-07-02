@@ -2,7 +2,10 @@ package modules
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log/slog"
+	"strings"
 
 	"dagger.io/dagger"
 )
@@ -132,22 +135,43 @@ func (m *DaggerLLMModule) CreateInvestigationPlan(ctx context.Context, objective
 		provider = providers[0]
 	}
 
+	// Get available Steampipe tables for context
+	availableTables := GetCommonSteampipeTables(provider)
+	tableList := ""
+	for _, table := range availableTables {
+		tableList += "- " + table + "\n"
+	}
+	
+	// Get example queries
+	examples := GetSteampipeTableExamples(provider)
+	exampleQueries := ""
+	for desc, query := range examples {
+		exampleQueries += fmt.Sprintf("- %s: %s\n", desc, query)
+	}
+
 	promptText := fmt.Sprintf(`
 You are a cloud infrastructure investigator. Create a step-by-step investigation plan for:
 
 Objective: %s
 Cloud Provider: %s
 
+IMPORTANT: You MUST use these actual Steampipe tables for %s:
+%s
+
+Example queries:
+%s
+
 Return a JSON array of investigation steps, each with:
 - "step_number": sequential number  
 - "description": what this step investigates
 - "provider": which cloud provider to query ("%s")
-- "query": the Steampipe SQL query to run
+- "query": the Steampipe SQL query to run (MUST use actual tables listed above)
 - "expected_insights": what we hope to learn
 
 Focus on security, compliance, cost, and performance aspects.
 Generate exactly 3-5 steps that thoroughly investigate the objective.
-`, objective, provider, provider)
+NEVER use made-up table names. Only use the tables listed above.
+`, objective, provider, provider, tableList, exampleQueries, provider)
 
 	// Use native Dagger LLM with system prompt for better JSON output
 	llm := m.client.LLM(dagger.LLMOpts{
@@ -169,17 +193,71 @@ Generate exactly 3-5 steps that thoroughly investigate the objective.
 		return nil, fmt.Errorf("failed to get LLM response: %w", err)
 	}
 
-	// For now, return example steps
-	// In production, we'd parse the JSON response from LLM
-	// TODO: Parse response JSON into []InvestigationStep
-	steps := []InvestigationStep{
-		{
-			StepNumber:       1,
-			Description:      "Analyze resource security based on: " + objective,
-			Provider:         provider,
-			Query:            "SELECT * FROM " + provider + "_resource_inventory",
-			ExpectedInsights: "Overview of all resources",
-		},
+	// Parse the LLM response
+	responseText, err := synced.LastReply(ctx)
+	if err != nil {
+		// Fallback with a real table if LLM fails
+		slog.Warn("LLM failed, using fallback", "error", err)
+		
+		// Use a real table based on provider
+		fallbackTable := "aws_account"
+		if provider == "azure" {
+			fallbackTable = "azure_subscription"
+		} else if provider == "gcp" {
+			fallbackTable = "gcp_project"
+		}
+		
+		steps := []InvestigationStep{
+			{
+				StepNumber:       1,
+				Description:      "Basic " + provider + " account overview",
+				Provider:         provider,
+				Query:            "SELECT * FROM " + fallbackTable + " LIMIT 1",
+				ExpectedInsights: "Account information and configuration",
+			},
+		}
+		return steps, nil
+	}
+	
+	// Clean up the response - remove markdown code blocks if present
+	cleanedResponse := responseText
+	if strings.Contains(responseText, "```json") {
+		start := strings.Index(responseText, "```json") + 7
+		end := strings.LastIndex(responseText, "```")
+		if start > 7 && end > start {
+			cleanedResponse = strings.TrimSpace(responseText[start:end])
+		}
+	} else if strings.Contains(responseText, "```") {
+		start := strings.Index(responseText, "```") + 3
+		end := strings.LastIndex(responseText, "```")
+		if start > 3 && end > start {
+			cleanedResponse = strings.TrimSpace(responseText[start:end])
+		}
+	}
+	
+	// Try to parse the JSON response
+	var steps []InvestigationStep
+	if err := json.Unmarshal([]byte(cleanedResponse), &steps); err != nil {
+		slog.Warn("Failed to parse LLM JSON response", "error", err, "response", cleanedResponse)
+		
+		// Try to extract a query from the response text
+		// This is a simple fallback - in production you'd want more robust parsing
+		fallbackTable := "aws_account"
+		if provider == "azure" {
+			fallbackTable = "azure_subscription"  
+		} else if provider == "gcp" {
+			fallbackTable = "gcp_project"
+		}
+		
+		steps = []InvestigationStep{
+			{
+				StepNumber:       1,
+				Description:      "Investigation based on: " + objective,
+				Provider:         provider,
+				Query:            "SELECT * FROM " + fallbackTable + " LIMIT 1",
+				ExpectedInsights: "Basic account overview",
+			},
+		}
 	}
 
 	return steps, nil

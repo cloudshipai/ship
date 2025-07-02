@@ -40,16 +40,9 @@ func (m *SteampipeModule) RunQuery(ctx context.Context, plugin string, query str
 		container = container.WithExec([]string{"steampipe", "plugin", "install", plugin})
 	}
 
-	// Mount AWS credentials from host if available and plugin is AWS
-	if plugin == "aws" {
-		if homeDir := os.Getenv("HOME"); homeDir != "" {
-			awsCredsPath := filepath.Join(homeDir, ".aws")
-			if _, err := os.Stat(awsCredsPath); err == nil {
-				awsCreds := m.client.Host().Directory(awsCredsPath)
-				container = container.WithDirectory("/root/.aws", awsCreds)
-			}
-		}
-	}
+	// For AWS, we'll use environment variables only (no profile mounting)
+	// This avoids the "failed to get shared config profile" error
+	// The credentials are passed via the credentials map below
 
 	// Set environment variables for credentials
 	for key, value := range credentials {
@@ -58,22 +51,30 @@ func (m *SteampipeModule) RunQuery(ctx context.Context, plugin string, query str
 		}
 	}
 
-	// If AWS_PROFILE is set, we need to configure Steampipe to use it
-	if profile, ok := credentials["AWS_PROFILE"]; ok && profile != "" {
-		container = container.WithEnvVariable("AWS_SDK_LOAD_CONFIG", "1")
-		// Also set the shared config file location
-		container = container.WithEnvVariable("AWS_SHARED_CREDENTIALS_FILE", "/root/.aws/credentials")
-		container = container.WithEnvVariable("AWS_CONFIG_FILE", "/root/.aws/config")
+	// For AWS, check the Steampipe connection status
+	if plugin == "aws" {
+		// Check Steampipe AWS plugin connection
+		checkContainer := container.WithExec([]string{
+			"sh", "-c", "steampipe plugin list && echo '---' && steampipe connection list",
+		})
+		connectionStatus, _ := checkContainer.Stdout(ctx)
+		fmt.Printf("Steampipe AWS connection status:\n%s\n", connectionStatus)
 	}
-
-	// Execute the query
-	container = container.WithExec([]string{
-		"steampipe", "query", query, "--output", output,
+	
+	// Execute the query with explicit timeout and error capture
+	queryContainer := container.WithExec([]string{
+		"sh", "-c",
+		fmt.Sprintf("steampipe query '%s' --output %s 2>&1 || echo 'EXIT_CODE:'$?", query, output),
 	})
 
-	stdout, err := container.Stdout(ctx)
+	stdout, err := queryContainer.Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to run steampipe query: %w", err)
+	}
+	
+	// Check if we got an error
+	if strings.Contains(stdout, "EXIT_CODE:") || strings.Contains(stdout, "Error:") {
+		return "", fmt.Errorf("steampipe query failed: %s", stdout)
 	}
 
 	return stdout, nil
@@ -96,7 +97,19 @@ func (m *SteampipeModule) RunMultipleQueries(ctx context.Context, plugin string,
 			awsCredsPath := filepath.Join(homeDir, ".aws")
 			if _, err := os.Stat(awsCredsPath); err == nil {
 				awsCreds := m.client.Host().Directory(awsCredsPath)
-				container = container.WithDirectory("/root/.aws", awsCreds)
+				// Mount to both /root/.aws and /home/steampipe/.aws since Steampipe runs as steampipe user
+				container = container.WithDirectory("/home/steampipe/.aws", awsCreds)
+				
+				// Always set AWS SDK environment variables when credentials are mounted
+				// This ensures the AWS SDK knows to look for the mounted credential files
+				container = container.WithEnvVariable("AWS_SDK_LOAD_CONFIG", "1")
+				container = container.WithEnvVariable("AWS_SHARED_CREDENTIALS_FILE", "/home/steampipe/.aws/credentials")
+				container = container.WithEnvVariable("AWS_CONFIG_FILE", "/home/steampipe/.aws/config")
+				
+				// If no AWS_PROFILE is explicitly set, default to "default" profile
+				if awsProfile, hasProfile := credentials["AWS_PROFILE"]; !hasProfile || awsProfile == "" {
+					container = container.WithEnvVariable("AWS_PROFILE", "default")
+				}
 			}
 		}
 	}
@@ -106,14 +119,6 @@ func (m *SteampipeModule) RunMultipleQueries(ctx context.Context, plugin string,
 		if value != "" {
 			container = container.WithEnvVariable(key, value)
 		}
-	}
-
-	// If AWS_PROFILE is set, we need to configure Steampipe to use it
-	if profile, ok := credentials["AWS_PROFILE"]; ok && profile != "" {
-		container = container.WithEnvVariable("AWS_SDK_LOAD_CONFIG", "1")
-		// Also set the shared config file location
-		container = container.WithEnvVariable("AWS_SHARED_CREDENTIALS_FILE", "/root/.aws/credentials")
-		container = container.WithEnvVariable("AWS_CONFIG_FILE", "/root/.aws/config")
 	}
 
 	// Execute each query

@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"dagger.io/dagger"
 )
@@ -38,26 +42,45 @@ You have access to the following tools:
 
 1. STEAMPIPE_QUERY: Execute SQL queries against cloud infrastructure
    Usage: {"tool": "steampipe", "action": "query", "params": {"provider": "aws", "sql": "SELECT ..."}}
+   - Query real AWS/Azure/GCP resources
+   - Use information_schema.columns to discover table schemas
+   - Check tags to identify Terraform-managed resources
 
-2. COST_ANALYSIS: Analyze costs of Terraform plans  
+2. TERRAFORM_PLAN: Run terraform plan and capture output
+   Usage: {"tool": "terraform", "action": "plan", "params": {"path": ".", "format": "json"}}
+   
+3. TERRAFORM_STATE: Read terraform state file
+   Usage: {"tool": "terraform", "action": "show-state", "params": {"path": "terraform.tfstate"}}
+
+4. COST_ANALYSIS: Analyze costs of Terraform plans  
    Usage: {"tool": "openinfraquote", "action": "analyze", "params": {"file": "path/to/tfplan.json", "region": "us-east-1"}}
 
-3. TERRAFORM_DOCS: Generate documentation for Terraform modules
+5. TERRAFORM_DOCS: Generate documentation for Terraform modules
    Usage: {"tool": "terraform-docs", "action": "generate", "params": {"path": "path/to/module"}}
 
-4. SECURITY_SCAN: Scan for security issues
+6. SECURITY_SCAN: Scan for security issues with Checkov
    Usage: {"tool": "checkov", "action": "scan", "params": {"path": "path/to/code"}}
 
-5. INFRAMAP_DIAGRAM: Generate infrastructure diagrams from Terraform state or HCL
+7. TFLINT: Lint Terraform code
+   Usage: {"tool": "tflint", "action": "lint", "params": {"path": "."}}
+
+8. INFRACOST: Estimate costs for Terraform changes
+   Usage: {"tool": "infracost", "action": "breakdown", "params": {"path": "."}}
+
+9. INFRAMAP_DIAGRAM: Generate infrastructure diagrams from Terraform state or HCL
    Usage: {"tool": "inframap", "action": "diagram", "params": {"input": "terraform.tfstate", "format": "png"}}
    Or for HCL: {"tool": "inframap", "action": "diagram-hcl", "params": {"path": ".", "format": "svg"}}
 
-To use a tool, respond with a JSON object containing the tool request.
-After receiving results, you can use more tools or provide final analysis.
+IMPORTANT: When you want to use a tool, you MUST respond with ONLY a valid JSON object. Do not include any text before or after the JSON.
+Example correct response:
+{"tool": "steampipe", "action": "query", "params": {"provider": "aws", "sql": "SELECT count(*) FROM aws_s3_bucket"}}
+
+After I execute the tool and return results, you can then use another tool or provide your final analysis.
+DO NOT describe your plan - just execute it by returning JSON tool requests.
 `
 
 	// Initial prompt with objective and available tools
-	systemPrompt := "You are an infrastructure investigator with access to real tools. " + toolsPrompt
+	systemPrompt := "You are an infrastructure investigator with access to real tools. Always respond with JSON when using tools, never with explanatory text. " + toolsPrompt
 
 	// Create LLM with tool-use system prompt
 	llm := m.client.LLM(dagger.LLMOpts{
@@ -65,7 +88,7 @@ After receiving results, you can use more tools or provide final analysis.
 	}).WithSystemPrompt(systemPrompt)
 
 	// Start investigation
-	conversation := llm.WithPrompt(fmt.Sprintf("Investigate: %s\n\nFirst, plan what tools you'll use.", objective))
+	conversation := llm.WithPrompt(fmt.Sprintf("Task: %s\n\nRespond with a JSON tool request to begin investigation. Do not explain, just return JSON.", objective))
 
 	// Execute up to 5 tool uses
 	var toolResults []ToolResult
@@ -81,26 +104,49 @@ After receiving results, you can use more tools or provide final analysis.
 			return nil, fmt.Errorf("failed to get LLM response: %w", err)
 		}
 
-		// Check if response contains tool request
-		var toolRequest LLMToolRequest
-		if err := json.Unmarshal([]byte(response), &toolRequest); err == nil {
-			// Execute the requested tool
-			result, err := m.executeTool(ctx, toolRequest)
-			if err != nil {
-				// Tell LLM about the error
-				conversation = conversation.WithPrompt(fmt.Sprintf("Tool error: %v", err))
-				continue
+		slog.Debug("LLM response", "iteration", i+1, "response_length", len(response))
+		
+		// Try to extract JSON from response (handle cases where LLM adds text)
+		jsonStart := strings.Index(response, "{")
+		jsonEnd := strings.LastIndex(response, "}")
+		
+		if jsonStart >= 0 && jsonEnd > jsonStart {
+			jsonStr := response[jsonStart:jsonEnd+1]
+			
+			var toolRequest LLMToolRequest
+			if err := json.Unmarshal([]byte(jsonStr), &toolRequest); err == nil && toolRequest.Tool != "" {
+				slog.Info("Executing tool", "tool", toolRequest.Tool, "action", toolRequest.Action)
+				
+				// Execute the requested tool
+				result, err := m.executeTool(ctx, toolRequest)
+				if err != nil {
+					// Tell LLM about the error
+					conversation = conversation.WithPrompt(fmt.Sprintf("Tool error: %v\n\nTry another tool or provide your analysis.", err))
+					toolResults = append(toolResults, ToolResult{
+						Tool:   toolRequest.Tool,
+						Action: toolRequest.Action,
+						Error:  err,
+					})
+					continue
+				}
+
+				toolResults = append(toolResults, result)
+
+				// Feed results back to LLM
+				conversation = conversation.WithPrompt(fmt.Sprintf(
+					"Tool '%s' executed successfully. Output:\n%s\n\nRespond with another JSON tool request to continue, or provide your final analysis as plain text.",
+					toolRequest.Tool, result.Output,
+				))
+			} else {
+				// Failed to parse as tool request, assume it's the final analysis
+				return &InvestigationReport{
+					Objective: objective,
+					ToolsUsed: toolResults,
+					Analysis:  response,
+				}, nil
 			}
-
-			toolResults = append(toolResults, result)
-
-			// Feed results back to LLM
-			conversation = conversation.WithPrompt(fmt.Sprintf(
-				"Tool '%s' returned:\n%s\n\nWhat would you like to do next?",
-				toolRequest.Tool, result.Output,
-			))
 		} else {
-			// LLM provided final analysis
+			// No JSON found, assume it's the final analysis
 			return &InvestigationReport{
 				Objective: objective,
 				ToolsUsed: toolResults,
@@ -135,8 +181,11 @@ func (m *LLMWithToolsModule) executeTool(ctx context.Context, request LLMToolReq
 		// Execute Steampipe query
 		provider := request.Params["provider"]
 		sql := request.Params["sql"]
+		
+		// Get credentials for the provider
+		credentials := getProviderCredentials(provider)
 
-		output, err := m.steampipeModule.RunQuery(ctx, provider, sql, nil)
+		output, err := m.steampipeModule.RunQuery(ctx, provider, sql, credentials, "json")
 		return ToolResult{
 			Tool:   "steampipe",
 			Action: request.Action,
@@ -171,6 +220,79 @@ func (m *LLMWithToolsModule) executeTool(ctx context.Context, request LLMToolReq
 			Output: output,
 			Error:  err,
 		}, err
+
+	case "terraform":
+		// Handle terraform operations
+		switch request.Action {
+		case "plan":
+			path := request.Params["path"]
+			if path == "" {
+				path = "."
+			}
+			// TODO: Implement terraform plan execution
+			return ToolResult{
+				Tool:   "terraform",
+				Action: request.Action,
+				Output: "Terraform plan would be executed here",
+				Error:  fmt.Errorf("terraform plan not yet implemented"),
+			}, nil
+			
+		case "show-state":
+			statePath := request.Params["path"]
+			// TODO: Implement terraform state reading
+			return ToolResult{
+				Tool:   "terraform",
+				Action: request.Action,
+				Output: fmt.Sprintf("Terraform state would be read from: %s", statePath),
+				Error:  fmt.Errorf("terraform state reading not yet implemented"),
+			}, nil
+			
+		default:
+			return ToolResult{}, fmt.Errorf("unknown terraform action: %s", request.Action)
+		}
+		
+	case "checkov":
+		// Security scanning
+		path := request.Params["path"]
+		if path == "" {
+			path = "."
+		}
+		// Use existing terraform-tools checkov functionality
+		// TODO: Create CheckovModule and integrate
+		return ToolResult{
+			Tool:   "checkov",
+			Action: request.Action,
+			Output: "Checkov scan would run here",
+			Error:  fmt.Errorf("checkov integration pending"),
+		}, nil
+		
+	case "tflint":
+		// Terraform linting
+		path := request.Params["path"]
+		if path == "" {
+			path = "."
+		}
+		// TODO: Create TFLintModule
+		return ToolResult{
+			Tool:   "tflint",
+			Action: request.Action,
+			Output: "TFLint would run here",
+			Error:  fmt.Errorf("tflint integration pending"),
+		}, nil
+		
+	case "infracost":
+		// Cost estimation
+		path := request.Params["path"]
+		if path == "" {
+			path = "."
+		}
+		// TODO: Create InfracostModule
+		return ToolResult{
+			Tool:   "infracost",
+			Action: request.Action,
+			Output: "Infracost would run here",
+			Error:  fmt.Errorf("infracost integration pending"),
+		}, nil
 
 	case "inframap":
 		// Generate infrastructure diagram
@@ -303,4 +425,83 @@ type CostReport struct {
 func extractRecommendations(analysis string) []string {
 	// In production, this would parse the LLM output
 	return []string{"Recommendations would be extracted here"}
+}
+
+// getProviderCredentials returns credentials for cloud providers
+func getProviderCredentials(provider string) map[string]string {
+	creds := make(map[string]string)
+	
+	switch provider {
+	case "aws":
+		// AWS credentials from environment
+		if v := os.Getenv("AWS_ACCESS_KEY_ID"); v != "" {
+			creds["AWS_ACCESS_KEY_ID"] = v
+		}
+		if v := os.Getenv("AWS_SECRET_ACCESS_KEY"); v != "" {
+			creds["AWS_SECRET_ACCESS_KEY"] = v
+		}
+		if v := os.Getenv("AWS_SESSION_TOKEN"); v != "" {
+			creds["AWS_SESSION_TOKEN"] = v
+		}
+		if v := os.Getenv("AWS_REGION"); v != "" {
+			creds["AWS_REGION"] = v
+		} else {
+			creds["AWS_REGION"] = "us-east-1"
+		}
+		
+		// If no environment credentials, try to load from ~/.aws/credentials
+		if creds["AWS_ACCESS_KEY_ID"] == "" {
+			if homeDir := os.Getenv("HOME"); homeDir != "" {
+				credFile := filepath.Join(homeDir, ".aws", "credentials")
+				if content, err := os.ReadFile(credFile); err == nil {
+					// Simple parsing for default profile
+					lines := strings.Split(string(content), "\n")
+					inDefaultProfile := false
+					for _, line := range lines {
+						line = strings.TrimSpace(line)
+						if line == "[default]" {
+							inDefaultProfile = true
+							continue
+						}
+						if strings.HasPrefix(line, "[") && line != "[default]" {
+							inDefaultProfile = false
+							continue
+						}
+						if inDefaultProfile {
+							if strings.HasPrefix(line, "aws_access_key_id") {
+								parts := strings.SplitN(line, "=", 2)
+								if len(parts) == 2 {
+									creds["AWS_ACCESS_KEY_ID"] = strings.TrimSpace(parts[1])
+								}
+							}
+							if strings.HasPrefix(line, "aws_secret_access_key") {
+								parts := strings.SplitN(line, "=", 2)
+								if len(parts) == 2 {
+									creds["AWS_SECRET_ACCESS_KEY"] = strings.TrimSpace(parts[1])
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	case "azure":
+		// Azure credentials
+		if v := os.Getenv("AZURE_TENANT_ID"); v != "" {
+			creds["AZURE_TENANT_ID"] = v
+		}
+		if v := os.Getenv("AZURE_CLIENT_ID"); v != "" {
+			creds["AZURE_CLIENT_ID"] = v
+		}
+		if v := os.Getenv("AZURE_CLIENT_SECRET"); v != "" {
+			creds["AZURE_CLIENT_SECRET"] = v
+		}
+	case "gcp":
+		// GCP credentials
+		if v := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"); v != "" {
+			creds["GOOGLE_APPLICATION_CREDENTIALS"] = v
+		}
+	}
+	
+	return creds
 }

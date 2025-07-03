@@ -32,8 +32,9 @@ func (m *InfraScanModule) ScanDirectory(ctx context.Context, dir string) (string
 		WithWorkdir("/workspace").
 		WithExec([]string{
 			"trivy",
-			"config",
+			"fs",
 			".",
+			"--scanners", "misconfig",
 			"--format", "json",
 			"--severity", "HIGH,CRITICAL,MEDIUM,LOW",
 		})
@@ -57,8 +58,9 @@ func (m *InfraScanModule) ScanFile(ctx context.Context, filePath string) (string
 		WithWorkdir("/workspace").
 		WithExec([]string{
 			"trivy",
-			"config",
+			"fs",
 			filename,
+			"--scanners", "misconfig",
 			"--format", "json",
 			"--severity", "HIGH,CRITICAL,MEDIUM,LOW",
 		})
@@ -82,8 +84,9 @@ func (m *InfraScanModule) ScanWithRules(ctx context.Context, dir string, rulesFi
 		container = container.WithFile("/policy.rego", m.client.Host().File(rulesFile))
 		container = container.WithExec([]string{
 			"trivy",
-			"config",
+			"fs",
 			"/workspace",
+			"--scanners", "misconfig",
 			"--format", "json",
 			"--severity", "HIGH,CRITICAL,MEDIUM,LOW",
 			"--config-policy", "/policy.rego",
@@ -91,8 +94,9 @@ func (m *InfraScanModule) ScanWithRules(ctx context.Context, dir string, rulesFi
 	} else {
 		container = container.WithExec([]string{
 			"trivy",
-			"config",
+			"fs",
 			"/workspace",
+			"--scanners", "misconfig",
 			"--format", "json",
 			"--severity", "HIGH,CRITICAL,MEDIUM,LOW",
 		})

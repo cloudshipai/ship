@@ -129,7 +129,6 @@ type QueryPlan struct {
 
 // CreateInvestigationPlan generates a comprehensive investigation plan using Dagger LLM
 func (m *DaggerLLMModule) CreateInvestigationPlan(ctx context.Context, objective string, providers []string) ([]InvestigationStep, error) {
-	_ = ctx           // Mark as used
 	provider := "aws" // Default
 	if len(providers) > 0 {
 		provider = providers[0]
@@ -142,12 +141,15 @@ func (m *DaggerLLMModule) CreateInvestigationPlan(ctx context.Context, objective
 		tableList += "- " + table + "\n"
 	}
 	
-	// Get example queries
+	// Get example queries with REAL column names
 	examples := GetSteampipeTableExamples(provider)
 	exampleQueries := ""
 	for desc, query := range examples {
 		exampleQueries += fmt.Sprintf("- %s: %s\n", desc, query)
 	}
+	
+	// Column information will be provided dynamically in the objective
+	columnInfo := ""
 
 	promptText := fmt.Sprintf(`
 You are a cloud infrastructure investigator. Create a step-by-step investigation plan for:
@@ -158,20 +160,38 @@ Cloud Provider: %s
 IMPORTANT: You MUST use these actual Steampipe tables for %s:
 %s
 
-Example queries:
+Example queries with CORRECT column names:
+%s
+
 %s
 
 Return a JSON array of investigation steps, each with:
 - "step_number": sequential number  
 - "description": what this step investigates
 - "provider": which cloud provider to query ("%s")
-- "query": the Steampipe SQL query to run (MUST use actual tables listed above)
+- "query": the Steampipe SQL query to run (MUST use actual tables and column names from examples above)
 - "expected_insights": what we hope to learn
+
+IMPORTANT STEAMPIPE QUERY RULES:
+1. Use ONLY the exact column names provided in the schema information above
+2. Boolean columns compare with true/false not 'true'/'false' strings  
+3. For JSONB columns, use appropriate operators (->>, ->, jsonb_array_elements)
+4. Table names always start with provider prefix (aws_, azure_, gcp_)
+5. If the objective mentions specific column information, trust it completely
+6. ONLY ONE SQL STATEMENT PER QUERY - no semicolons except at the end
+7. For complex queries, break them into multiple steps
+
+SPECIAL INSTRUCTIONS FOR TERRAFORM COMPARISONS:
+If the user asks about comparing Terraform with cloud resources:
+- Focus on querying actual cloud resources via Steampipe
+- Query resource tags to identify Terraform-managed resources (look for tags like 'terraform', 'managed-by', etc.)
+- Check for common Terraform resource types: EC2 instances, S3 buckets, RDS databases, IAM roles
+- Note: Direct Terraform state comparison requires the ai-agent command with cross-module access
 
 Focus on security, compliance, cost, and performance aspects.
 Generate exactly 3-5 steps that thoroughly investigate the objective.
-NEVER use made-up table names. Only use the tables listed above.
-`, objective, provider, provider, tableList, exampleQueries, provider)
+NEVER use made-up table names or column names. Only use what's provided above.
+`, objective, provider, provider, tableList, exampleQueries, columnInfo, provider)
 
 	// Use native Dagger LLM with system prompt for better JSON output
 	llm := m.client.LLM(dagger.LLMOpts{
@@ -227,16 +247,45 @@ NEVER use made-up table names. Only use the tables listed above.
 	
 	// Clean up the response - remove markdown code blocks if present
 	cleanedResponse := responseText
-	if strings.Contains(responseText, "```json") {
-		start := strings.Index(responseText, "```json") + 8 // +8 to skip "```json\n"
+	
+	// First, check if there's a JSON array somewhere in the response
+	// Look for the first '[' that starts a JSON array
+	arrayStart := strings.Index(responseText, "[")
+	if arrayStart >= 0 {
+		// Find the matching closing bracket
+		bracketCount := 0
+		arrayEnd := -1
+		for i := arrayStart; i < len(responseText); i++ {
+			if responseText[i] == '[' {
+				bracketCount++
+			} else if responseText[i] == ']' {
+				bracketCount--
+				if bracketCount == 0 {
+					arrayEnd = i + 1
+					break
+				}
+			}
+		}
+		
+		if arrayEnd > arrayStart {
+			// Extract just the JSON array portion
+			cleanedResponse = strings.TrimSpace(responseText[arrayStart:arrayEnd])
+			slog.Debug("Extracted JSON array from response", "json_length", len(cleanedResponse))
+		}
+	} else if strings.Contains(responseText, "```json") {
+		// Find the start after ```json
+		start := strings.Index(responseText, "```json") + 7
+		// Find the end before the last ```
 		end := strings.LastIndex(responseText, "```")
-		if start > 8 && end > start {
+		if start > 0 && end > start {
+			// Extract the JSON portion and trim whitespace
 			cleanedResponse = strings.TrimSpace(responseText[start:end])
 		}
 	} else if strings.Contains(responseText, "```") {
-		start := strings.Index(responseText, "```") + 4 // +4 to skip "```\n"
+		// Handle plain ``` blocks
+		start := strings.Index(responseText, "```") + 3
 		end := strings.LastIndex(responseText, "```")
-		if start > 4 && end > start {
+		if start > 0 && end > start {
 			cleanedResponse = strings.TrimSpace(responseText[start:end])
 		}
 	}
@@ -246,23 +295,81 @@ NEVER use made-up table names. Only use the tables listed above.
 	if err := json.Unmarshal([]byte(cleanedResponse), &steps); err != nil {
 		slog.Debug("Failed to parse LLM JSON response", "error", err, "cleaned_response", cleanedResponse)
 		
-		// Try to extract a query from the response text
-		// This is a simple fallback - in production you'd want more robust parsing
-		fallbackTable := "aws_account"
-		if provider == "azure" {
-			fallbackTable = "azure_subscription"  
-		} else if provider == "gcp" {
-			fallbackTable = "gcp_project"
+		// Use template-based fallback based on the objective
+		objectiveLower := strings.ToLower(objective)
+		if strings.Contains(objectiveLower, "ec2") || strings.Contains(objectiveLower, "instance") {
+			// Use real EC2 queries
+			if strings.Contains(objectiveLower, "running") {
+				steps = []InvestigationStep{
+					{
+						StepNumber:       1,
+						Description:      "Count running EC2 instances",
+						Provider:         provider,
+						Query:            "SELECT COUNT(*) as count FROM aws_ec2_instance WHERE instance_state = 'running'",
+						ExpectedInsights: "Number of running instances",
+					},
+					{
+						StepNumber:       2,
+						Description:      "List running EC2 instances with details",
+						Provider:         provider,
+						Query:            "SELECT instance_id, instance_type, instance_state, region, vpc_id FROM aws_ec2_instance WHERE instance_state = 'running'",
+						ExpectedInsights: "Details of running instances",
+					},
+				}
+			} else {
+				steps = []InvestigationStep{
+					{
+						StepNumber:       1,
+						Description:      "List all EC2 instances",
+						Provider:         provider,
+						Query:            "SELECT instance_id, instance_type, instance_state, region, vpc_id FROM aws_ec2_instance",
+						ExpectedInsights: "Overview of all EC2 instances",
+					},
+				}
+			}
+		} else if strings.Contains(objectiveLower, "s3") || strings.Contains(objectiveLower, "bucket") {
+			steps = []InvestigationStep{
+				{
+					StepNumber:       1,
+					Description:      "Count S3 buckets",
+					Provider:         provider,
+					Query:            "SELECT COUNT(*) as count FROM aws_s3_bucket",
+					ExpectedInsights: "Total number of S3 buckets",
+				},
+				{
+					StepNumber:       2,
+					Description:      "List S3 buckets with details",
+					Provider:         provider,
+					Query:            "SELECT name, region, creation_date FROM aws_s3_bucket",
+					ExpectedInsights: "S3 bucket inventory",
+				},
+			}
+		} else {
+			// Generic fallback
+			fallbackTable := "aws_account"
+			if provider == "azure" {
+				fallbackTable = "azure_subscription"  
+			} else if provider == "gcp" {
+				fallbackTable = "gcp_project"
+			}
+			
+			steps = []InvestigationStep{
+				{
+					StepNumber:       1,
+					Description:      "Investigation based on: " + objective,
+					Provider:         provider,
+					Query:            "SELECT * FROM " + fallbackTable + " LIMIT 1",
+					ExpectedInsights: "Basic account overview",
+				},
+			}
 		}
 		
-		steps = []InvestigationStep{
-			{
-				StepNumber:       1,
-				Description:      "Investigation based on: " + objective,
-				Provider:         provider,
-				Query:            "SELECT * FROM " + fallbackTable + " LIMIT 1",
-				ExpectedInsights: "Basic account overview",
-			},
+		slog.Warn("Using fallback investigation plan due to JSON parsing failure")
+	} else {
+		// Successfully parsed steps
+		slog.Info("Successfully parsed investigation steps", "step_count", len(steps))
+		for i, step := range steps {
+			slog.Debug("Parsed step", "number", i+1, "query", step.Query)
 		}
 	}
 

@@ -35,3 +35,11 @@ go.work.sum
 ship
 dist/
 test-fresh/
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+*.tfplan
+tf.plan

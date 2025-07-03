@@ -15,7 +15,7 @@ Type "# Generate documentation for Terraform modules"
 Enter
 Sleep 1s
 
-Type "ship terraform-tools generate-docs /home/epuerta/projects/ship/examples/terraform/easy-s3-bucket"
+Type "ship terraform-tools generate-docs examples/terraform/easy-s3-bucket"
 Enter
 Sleep 5s
 
@@ -23,7 +23,7 @@ Type "# View the generated documentation"
 Enter
 Sleep 500ms
 
-Type "cat /home/epuerta/projects/ship/examples/terraform/easy-s3-bucket/README.md | head -20"
+Type "cat examples/terraform/easy-s3-bucket/README.md | head -20"
 Enter
 Sleep 3s
 

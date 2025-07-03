@@ -15,7 +15,7 @@ Type "# Security scan Terraform code with Trivy"
 Enter
 Sleep 1s
 
-Type "ship terraform-tools security-scan /home/epuerta/projects/ship/examples/terraform/easy-s3-bucket"
+Type "ship terraform-tools security-scan examples/terraform/easy-s3-bucket"
 Enter
 Sleep 6s
 

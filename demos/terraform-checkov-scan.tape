@@ -15,7 +15,7 @@ Type "# Comprehensive security scan with Checkov"
 Enter
 Sleep 1s
 
-Type "ship terraform-tools checkov-scan /home/epuerta/projects/ship/examples/terraform/easy-s3-bucket"
+Type "ship terraform-tools checkov-scan examples/terraform/easy-s3-bucket"
 Enter
 Sleep 7s
 

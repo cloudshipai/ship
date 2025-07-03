@@ -19,41 +19,40 @@ CloudshipAI CLI - A powerful command-line tool that brings enterprise-grade infr
 - **☁️ Cloud Integration**: Seamlessly works with AWS, Azure, GCP, and other cloud providers
 - **🔧 CI/CD Ready**: Perfect for integration into your existing pipelines
 
+## 📚 Table of Contents
+
+- [Installation](#-installation)
+- [Quick Start](#-quick-start)
+- [Demo](#-demo)
+- [Available Tools](#️-available-tools)
+- [Command Reference](#-command-reference)
+- [Authentication](#-authentication)
+- [Using External Dagger Modules](#-using-external-dagger-modules)
+- [Contributing](#-contributing)
+- [License](#-license)
+
+## 🎬 Demo
+
+### Terraform Tools in Action
+
+![Ship CLI Terraform Tools Demo](./terraform-all-working-tools.gif)
+
+> This demo shows Ship CLI running terraform-docs, tflint, and security scanning on a Terraform module - all without any local tool installations!
+
 ## 📦 Installation
 
-### Quick Install (Recommended)
+### Quick Install with Go
 
 ```bash
-# Linux/macOS - Install latest release with wget
-wget -qO- https://github.com/cloudshipai/ship/releases/latest/download/ship_$(uname -s)_$(uname -m).tar.gz | tar xz && sudo mv ship /usr/local/bin/
-
-# Or with curl
-curl -sSL https://github.com/cloudshipai/ship/releases/latest/download/ship_$(uname -s)_$(uname -m).tar.gz | tar xz && sudo mv ship /usr/local/bin/
+# Install directly with Go
+go install github.com/cloudshipai/ship/cmd/ship@latest
 
 # Verify installation
 ship version
 ```
 
-### Platform-Specific Downloads
-
-```bash
-# Linux x86_64
-wget https://github.com/cloudshipai/ship/releases/latest/download/ship_Linux_x86_64.tar.gz
-
-# macOS Intel
-wget https://github.com/cloudshipai/ship/releases/latest/download/ship_Darwin_x86_64.tar.gz
-
-# macOS Apple Silicon
-wget https://github.com/cloudshipai/ship/releases/latest/download/ship_Darwin_arm64.tar.gz
-
-# Linux ARM64
-wget https://github.com/cloudshipai/ship/releases/latest/download/ship_Linux_arm64.tar.gz
-
-# Windows
-wget https://github.com/cloudshipai/ship/releases/latest/download/ship_Windows_x86_64.zip
-```
-
 ### From Source
+
 ```bash
 # Clone the repository
 git clone https://github.com/cloudshipai/ship.git
@@ -63,13 +62,8 @@ cd ship
 go build -o ship ./cmd/ship
 sudo mv ship /usr/local/bin/
 
-# Verify installation
-ship version
-```
-
-### Using Go Install
-```bash
-go install github.com/cloudshipai/ship/cmd/ship@latest
+# Or just run directly
+go run ./cmd/ship [command]
 ```
 
 ## 🏃 Quick Start
@@ -284,9 +278,7 @@ jobs:
       
       - name: Setup Ship CLI
         run: |
-          wget https://github.com/cloudship/ship/releases/latest/download/ship-linux-amd64
-          chmod +x ship-linux-amd64
-          sudo mv ship-linux-amd64 /usr/local/bin/ship
+          go install github.com/cloudshipai/ship/cmd/ship@latest
       
       - name: Run Security Scan
         run: ship terraform-tools checkov-scan
@@ -488,14 +480,38 @@ go test -v ./internal/dagger/modules/
 go test -v -run TestTFLintModule ./internal/dagger/modules/
 ```
 
-## 🧩 Creating Custom Modules (Community Extensions)
+## 🧩 Using External Dagger Modules
 
-Ship CLI is designed to be extensible! You can create custom Dagger modules to add new tools and capabilities.
+Ship CLI is designed to be extensible! You can use any Dagger module without modifying Ship CLI itself.
 
-### Quick Example: Create Your Own Tool
+### Using Published Dagger Modules
 
+```bash
+# Use any Dagger module directly
+ship run dagger call --mod github.com/username/my-module@v1.0.0 analyze --source .
+
+# Example: Using a custom security scanner
+ship run dagger call --mod github.com/security/scanner@latest scan \
+  --directory . \
+  --severity high
+
+# Example: Custom cost analyzer
+ship run dagger call --mod github.com/finops/analyzer@v2.1.0 estimate \
+  --terraform-dir . \
+  --currency USD
+```
+
+### Creating Your Own Dagger Module
+
+1. **Initialize a new Dagger module:**
+```bash
+dagger init --sdk=go my-custom-tool
+cd my-custom-tool
+```
+
+2. **Define your tool's functionality:**
 ```go
-// my-tool/main.go
+// main.go
 package main
 
 import (
@@ -503,27 +519,46 @@ import (
     "dagger.io/dagger"
 )
 
-type MyTool struct{}
+type MyCustomTool struct{}
 
-func (m *MyTool) Analyze(ctx context.Context, source *dagger.Directory) (string, error) {
+// Analyze runs custom analysis on source code
+func (m *MyCustomTool) Analyze(
+    ctx context.Context,
+    // Directory containing code to analyze
+    source *dagger.Directory,
+    // +optional
+    // Output format (json, text, markdown)
+    format string,
+) (string, error) {
     return dag.Container().
         From("alpine:latest").
         WithMountedDirectory("/src", source).
-        WithExec([]string{"analyze-command"}).
+        WithWorkdir("/src").
+        WithExec([]string{"your-analysis-command", "--format", format}).
         Stdout(ctx)
 }
 ```
 
-### 📚 Full Documentation
+3. **Publish your module:**
+```bash
+# Push to GitHub
+git init
+git add .
+git commit -m "Initial module"
+git remote add origin https://github.com/yourusername/my-custom-tool
+git push -u origin main
+git tag v1.0.0
+git push --tags
+```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for a complete guide on:
-- Creating custom Dagger modules
-- Module structure and metadata
-- AI/LLM integration for your tools
-- Testing and publishing modules
-- Joining the community registry
+4. **Use your module with Ship CLI:**
+```bash
+# Now anyone can use your module!
+ship run dagger call --mod github.com/yourusername/my-custom-tool@v1.0.0 \
+  analyze --source . --format json
+```
 
-### 🎯 Module Ideas We'd Love to See
+### Module Ideas We'd Love to See
 
 - **Cloud Security Scanner**: Deep security analysis for AWS/Azure/GCP
 - **Kubernetes Analyzer**: K8s manifest validation and cluster analysis
@@ -534,9 +569,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for a complete guide on:
 
 ### 🤝 Community
 
-- **Submit Your Module**: Add to our [community registry](https://github.com/cloudshipai/community-modules)
-- **Get Help**: Join our [Discord](https://discord.gg/cloudship)
-- **Share Ideas**: Open an [issue](https://github.com/cloudshipai/ship/issues)
+- **Share Your Modules**: Tag them with `#ship-cli` on GitHub
+- **Get Help**: Open an [issue](https://github.com/cloudshipai/ship/issues)
+- **Contribute**: See our [Contributing Guide](CONTRIBUTING.md)
 
 ## 📈 Roadmap
 

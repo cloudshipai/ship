@@ -41,7 +41,7 @@ CloudshipAI CLI - A powerful command-line tool that brings enterprise-grade infr
 
 ### OpenInfraQuote - Advanced Cost Analysis
 
-![OpenInfraQuote Cost Analysis Demo](./openinfraquote-demo.gif)
+![OpenInfraQuote Cost Analysis Demo](./openinfraquote-real-demo.gif)
 
 > OpenInfraQuote provides highly accurate AWS cost estimation by analyzing your Terraform plans against real AWS pricing data. It supports 100+ AWS resource types with region-specific pricing!
 

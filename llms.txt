@@ -20,16 +20,7 @@ go install github.com/cloudshipai/ship/cmd/ship@main
 ship version
 ```
 
-### Method 2: Binary Download
-```bash
-# Linux/macOS - Auto-detect architecture
-wget -qO- https://github.com/cloudshipai/ship/releases/latest/download/ship_$(uname -s)_$(uname -m).tar.gz | tar xz && sudo mv ship /usr/local/bin/
-
-# Verify installation
-ship version
-```
-
-### Method 3: Build from Source
+### Method 2: Build from Source
 ```bash
 git clone https://github.com/cloudshipai/ship.git
 cd ship
@@ -61,8 +52,9 @@ ship terraform-tools security-scan
 # Generate documentation
 ship terraform-tools generate-docs > README.md
 
-# Estimate costs
-ship terraform-tools cost-estimate
+# Estimate costs (two options)
+ship terraform-tools cost-estimate  # Uses Infracost
+ship terraform-tools cost-analysis  # Uses OpenInfraQuote (more accurate)
 
 # Generate infrastructure diagram
 ship terraform-tools generate-diagram . --hcl --format png -o infrastructure.png
@@ -274,11 +266,14 @@ ship steampipe-simple-test
 - `ship ai-services` - Microservices-based AI investigation
 - `ship investigate` - Manual Steampipe investigations
 - `ship modules` - Manage Ship CLI modules
+- `ship run` - Execute external Dagger modules
 
 ### Terraform Tools Subcommands
 - `lint` - TFLint validation
-- `security-scan` - Checkov and Trivy security scanning
-- `cost-estimate` - Infracost analysis
+- `security-scan` - Trivy security scanning
+- `checkov-scan` - Comprehensive Checkov security and compliance scanning
+- `cost-estimate` - Infracost cost analysis
+- `cost-analysis` - OpenInfraQuote advanced cost analysis (more accurate)
 - `generate-docs` - terraform-docs documentation
 - `generate-diagram` - InfraMap infrastructure diagrams
 
@@ -310,7 +305,7 @@ ship terraform-tools generate-diagram . --hcl --format svg -o security-audit-dia
 ship ai-investigate --prompt "Find all resources that might be costing money unnecessarily" --execute
 
 # Step 2: Generate detailed cost estimate
-ship terraform-tools cost-estimate
+ship terraform-tools cost-analysis  # Uses OpenInfraQuote for accurate AWS pricing
 
 # Step 3: Get AI recommendations
 ship ai-agent --task "Analyze infrastructure costs and suggest optimizations"
@@ -328,6 +323,49 @@ ship terraform-tools generate-diagram . --hcl --format png -o architecture.png
 ship ai-agent --task "Document infrastructure architecture and create comprehensive overview"
 ```
 
+## OpenInfraQuote - Advanced Cost Analysis
+
+OpenInfraQuote provides highly accurate AWS cost estimation by analyzing Terraform plans against real AWS pricing data.
+
+### Features
+- 🎯 **Accurate Pricing**: Uses real-time AWS pricing API data
+- 📊 **Detailed Breakdown**: Shows costs per resource with hourly/monthly rates
+- 🌍 **Region-Specific**: Accounts for regional price variations
+- 📈 **100+ Resources**: Supports EC2, RDS, S3, ELB, Lambda, and more
+- 🔄 **JSON Output**: Machine-readable format for automation
+
+### Usage
+```bash
+# Analyze costs for a Terraform directory
+ship terraform-tools cost-analysis
+
+# Analyze a specific plan file
+ship terraform-tools cost-analysis terraform.tfplan.json
+
+# Use specific AWS region for pricing
+ship terraform-tools cost-analysis --aws-region us-west-2
+```
+
+### Example Output
+```json
+{
+  "resources": [
+    {
+      "address": "aws_instance.example",
+      "type": "aws_instance",
+      "price": { "min": 30.368, "max": 30.368 },
+      "products": [
+        {
+          "price_info": { "price": 0.0416, "type": "hourly" },
+          "description": "t3.medium instance in us-east-1"
+        }
+      ]
+    }
+  ],
+  "price": { "min": 70.37, "max": 70.37 }
+}
+```
+
 ## Best Practices for LLMs
 
 1. **Always test connectivity first**: Use `ship version` to verify installation
@@ -336,12 +374,39 @@ ship ai-agent --task "Document infrastructure architecture and create comprehens
 4. **Combine tools**: Use multiple Ship CLI commands for comprehensive analysis
 5. **Save outputs**: Use `-o` flags to save diagrams and reports
 6. **Check prerequisites**: Ensure Docker is running for containerized tools
+7. **Use OpenInfraQuote for accurate costs**: More precise than other estimation tools
+8. **Create external Dagger modules**: Don't fork Ship CLI, create independent modules
 
-## Creating Custom Modules for Ship CLI
+## Using External Dagger Modules with Ship CLI
 
-Ship CLI supports community-created Dagger modules to extend functionality. Here's how to create one:
+Ship CLI is designed to be extensible! You can use any Dagger module without modifying Ship CLI itself. This approach keeps your tools independent and reusable.
 
-### Basic Module Structure
+### Using Published Dagger Modules
+
+```bash
+# Use any Dagger module directly with Ship CLI
+ship run dagger call --mod github.com/username/my-module@v1.0.0 analyze --source .
+
+# Example: Using a custom security scanner
+ship run dagger call --mod github.com/security/scanner@latest scan \
+  --directory . \
+  --severity high
+
+# Example: Custom cost analyzer
+ship run dagger call --mod github.com/finops/analyzer@v2.1.0 estimate \
+  --terraform-dir . \
+  --currency USD
+```
+
+### Creating Your Own Dagger Module
+
+1. **Initialize a new Dagger module:**
+```bash
+dagger init --sdk=go my-custom-tool
+cd my-custom-tool
+```
+
+2. **Define your tool's functionality (main.go):**
 ```go
 package main
 
@@ -350,40 +415,78 @@ import (
     "dagger.io/dagger"
 )
 
-type YourModule struct{}
+type MyCustomTool struct{}
 
-func (m *YourModule) YourFunction(ctx context.Context, source *dagger.Directory) (string, error) {
+// Analyze runs custom analysis on source code
+func (m *MyCustomTool) Analyze(
+    ctx context.Context,
+    // Directory containing code to analyze
+    source *dagger.Directory,
+    // +optional
+    // Output format (json, text, markdown)
+    format string,
+) (string, error) {
     return dag.Container().
-        From("your-image:latest").
-        WithMountedDirectory("/workspace", source).
-        WithExec([]string{"your-command"}).
+        From("alpine:latest").
+        WithMountedDirectory("/src", source).
+        WithWorkdir("/src").
+        WithExec([]string{"your-analysis-command", "--format", format}).
+        Stdout(ctx)
+}
+
+// Cost estimates infrastructure costs
+func (m *MyCustomTool) Cost(
+    ctx context.Context,
+    planFile *dagger.File,
+    region string,
+) (string, error) {
+    return dag.Container().
+        From("your-tool:latest").
+        WithFile("/tmp/plan.json", planFile).
+        WithExec([]string{"analyze-cost", "/tmp/plan.json", "--region", region}).
         Stdout(ctx)
 }
 ```
 
-### Module Metadata (module.yaml)
-```yaml
-apiVersion: ship.cloudship.ai/v1
-kind: Module
-metadata:
-  name: your-module
-  description: "Your module description"
-spec:
-  type: dagger
-  ai_tools:
-    - name: "your_tool"
-      description: "Tool description for AI"
-      usage: |
-        {"tool": "your-module", "action": "analyze", "params": {"path": "."}}
+3. **Publish your module:**
+```bash
+# Push to GitHub
+git init
+git add .
+git commit -m "Initial module"
+git remote add origin https://github.com/yourusername/my-custom-tool
+git push -u origin main
+git tag v1.0.0
+git push --tags
 ```
 
-### Publishing Modules
-1. Create GitHub repository with your module
-2. Tag a release (e.g., v1.0.0)
-3. Submit to community registry: https://github.com/cloudshipai/community-modules
+4. **Use your module with Ship CLI:**
+```bash
+# Now anyone can use your module!
+ship run dagger call --mod github.com/yourusername/my-custom-tool@v1.0.0 \
+  analyze --source . --format json
 
-### Full Documentation
-See CONTRIBUTING.md for complete guide on creating modules.
+# Use the cost function
+ship run dagger call --mod github.com/yourusername/my-custom-tool@v1.0.0 \
+  cost --plan-file terraform.tfplan.json --region us-east-1
+```
+
+### Best Practices for Dagger Modules
+
+1. **Clear function names**: Use descriptive names like `Scan`, `Analyze`, `Generate`
+2. **Document parameters**: Add comments above each parameter
+3. **Support multiple formats**: Allow JSON/text/markdown output
+4. **Error handling**: Return meaningful error messages
+5. **Version your modules**: Use semantic versioning (v1.0.0)
+
+### Example Module Ideas
+
+- **Cloud Security Scanner**: Deep AWS/Azure/GCP security analysis
+- **Kubernetes Validator**: K8s manifest validation and best practices
+- **Database Analyzer**: Schema validation, migration checks
+- **Compliance Checker**: SOC2, HIPAA, PCI-DSS validation
+- **Custom Cost Analyzer**: Organization-specific cost allocation
+- **Performance Profiler**: Infrastructure performance analysis
 
 ## Terraform Example Projects
 
@@ -486,7 +589,8 @@ Based on testing with these examples:
 - ✅ **Security Scanning**: Identifies real security issues
 - ✅ **Documentation**: Generates comprehensive README files
 - ✅ **CloudShip Push**: Seamless integration with --push flag
-- ⚠️ **Cost Estimation**: Requires INFRACOST_API_KEY environment variable
+- ⚠️ **Cost Estimation (Infracost)**: Requires INFRACOST_API_KEY environment variable
+- ✅ **Cost Analysis (OpenInfraQuote)**: Works without API key, uses real AWS pricing
 - ⚠️ **Diagrams**: May appear empty for very complex infrastructures
 
 ### Example Findings
@@ -498,15 +602,50 @@ Based on testing with these examples:
 
 These are intentional to demonstrate Ship CLI's detection capabilities!
 
+## Demo GIFs Available
+
+The Ship CLI repository includes visual demonstrations (GIF files) showing the tools in action:
+
+- **terraform-tools-clean.gif**: Shows terraform-docs, tflint, and trivy security scanning
+- **openinfraquote-real-demo.gif**: Demonstrates OpenInfraQuote cost analysis with real pricing
+- **terraform-*.gif**: Individual demos for each terraform tool
+
+These demos are located in the repository root and `demos/` directory.
+
+## Key Features for LLMs
+
+### 1. No Local Tool Installation Required
+All tools run in Docker containers via Dagger, making it safe for automated use.
+
+### 2. Extensibility with External Modules
+Create and use custom Dagger modules without forking Ship CLI:
+```bash
+ship run dagger call --mod github.com/your/module@v1.0.0 analyze --source .
+```
+
+### 3. Advanced Cost Analysis with OpenInfraQuote
+More accurate than traditional tools, uses real AWS pricing data:
+```bash
+ship terraform-tools cost-analysis terraform.tfplan.json
+```
+
+### 4. AI-Powered Infrastructure Investigation
+Natural language queries against live cloud infrastructure:
+```bash
+ship ai-investigate --prompt "Find security issues" --execute
+```
+
+### 5. MCP Server Integration
+Built-in server for seamless AI assistant integration.
+
 ## Support and Resources
 
 - **GitHub Repository**: https://github.com/cloudshipai/ship
 - **Issues and Bug Reports**: https://github.com/cloudshipai/ship/issues
 - **Documentation**: Check the README.md in the repository
-- **Contributing Guide**: CONTRIBUTING.md for creating modules
-- **Community Registry**: https://github.com/cloudshipai/community-modules
+- **Demo GIFs**: Visual demonstrations in the repository
+- **Example Terraform**: examples/terraform/ directory with easy/medium/complex examples
 - **MCP Protocol**: https://modelcontextprotocol.io/
-- **Example Terraform Files**: examples/terraform/ directory
-- **Test Results**: examples/terraform/TEST_RESULTS.md
+- **Dagger Documentation**: https://docs.dagger.io/
 
-This tool is designed to be LLM-friendly and provides extensive AI integration capabilities. All tools run in containers, making it safe and isolated for automated use by AI assistants.
+This tool is designed to be LLM-friendly and provides extensive AI integration capabilities. All tools run in containers, making it safe and isolated for automated use by AI assistants. The extensibility model allows you to create custom analysis tools without modifying the core Ship CLI.

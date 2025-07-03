@@ -35,7 +35,7 @@ CloudshipAI CLI - A powerful command-line tool that brings enterprise-grade infr
 
 ### Terraform Tools in Action
 
-![Ship CLI Terraform Tools Demo](./terraform-all-working-tools.gif)
+![Ship CLI Terraform Tools Demo](./terraform-tools-clean.gif)
 
 > This demo shows Ship CLI running terraform-docs, tflint, and security scanning on a Terraform module - all without any local tool installations!
 

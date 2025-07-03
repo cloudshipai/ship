@@ -39,6 +39,12 @@ CloudshipAI CLI - A powerful command-line tool that brings enterprise-grade infr
 
 > This demo shows Ship CLI running terraform-docs, tflint, and security scanning on a Terraform module - all without any local tool installations!
 
+### OpenInfraQuote - Advanced Cost Analysis
+
+![OpenInfraQuote Cost Analysis Demo](./openinfraquote-demo.gif)
+
+> OpenInfraQuote provides highly accurate AWS cost estimation by analyzing your Terraform plans against real AWS pricing data. It supports 100+ AWS resource types with region-specific pricing!
+
 ## 📦 Installation
 
 ### Quick Install with Go
@@ -358,6 +364,8 @@ ship terraform-tools checkov-scan --framework terraform,arm
 ```
 
 ### Cost Estimation
+
+#### Using Infracost
 ```bash
 # Estimate costs for current directory
 ship terraform-tools cost-estimate
@@ -368,6 +376,25 @@ ship terraform-tools cost-estimate --cloud aws
 # Compare costs between branches
 ship terraform-tools cost-estimate --compare-to main
 ```
+
+#### Using OpenInfraQuote (More Accurate)
+```bash
+# Analyze costs with OpenInfraQuote
+ship terraform-tools cost-analysis
+
+# Analyze specific plan file
+ship terraform-tools cost-analysis terraform.tfplan.json
+
+# Use specific AWS region for pricing
+ship terraform-tools cost-analysis --aws-region us-west-2
+```
+
+**OpenInfraQuote Features:**
+- 🎯 **Accurate Pricing**: Uses real-time AWS pricing API data
+- 📊 **Detailed Breakdown**: Shows costs per resource with hourly/monthly rates
+- 🌍 **Region-Specific**: Accounts for regional price variations
+- 📈 **100+ Resources**: Supports EC2, RDS, S3, ELB, Lambda, and more
+- 🔄 **JSON Output**: Machine-readable format for automation
 
 ### Documentation
 ```bash

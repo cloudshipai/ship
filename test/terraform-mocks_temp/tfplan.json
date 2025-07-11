@@ -1,0 +1,133 @@
+{
+  "format_version": "1.1",
+  "terraform_version": "1.5.7",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "aws_instance.example",
+          "mode": "managed",
+          "type": "aws_instance",
+          "name": "example",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "schema_version": 1,
+          "values": {
+            "ami": "ami-0c02fb55956c7d316",
+            "instance_type": "t3.medium",
+            "tags": {
+              "Name": "ship-test-instance",
+              "Environment": "dev",
+              "ManagedBy": "terraform"
+            },
+            "root_block_device": [
+              {
+                "delete_on_termination": true,
+                "encrypted": true,
+                "volume_size": 30,
+                "volume_type": "gp3"
+              }
+            ]
+          }
+        },
+        {
+          "address": "aws_s3_bucket.example",
+          "mode": "managed",
+          "type": "aws_s3_bucket",
+          "name": "example",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "schema_version": 0,
+          "values": {
+            "bucket": "ship-test-dev-bucket",
+            "tags": {
+              "Name": "ship-test-bucket",
+              "Environment": "dev"
+            }
+          }
+        },
+        {
+          "address": "aws_db_instance.example",
+          "mode": "managed",
+          "type": "aws_db_instance",
+          "name": "example",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "schema_version": 1,
+          "values": {
+            "allocated_storage": 20,
+            "engine": "postgres",
+            "engine_version": "15.3",
+            "instance_class": "db.t3.micro",
+            "db_name": "exampledb",
+            "username": "dbadmin",
+            "backup_retention_period": 7,
+            "backup_window": "03:00-04:00",
+            "maintenance_window": "sun:04:00-sun:05:00",
+            "storage_encrypted": false,
+            "tags": {
+              "Name": "ship-test-db",
+              "Environment": "dev"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "resource_changes": [
+    {
+      "address": "aws_instance.example",
+      "mode": "managed",
+      "type": "aws_instance",
+      "name": "example",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "ami": "ami-0c02fb55956c7d316",
+          "instance_type": "t3.medium"
+        }
+      }
+    },
+    {
+      "address": "aws_s3_bucket.example",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "example",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "bucket": "ship-test-dev-bucket"
+        }
+      }
+    },
+    {
+      "address": "aws_db_instance.example",
+      "mode": "managed",
+      "type": "aws_db_instance",
+      "name": "example",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "allocated_storage": 20,
+          "instance_class": "db.t3.micro"
+        }
+      }
+    }
+  ],
+  "configuration": {
+    "provider_config": {
+      "aws": {
+        "name": "aws",
+        "version_constraint": "~> 5.0",
+        "expressions": {
+          "region": {
+            "references": ["var.aws_region"]
+          }
+        }
+      }
+    }
+  }
+}

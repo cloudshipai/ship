@@ -126,10 +126,8 @@ func (e *Engine) NewSteampipeModule() *modules.SteampipeModule {
 	return modules.NewSteampipeModule(e.client)
 }
 
-// NewLLMModule creates a new LLM module
-func (e *Engine) NewLLMModule(provider, model string) *modules.LLMModule {
-	return modules.NewLLMModule(e.client, provider, model)
-}
+// NewLLMModule has been removed - use the new Eino agent system instead
+// See internal/agent package for the new AI-powered investigation capabilities
 
 // NewInfraMapModule creates a new InfraMap module
 func (e *Engine) NewInfraMapModule() *modules.InfraMapModule {

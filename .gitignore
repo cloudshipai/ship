@@ -7,7 +7,7 @@
 *.dll
 *.so
 *.dylib
-
+.mcp.json
 # Test binary, built with `go test -c`
 *.test
 
@@ -36,6 +36,22 @@ ship
 dist/
 test-fresh/
 
+# Temporary test files and scripts (should be in scripts/ or test/ dirs)
+test-*
+*.test.*
+temp-*
+tmp-*
+
+# Demo artifacts (should be in demos/ dir)  
+*.gif
+*.mp4
+*.webm
+
+# VHS tapes and recordings
+*.tape
+demos/*.gif
+demos/*.mp4
+
 # Terraform
 **/.terraform/
 *.tfstate
@@ -43,3 +59,17 @@ test-fresh/
 .terraform.lock.hcl
 *.tfplan
 tf.plan
+
+# Docker and container artifacts
+docker-compose.override.yml
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Shell scripts in root (should be in scripts/)
+/*.sh
+
+# Logs
+*.log
+logs/

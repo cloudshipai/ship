@@ -10,25 +10,22 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/components/tool"
-	"github.com/cloudwego/eino-ext/components/model/openai"
-	"github.com/cloudwego/eino/flow/agent/react"
-	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
-	"github.com/cloudshipai/ship/internal/agent/tools"
 	"dagger.io/dagger"
+	"github.com/cloudshipai/ship/internal/dagger/modules"
+	"github.com/cloudwego/eino-ext/components/model/openai"
+	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/components/tool/utils"
+	"github.com/cloudwego/eino/compose"
+	"github.com/cloudwego/eino/flow/agent/react"
+	"github.com/cloudwego/eino/schema"
 )
 
 // EinoInvestigationAgent implements the InvestigationAgent interface using Eino framework
 type EinoInvestigationAgent struct {
-	client       *dagger.Client
-	memory       *AgentMemory
-	learner      SchemaLearner
-	steampipeTool *tools.SteampipeTool
-	llmModel     model.ChatModel
-	agent        *react.Agent
-	memoryPath   string
+	client     *dagger.Client
+	memory     *AgentMemory
+	agent      *react.Agent
+	memoryPath string
 }
 
 // NewEinoInvestigationAgent creates a new Eino-based investigation agent
@@ -41,357 +38,482 @@ func NewEinoInvestigationAgent(ctx context.Context, client *dagger.Client, apiKe
 		Failures:  make([]QueryFailure, 0),
 	}
 
-	// Create schema learner
-	learner := NewMemorySchemaLearner(client, memory)
+	// Load existing memory if it exists
+	if memoryPath != "" {
+		if err := os.MkdirAll(filepath.Dir(memoryPath), 0755); err != nil {
+			return nil, fmt.Errorf("failed to create memory directory: %w", err)
+		}
 
-	// Create Steampipe tool
-	toolMemory := &tools.AgentMemory{
-		Successes: make([]tools.QuerySuccess, 0),
-		Failures:  make([]tools.QueryFailure, 0),
+		if data, err := os.ReadFile(memoryPath); err == nil {
+			if err := json.Unmarshal(data, memory); err != nil {
+				slog.Warn("Failed to load agent memory", "error", err)
+			} else {
+				slog.Info("Loaded agent memory", "schemas", len(memory.Schemas), "patterns", len(memory.Patterns))
+			}
+		}
 	}
-	steampipeTool := tools.NewSteampipeTool(client, toolMemory)
 
-	// Configure OpenAI model
-	config := &openai.ChatModelConfig{
-		APIKey: apiKey,
+	// Create OpenAI ChatModel
+	chatModel, err := openai.NewChatModel(ctx, &openai.ChatModelConfig{
 		Model:  "gpt-4",
-	}
-
-	llmModel, err := openai.NewChatModel(ctx, config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create OpenAI model: %w", err)
-	}
-
-	// Create agent tools
-	agentTools := []tool.BaseTool{steampipeTool}
-
-	// Create ReAct agent
-	reactAgent, err := react.NewAgent(ctx, &react.AgentConfig{
-		Model: llmModel,
-		ToolsConfig: compose.ToolsNodeConfig{
-			Tools: agentTools,
-		},
-		MessageModifier: func(ctx context.Context, input []*schema.Message) []*schema.Message {
-			systemMessage := schema.SystemMessage(`You are an expert cloud infrastructure investigator. Your goal is to help users understand their cloud infrastructure through natural language queries.
-
-CAPABILITIES:
-- Execute SQL queries against AWS, Azure, and GCP using Steampipe
-- Analyze security configurations and compliance
-- Identify cost optimization opportunities  
-- Investigate performance and operational issues
-- Provide actionable insights and recommendations
-
-APPROACH:
-1. Parse the user's natural language request to understand their intent
-2. Use the steampipe_query tool to gather relevant infrastructure data
-3. Execute multiple targeted queries if needed to get comprehensive information
-4. Analyze the results and provide clear, actionable insights
-5. Include specific recommendations when security or cost issues are found
-
-QUERY GUIDELINES:
-- Always use exact column names from table schemas
-- For AWS EC2 instances, use 'instance_state' not 'state' 
-- Be specific with WHERE clauses to avoid large result sets
-- When unsure about schema, query information_schema first
-- Prefer targeted queries over broad SELECT * statements
-
-RESPONSE FORMAT:
-- Start with a brief summary of what you found
-- List specific findings with numbers/counts
-- Highlight any security or cost concerns
-- Provide actionable recommendations
-- Be concise but thorough in your analysis`)
-			
-			// Prepend system message to input
-			result := make([]*schema.Message, 0, len(input)+1)
-			result = append(result, systemMessage)
-			result = append(result, input...)
-			return result
-		},
+		APIKey: apiKey,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create ReAct agent: %w", err)
+		return nil, fmt.Errorf("failed to create OpenAI chat model: %w", err)
 	}
 
-	agent := &EinoInvestigationAgent{
-		client:        client,
-		memory:        memory,
-		learner:       learner,
-		steampipeTool: steampipeTool,
-		llmModel:      llmModel,
-		agent:         reactAgent,
-		memoryPath:    memoryPath,
+	// Create Steampipe tool
+	steampipeTool := createSteampipeTool(client)
+
+	// Create React Agent
+	agent, err := react.NewAgent(ctx, &react.AgentConfig{
+		ToolCallingModel: chatModel,
+		ToolsConfig: compose.ToolsNodeConfig{
+			Tools: []tool.BaseTool{steampipeTool},
+		},
+		MaxStep: 10,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create React agent: %w", err)
 	}
 
-	// Load existing memory if available
-	if err := agent.LoadMemory(); err != nil {
-		slog.Debug("No existing memory found, starting fresh", "error", err)
-	}
-
-	return agent, nil
+	return &EinoInvestigationAgent{
+		client:     client,
+		memory:     memory,
+		agent:      agent,
+		memoryPath: memoryPath,
+	}, nil
 }
 
-// Investigate performs an infrastructure investigation using the Eino agent
+// SteampipeRequest represents a Steampipe query request
+type SteampipeRequest struct {
+	Query    string `json:"query"`
+	Provider string `json:"provider"`
+}
+
+// SteampipeResponse represents a Steampipe query response
+type SteampipeResponse struct {
+	Result string `json:"result"`
+	Error  string `json:"error,omitempty"`
+}
+
+// createSteampipeTool creates a Steampipe query execution tool for the agent
+func createSteampipeTool(client *dagger.Client) tool.BaseTool {
+	toolInfo := &schema.ToolInfo{
+		Name: "steampipe_query",
+		Desc: "Execute Steampipe SQL queries to investigate cloud infrastructure. Use this to query AWS, Azure, or GCP resources using SQL syntax.",
+		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
+			"query": {
+				Type:     schema.String,
+				Desc:     "The SQL query to execute against Steampipe tables",
+				Required: true,
+			},
+			"provider": {
+				Type: schema.String,
+				Desc: "Cloud provider (aws, azure, gcp)",
+			},
+		}),
+	}
+
+	return utils.NewTool(toolInfo, func(ctx context.Context, req *SteampipeRequest) (*SteampipeResponse, error) {
+		// Default to AWS if no provider specified
+		if req.Provider == "" {
+			req.Provider = "aws"
+		}
+
+		// Execute Steampipe query
+		steampipeModule := modules.NewSteampipeModule(client)
+
+		// Get provider credentials from environment
+		credentials := getProviderCredentialsFromEnv(req.Provider)
+
+		result, err := steampipeModule.RunQuery(ctx, req.Provider, req.Query, credentials, "json")
+		if err != nil {
+			return &SteampipeResponse{
+				Error: fmt.Sprintf("steampipe query failed: %v", err),
+			}, nil // Return error in response, not as error
+		}
+
+		return &SteampipeResponse{
+			Result: result,
+		}, nil
+	})
+}
+
+// getProviderCredentialsFromEnv gets cloud provider credentials from environment variables
+func getProviderCredentialsFromEnv(provider string) map[string]string {
+	credentials := make(map[string]string)
+
+	switch provider {
+	case "aws":
+		if val := os.Getenv("AWS_ACCESS_KEY_ID"); val != "" {
+			credentials["AWS_ACCESS_KEY_ID"] = val
+		}
+		if val := os.Getenv("AWS_SECRET_ACCESS_KEY"); val != "" {
+			credentials["AWS_SECRET_ACCESS_KEY"] = val
+		}
+		if val := os.Getenv("AWS_SESSION_TOKEN"); val != "" {
+			credentials["AWS_SESSION_TOKEN"] = val
+		}
+		if val := os.Getenv("AWS_REGION"); val != "" {
+			credentials["AWS_REGION"] = val
+		} else {
+			credentials["AWS_REGION"] = "us-east-1" // default
+		}
+		if val := os.Getenv("AWS_PROFILE"); val != "" {
+			credentials["AWS_PROFILE"] = val
+		}
+
+	case "azure":
+		if val := os.Getenv("AZURE_CLIENT_ID"); val != "" {
+			credentials["AZURE_CLIENT_ID"] = val
+		}
+		if val := os.Getenv("AZURE_CLIENT_SECRET"); val != "" {
+			credentials["AZURE_CLIENT_SECRET"] = val
+		}
+		if val := os.Getenv("AZURE_TENANT_ID"); val != "" {
+			credentials["AZURE_TENANT_ID"] = val
+		}
+		if val := os.Getenv("AZURE_SUBSCRIPTION_ID"); val != "" {
+			credentials["AZURE_SUBSCRIPTION_ID"] = val
+		}
+
+	case "gcp":
+		if val := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"); val != "" {
+			credentials["GOOGLE_APPLICATION_CREDENTIALS"] = val
+		}
+		if val := os.Getenv("GOOGLE_CLOUD_PROJECT"); val != "" {
+			credentials["GOOGLE_CLOUD_PROJECT"] = val
+		}
+		if val := os.Getenv("GCLOUD_PROJECT"); val != "" {
+			credentials["GCLOUD_PROJECT"] = val
+		}
+	}
+
+	return credentials
+}
+
+// Investigate performs an AI-powered infrastructure investigation using the Eino React agent
 func (a *EinoInvestigationAgent) Investigate(ctx context.Context, request InvestigationRequest) (*InvestigationResult, error) {
-	start := time.Now()
-	
+	startTime := time.Now()
+
 	slog.Info("Starting investigation", "prompt", request.Prompt, "provider", request.Provider)
 
-	// Learn schemas for the provider if not already cached
-	if err := a.ensureSchemaLearned(ctx, request.Provider, request.Credentials); err != nil {
-		slog.Warn("Failed to learn schemas", "error", err)
-		// Continue anyway, agent might still work with basic knowledge
-	}
+	// Create enhanced prompt with context
+	enhancedPrompt := a.enhancePrompt(request.Prompt, request.Provider, request.Region)
 
-	// Create investigation context
-	ctxWithCreds := context.WithValue(ctx, "credentials", request.Credentials)
-	ctxWithProvider := context.WithValue(ctxWithCreds, "provider", request.Provider)
-	ctxWithStart := context.WithValue(ctxWithProvider, "start_time", start)
-
-	// Enhance the user prompt with schema information
-	enhancedPrompt := a.enhancePromptWithContext(request)
-
-	// Execute the agent
+	// Create user message
 	messages := []*schema.Message{
-		{
-			Role:    schema.User,
-			Content: enhancedPrompt,
-		},
+		schema.SystemMessage(fmt.Sprintf("You are an expert cloud infrastructure analyst specializing in %s. Use the steampipe_query tool to investigate cloud resources and provide detailed insights. Always explain your findings and provide actionable recommendations.", request.Provider)),
+		schema.UserMessage(enhancedPrompt),
 	}
 
-	// Generate the agent response
-	response, err := a.agent.Generate(ctxWithStart, messages)
+	// Execute investigation using React agent
+	response, err := a.agent.Generate(ctx, messages)
 	if err != nil {
 		return nil, fmt.Errorf("agent execution failed: %w", err)
 	}
 
-	// Parse the agent's response
-	result := a.parseAgentResponse(response, request, start)
-
-	// Save updated memory
-	if err := a.SaveMemory(); err != nil {
-		slog.Warn("Failed to save agent memory", "error", err)
-	}
-
-	slog.Info("Investigation completed", "duration", time.Since(start), "steps", len(result.Steps))
-	return result, nil
-}
-
-// ensureSchemaLearned ensures that schemas are learned for the provider
-func (a *EinoInvestigationAgent) ensureSchemaLearned(ctx context.Context, provider string, credentials map[string]string) error {
-	// For now, always try to learn schemas
-	// TODO: Implement proper schema caching
-
-	// Learn schemas
-	slog.Info("Learning schemas for provider", "provider", provider)
-	return a.learner.LearnSchema(ctx, provider, credentials)
-}
-
-// enhancePromptWithContext adds relevant context to the user prompt
-func (a *EinoInvestigationAgent) enhancePromptWithContext(request InvestigationRequest) string {
-	var enhanced strings.Builder
-	
-	enhanced.WriteString(fmt.Sprintf("INVESTIGATION REQUEST:\n%s\n\n", request.Prompt))
-	enhanced.WriteString(fmt.Sprintf("TARGET PROVIDER: %s\n", request.Provider))
-	
-	if request.Region != "" {
-		enhanced.WriteString(fmt.Sprintf("REGION: %s\n", request.Region))
-	}
-
-	// Add schema context for relevant tables
-	relevantTables := a.identifyRelevantTables(request.Prompt, request.Provider)
-	if len(relevantTables) > 0 {
-		enhanced.WriteString(fmt.Sprintf("\nRelevant tables: %s\n", strings.Join(relevantTables, ", ")))
-	}
-
-	// Add lessons learned from previous failures
-	if len(a.memory.Failures) > 0 {
-		enhanced.WriteString("\nKNOWN ISSUES TO AVOID:\n")
-		recentFailures := a.getRecentFailures(5) // Last 5 failures
-		for _, failure := range recentFailures {
-			if failure.LessonLearned != "" {
-				enhanced.WriteString(fmt.Sprintf("- %s\n", failure.LessonLearned))
-			}
-		}
-	}
-
-	enhanced.WriteString("\nPlease investigate this request step by step using the steampipe_query tool.")
-	
-	return enhanced.String()
-}
-
-// identifyRelevantTables identifies which tables are likely relevant to the query
-func (a *EinoInvestigationAgent) identifyRelevantTables(prompt, provider string) []string {
-	prompt = strings.ToLower(prompt)
-	var relevant []string
-
-	// Common table mappings based on keywords
-	tableKeywords := map[string][]string{
-		"aws_ec2_instance":        {"ec2", "instance", "server", "compute", "vm"},
-		"aws_s3_bucket":          {"s3", "bucket", "storage", "object"},
-		"aws_rds_db_instance":    {"rds", "database", "db", "mysql", "postgres"},
-		"aws_vpc_security_group": {"security group", "sg", "firewall", "rules", "ports"},
-		"aws_iam_user":           {"iam", "user", "identity", "access"},
-		"aws_iam_role":           {"role", "permission", "policy"},
-		"aws_vpc":                {"vpc", "network", "subnet"},
-		"aws_lambda_function":    {"lambda", "function", "serverless"},
-	}
-
-	for table, keywords := range tableKeywords {
-		for _, keyword := range keywords {
-			if strings.Contains(prompt, keyword) {
-				relevant = append(relevant, table)
-				break
-			}
-		}
-	}
-
-	// Always include account table for basic info
-	if provider == "aws" {
-		relevant = append(relevant, "aws_account")
-	}
-
-	return relevant
-}
-
-// getRecentFailures returns the most recent failures for learning
-func (a *EinoInvestigationAgent) getRecentFailures(count int) []QueryFailure {
-	failures := a.memory.Failures
-	if len(failures) <= count {
-		return failures
-	}
-	return failures[len(failures)-count:]
-}
-
-// parseAgentResponse converts the agent's response into an InvestigationResult
-func (a *EinoInvestigationAgent) parseAgentResponse(response *schema.Message, request InvestigationRequest, start time.Time) *InvestigationResult {
+	// Build result
 	result := &InvestigationResult{
 		Success:    true,
-		Steps:      []InvestigationStep{},
 		Summary:    response.Content,
+		Duration:   time.Since(startTime).String(),
+		Confidence: 0.95, // High confidence for Eino-based queries
+		QueryCount: 1,    // Will be updated based on tool calls
+		Steps:      []InvestigationStep{},
 		Insights:   []Insight{},
-		QueryCount: 0,
-		Duration:   time.Since(start).String(),
-		Confidence: 0.8, // Default confidence
+		Timestamp:  startTime,
 	}
 
 	// Extract insights from the response
 	result.Insights = a.extractInsights(response.Content, request.Provider)
 
-	// Count queries from memory
-	result.QueryCount = len(a.memory.Successes) + len(a.memory.Failures)
+	// Update memory with successful investigation
+	a.updateMemory(request.Prompt, result)
 
-	return result
+	// Save memory if path is provided
+	if a.memoryPath != "" {
+		if err := a.SaveMemory(); err != nil {
+			slog.Warn("Failed to save agent memory", "error", err)
+		}
+	}
+
+	return result, nil
 }
 
-// extractInsights parses insights from the agent's response
+// enhancePrompt creates a better prompt with context and examples
+func (a *EinoInvestigationAgent) enhancePrompt(prompt, provider, region string) string {
+	enhanced := fmt.Sprintf("Cloud Provider: %s", provider)
+	if region != "" {
+		enhanced += fmt.Sprintf("\nRegion: %s", region)
+	}
+	enhanced += fmt.Sprintf("\n\nTask: %s", prompt)
+
+	enhanced += `
+
+Please execute Steampipe queries to investigate this request. Provide:
+1. Clear findings from the data
+2. Security or cost implications
+3. Specific actionable recommendations
+4. Any compliance concerns
+
+Use appropriate Steampipe tables for ` + provider + ` such as:
+- aws_ec2_instance (for EC2 instances)
+- aws_s3_bucket (for S3 buckets)  
+- aws_iam_user (for IAM users)
+- aws_vpc_security_group (for security groups)
+- aws_rds_db_instance (for RDS instances)
+
+Format your response with clear sections and specific findings.`
+
+	return enhanced
+}
+
+// extractInsights extracts actionable insights from the investigation response
 func (a *EinoInvestigationAgent) extractInsights(content, provider string) []Insight {
-	var insights []Insight
+	insights := []Insight{}
 
-	// Look for common security patterns in the response
-	if strings.Contains(strings.ToLower(content), "security group") && strings.Contains(content, "0.0.0.0/0") {
+	contentLower := strings.ToLower(content)
+
+	// Security insights for public access (first priority)
+	if strings.Contains(contentLower, "0.0.0.0/0") || strings.Contains(contentLower, "public") {
 		insights = append(insights, Insight{
 			Type:           "security",
+			Title:          "Public Access Detected",
+			Description:    "Found resources with public access that may pose security risks",
 			Severity:       "high",
-			Title:          "Open Security Groups Detected",
-			Description:    "Found security groups allowing access from 0.0.0.0/0",
-			Impact:         "Potential unauthorized access to resources",
-			Recommendation: "Review and restrict security group rules to specific IP ranges",
-			Confidence:     0.9,
+			Recommendation: "Review and restrict public access to essential services only",
 		})
 	}
 
-	if strings.Contains(strings.ToLower(content), "unencrypted") {
+	// Security insights for unencrypted resources (second priority)
+	if strings.Contains(contentLower, "unencrypted") || strings.Contains(contentLower, "no encryption") {
 		insights = append(insights, Insight{
 			Type:           "security",
-			Severity:       "medium",
-			Title:          "Unencrypted Resources Found",
-			Description:    "Some resources are not encrypted",
-			Impact:         "Data may be vulnerable if compromised",
-			Recommendation: "Enable encryption for all sensitive data stores",
-			Confidence:     0.8,
+			Title:          "Encryption Issue",
+			Description:    "Found resources without proper encryption",
+			Severity:       "high",
+			Recommendation: "Enable encryption for sensitive data and storage",
 		})
 	}
 
-	// Look for cost optimization opportunities
-	if strings.Contains(strings.ToLower(content), "stopped") && strings.Contains(content, "instance") {
+	// Cost insights (third priority)
+	if strings.Contains(contentLower, "unused") || strings.Contains(contentLower, "idle") || strings.Contains(contentLower, "stopped") || strings.Contains(contentLower, "cost") {
 		insights = append(insights, Insight{
 			Type:           "cost",
+			Title:          "Cost Optimization Opportunity",
+			Description:    "Found unused or idle resources that may be costing money",
 			Severity:       "medium",
-			Title:          "Stopped Instances Found",
-			Description:    "Found stopped EC2 instances that may be incurring costs",
-			Impact:         "Unnecessary costs for unused resources",
-			Recommendation: "Consider terminating unused instances or using scheduled start/stop",
-			Confidence:     0.7,
+			Recommendation: "Consider terminating or rightsizing unused resources",
+		})
+	}
+
+	// Compliance insights (fourth priority)
+	if strings.Contains(contentLower, "compliance") || strings.Contains(contentLower, "regulation") {
+		insights = append(insights, Insight{
+			Type:           "compliance",
+			Title:          "Compliance Issue",
+			Description:    "Found potential compliance concerns",
+			Severity:       "high",
+			Recommendation: "Review compliance requirements and implement necessary controls",
 		})
 	}
 
 	return insights
 }
 
-// GetMemory returns the agent's current memory
-func (a *EinoInvestigationAgent) GetMemory() *AgentMemory {
-	return a.memory
+// updateMemory updates the agent memory with successful investigation patterns
+func (a *EinoInvestigationAgent) updateMemory(prompt string, result *InvestigationResult) {
+	// Record successful query pattern
+	pattern := QueryPattern{
+		Prompt:     prompt,
+		Provider:   "aws", // Default for now
+		Success:    result.Success,
+		Confidence: result.Confidence,
+		Timestamp:  time.Now(),
+	}
+
+	// Store pattern with a key based on prompt keywords
+	key := fmt.Sprintf("pattern_%d", len(a.memory.Patterns))
+	a.memory.Patterns[key] = pattern
+
+	// Record success
+	success := QuerySuccess{
+		Prompt:     prompt,
+		QueryCount: result.QueryCount,
+		Duration:   result.Duration,
+		Confidence: result.Confidence,
+		Timestamp:  time.Now(),
+	}
+	a.memory.Successes = append(a.memory.Successes, success)
+
+	// Update last update time
+	a.memory.LastUpdate = time.Now().Format(time.RFC3339)
 }
 
-// SaveMemory persists the agent's memory to disk
+// SaveMemory saves the agent memory to disk
 func (a *EinoInvestigationAgent) SaveMemory() error {
 	if a.memoryPath == "" {
-		return nil // Memory persistence disabled
+		return nil
 	}
 
-	// Ensure directory exists
-	dir := filepath.Dir(a.memoryPath)
-	if err := ensureDir(dir); err != nil {
-		return fmt.Errorf("failed to create memory directory: %w", err)
-	}
-
-	// Update timestamp
-	a.memory.LastUpdate = time.Now().Format(time.RFC3339)
-
-	// Marshal to JSON
 	data, err := json.MarshalIndent(a.memory, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal memory: %w", err)
 	}
 
-	// Write to file
-	if err := writeFile(a.memoryPath, data); err != nil {
-		return fmt.Errorf("failed to write memory file: %w", err)
-	}
-
-	slog.Debug("Agent memory saved", "path", a.memoryPath)
-	return nil
+	return os.WriteFile(a.memoryPath, data, 0644)
 }
 
-// LoadMemory loads the agent's memory from disk
+// LoadMemory loads the agent memory from disk
 func (a *EinoInvestigationAgent) LoadMemory() error {
 	if a.memoryPath == "" {
-		return nil // Memory persistence disabled
+		return nil
 	}
 
-	data, err := readFile(a.memoryPath)
+	data, err := os.ReadFile(a.memoryPath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			// File doesn't exist, initialize with empty memory
+			a.memory = &AgentMemory{
+				Schemas:   make(map[string]TableSchema),
+				Patterns:  make(map[string]QueryPattern),
+				Successes: make([]QuerySuccess, 0),
+				Failures:  make([]QueryFailure, 0),
+			}
+			return nil
+		}
 		return fmt.Errorf("failed to read memory file: %w", err)
 	}
 
-	if err := json.Unmarshal(data, a.memory); err != nil {
+	err = json.Unmarshal(data, a.memory)
+	if err != nil {
 		return fmt.Errorf("failed to unmarshal memory: %w", err)
 	}
 
-	slog.Debug("Agent memory loaded", "path", a.memoryPath, "schemas", len(a.memory.Schemas))
 	return nil
 }
 
-// File I/O functions for agent memory persistence
-func ensureDir(dir string) error {
-	return os.MkdirAll(dir, 0755)
+// GetMemory returns the current agent memory
+func (a *EinoInvestigationAgent) GetMemory() *AgentMemory {
+	return a.memory
 }
 
-func writeFile(path string, data []byte) error {
-	return os.WriteFile(path, data, 0644)
+// identifyRelevantTables identifies relevant Steampipe tables based on prompt and provider
+func (a *EinoInvestigationAgent) identifyRelevantTables(prompt, provider string) []string {
+	promptLower := strings.ToLower(prompt)
+	tables := []string{}
+
+	// Always include account table for provider context
+	switch provider {
+	case "aws":
+		tables = append(tables, "aws_account")
+
+		// EC2 related tables
+		if strings.Contains(promptLower, "instance") || strings.Contains(promptLower, "ec2") || strings.Contains(promptLower, "server") || strings.Contains(promptLower, "compute") {
+			tables = append(tables, "aws_ec2_instance")
+		}
+
+		// Security group related
+		if strings.Contains(promptLower, "security") || strings.Contains(promptLower, "firewall") || strings.Contains(promptLower, "0.0.0.0") || strings.Contains(promptLower, "port") {
+			tables = append(tables, "aws_vpc_security_group")
+		}
+
+		// S3 related tables
+		if strings.Contains(promptLower, "bucket") || strings.Contains(promptLower, "s3") || strings.Contains(promptLower, "storage") {
+			tables = append(tables, "aws_s3_bucket")
+		}
+
+		// IAM related tables
+		if strings.Contains(promptLower, "user") || strings.Contains(promptLower, "role") || strings.Contains(promptLower, "iam") || strings.Contains(promptLower, "permission") || strings.Contains(promptLower, "policy") {
+			tables = append(tables, "aws_iam_user")
+			tables = append(tables, "aws_iam_role")
+		}
+
+		// Lambda related tables
+		if strings.Contains(promptLower, "lambda") || strings.Contains(promptLower, "function") || strings.Contains(promptLower, "serverless") {
+			tables = append(tables, "aws_lambda_function")
+		}
+
+		// RDS related tables
+		if strings.Contains(promptLower, "database") || strings.Contains(promptLower, "rds") || strings.Contains(promptLower, "mysql") || strings.Contains(promptLower, "postgres") {
+			tables = append(tables, "aws_rds_db_instance")
+		}
+
+		// VPC related tables
+		if strings.Contains(promptLower, "vpc") || strings.Contains(promptLower, "network") || strings.Contains(promptLower, "subnet") {
+			tables = append(tables, "aws_vpc")
+		}
+
+		// EBS related tables
+		if strings.Contains(promptLower, "volume") || strings.Contains(promptLower, "ebs") || strings.Contains(promptLower, "disk") {
+			tables = append(tables, "aws_ebs_volume")
+		}
+
+	case "azure":
+		tables = append(tables, "azure_subscription")
+
+		// Add Azure-specific table identification logic
+		if strings.Contains(promptLower, "vm") || strings.Contains(promptLower, "virtual machine") || strings.Contains(promptLower, "compute") {
+			tables = append(tables, "azure_compute_virtual_machine")
+		}
+
+		if strings.Contains(promptLower, "storage") || strings.Contains(promptLower, "blob") {
+			tables = append(tables, "azure_storage_account")
+		}
+
+	case "gcp":
+		tables = append(tables, "gcp_project")
+
+		// Add GCP-specific table identification logic
+		if strings.Contains(promptLower, "instance") || strings.Contains(promptLower, "compute") || strings.Contains(promptLower, "gce") {
+			tables = append(tables, "gcp_compute_instance")
+		}
+
+		if strings.Contains(promptLower, "storage") || strings.Contains(promptLower, "bucket") || strings.Contains(promptLower, "gcs") {
+			tables = append(tables, "gcp_storage_bucket")
+		}
+	}
+
+	// Remove duplicates
+	seen := make(map[string]bool)
+	result := []string{}
+	for _, table := range tables {
+		if !seen[table] {
+			seen[table] = true
+			result = append(result, table)
+		}
+	}
+
+	return result
 }
 
-func readFile(path string) ([]byte, error) {
-	return os.ReadFile(path)
+// enhancePromptWithContext enhances the prompt with context from memory and failures
+func (a *EinoInvestigationAgent) enhancePromptWithContext(request InvestigationRequest) string {
+	enhanced := fmt.Sprintf("TARGET PROVIDER: %s\n", request.Provider)
+
+	if request.Region != "" {
+		enhanced += fmt.Sprintf("REGION: %s\n", request.Region)
+	}
+
+	enhanced += fmt.Sprintf("USER REQUEST: %s\n\n", request.Prompt)
+
+	// Add context from memory failures
+	if len(a.memory.Failures) > 0 {
+		enhanced += "KNOWN ISSUES TO AVOID:\n"
+		for _, failure := range a.memory.Failures {
+			enhanced += fmt.Sprintf("- %s (Lesson: %s)\n", failure.ErrorType, failure.LessonLearned)
+		}
+		enhanced += "\n"
+	}
+
+	// Add suggested approach
+	enhanced += "Please investigate using appropriate Steampipe tables and provide:\n"
+	enhanced += "1. Clear findings from the data\n"
+	enhanced += "2. Security and cost implications\n"
+	enhanced += "3. Specific actionable recommendations\n"
+	enhanced += "4. Any compliance concerns\n"
+
+	return enhanced
 }

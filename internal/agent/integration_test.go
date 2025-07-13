@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	"dagger.io/dagger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"dagger.io/dagger"
 )
 
 // Integration tests that demonstrate real Eino agent functionality
@@ -28,7 +28,7 @@ func TestEinoAgent_SecurityInvestigation_Integration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	
+
 	// Create a temporary memory path
 	tempDir := t.TempDir()
 	memoryPath := filepath.Join(tempDir, "agent_memory.json")
@@ -68,7 +68,7 @@ func TestEinoAgent_SecurityInvestigation_Integration(t *testing.T) {
 
 	// Verify insights are extracted
 	assert.NotNil(t, result.Insights)
-	
+
 	// Check that memory was updated
 	memory := agent.GetMemory()
 	assert.NotNil(t, memory)
@@ -112,13 +112,13 @@ func TestEinoAgent_CostOptimization_Integration(t *testing.T) {
 	// Verify result contains cost-related insights
 	assert.True(t, result.Success)
 	assert.NotEmpty(t, result.Summary)
-	
+
 	// Look for cost-related keywords in response
 	summaryLower := strings.ToLower(result.Summary)
-	assert.True(t, 
-		strings.Contains(summaryLower, "cost") || 
-		strings.Contains(summaryLower, "volume") || 
-		strings.Contains(summaryLower, "unused"),
+	assert.True(t,
+		strings.Contains(summaryLower, "cost") ||
+			strings.Contains(summaryLower, "volume") ||
+			strings.Contains(summaryLower, "unused"),
 		"Result should contain cost-related information")
 }
 
@@ -193,8 +193,8 @@ func TestEinoAgent_PromptEnhancement_Integration(t *testing.T) {
 	agent.memory.Failures = []QueryFailure{
 		{
 			OriginalIntent: "find running instances",
-			ErrorType:     "schema",
-			LessonLearned: "Use 'instance_state' instead of 'state' for EC2 queries",
+			ErrorType:      "schema",
+			LessonLearned:  "Use 'instance_state' instead of 'state' for EC2 queries",
 		},
 	}
 
@@ -267,14 +267,14 @@ func TestEinoAgent_TableIdentification_Integration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tables := agent.identifyRelevantTables(tt.prompt, tt.provider)
-			
+
 			// Verify all expected tables are identified
 			for _, expected := range tt.expected {
-				assert.Contains(t, tables, expected, 
-					"Expected table %s not found in identified tables %v for prompt: %s", 
+				assert.Contains(t, tables, expected,
+					"Expected table %s not found in identified tables %v for prompt: %s",
 					expected, tables, tt.prompt)
 			}
-			
+
 			// Verify reasonable number of tables (not too many or too few)
 			assert.GreaterOrEqual(t, len(tables), 1, "Should identify at least one table")
 			assert.LessOrEqual(t, len(tables), 8, "Should not identify too many tables")
@@ -293,7 +293,7 @@ func TestEinoAgent_ErrorHandling_Integration(t *testing.T) {
 
 	// Test with invalid API key
 	agent, err := NewEinoInvestigationAgent(ctx, createMockDaggerClient(t), "invalid-key", memoryPath)
-	
+
 	// Should create agent but fail on actual usage
 	if err == nil {
 		request := InvestigationRequest{
@@ -303,7 +303,7 @@ func TestEinoAgent_ErrorHandling_Integration(t *testing.T) {
 				"AWS_ACCESS_KEY_ID": "test",
 			},
 		}
-		
+
 		// This should fail gracefully
 		result, err := agent.Investigate(ctx, request)
 		if err != nil {
@@ -473,14 +473,14 @@ func createMockDaggerClient(t testing.TB) *dagger.Client {
 		t.Skipf("Dagger not available for integration test: %v", err)
 		return nil
 	}
-	
+
 	// Register cleanup to close the client after test
 	t.Cleanup(func() {
 		if client != nil {
 			client.Close()
 		}
 	})
-	
+
 	return client
 }
 
@@ -488,7 +488,7 @@ func createMockDaggerClient(t testing.TB) *dagger.Client {
 func TestEinoAgent_ReliabilityComparison(t *testing.T) {
 	// This test demonstrates the improvement over the old LLM system
 	// which had ~40% failure rate due to hardcoded solutions
-	
+
 	tempDir := t.TempDir()
 	memoryPath := filepath.Join(tempDir, "agent_memory.json")
 
@@ -526,7 +526,7 @@ func TestEinoAgent_ReliabilityComparison(t *testing.T) {
 				successCount++
 			}
 			assert.NotEmpty(t, tables, "Should identify relevant tables for: %s", tc.prompt)
-			
+
 			// Test prompt enhancement (should always work)
 			request := InvestigationRequest{
 				Prompt:   tc.prompt,
@@ -541,6 +541,6 @@ func TestEinoAgent_ReliabilityComparison(t *testing.T) {
 	// The new Eino agent should have much higher success rate than old system
 	successRate := float64(successCount) / float64(len(testCases))
 	assert.GreaterOrEqual(t, successRate, 0.8, "Eino agent should have >80% success rate (vs 60% for old system)")
-	
+
 	t.Logf("Eino Agent Success Rate: %.1f%% (Old LLM System: ~60%%)", successRate*100)
 }

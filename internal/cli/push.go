@@ -81,7 +81,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 
 	// Get file path
 	filePath := args[0]
-	
+
 	// Handle stdin
 	var data []byte
 	if filePath == "-" {
@@ -95,7 +95,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 		if _, err := os.Stat(filePath); err != nil {
 			return fmt.Errorf("file not found: %s", filePath)
 		}
-		
+
 		// Read file
 		data, err = os.ReadFile(filePath)
 		if err != nil {
@@ -159,7 +159,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 
 	// Upload artifact
 	fmt.Printf("Uploading %s to CloudShip...\n", filepath.Base(filePath))
-	
+
 	resp, err := client.UploadArtifact(req)
 	if err != nil {
 		return fmt.Errorf("failed to upload artifact: %w", err)
@@ -168,7 +168,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 	// Success
 	green := color.New(color.FgGreen)
 	green.Printf("✓ Successfully uploaded artifact!\n")
-	
+
 	fmt.Printf("\nArtifact ID: %s\n", resp.ArtifactID)
 	fmt.Printf("Version: %d\n", resp.Version)
 	fmt.Printf("Download URL: %s\n", resp.DownloadURL)
@@ -180,7 +180,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 func readStdin() ([]byte, error) {
 	var data []byte
 	buf := make([]byte, 1024)
-	
+
 	for {
 		n, err := os.Stdin.Read(buf)
 		if n > 0 {
@@ -193,7 +193,7 @@ func readStdin() ([]byte, error) {
 			return nil, err
 		}
 	}
-	
+
 	return data, nil
 }
 

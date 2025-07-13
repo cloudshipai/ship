@@ -11,14 +11,14 @@ func TestEinoInvestigationAgent_Creation(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping agent creation test in short mode")
 	}
-	
+
 	// This test requires actual OpenAI API key and Dagger, so we'll mock it
 	t.Run("agent creation with valid config", func(t *testing.T) {
 		// Test agent creation parameters
 		ctx := context.Background()
 		apiKey := "test-api-key"
 		memoryPath := "/tmp/test-memory.json"
-		
+
 		// We can't create a real agent without Dagger client and OpenAI key
 		// So we'll test the validation logic
 		assert.NotEmpty(t, apiKey)
@@ -86,7 +86,7 @@ func TestInvestigationRequest_Validation(t *testing.T) {
 
 func TestEinoInvestigationAgent_TableIdentification(t *testing.T) {
 	agent := &EinoInvestigationAgent{}
-	
+
 	tests := []struct {
 		name     string
 		prompt   string
@@ -134,7 +134,7 @@ func TestEinoInvestigationAgent_TableIdentification(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tables := agent.identifyRelevantTables(tt.prompt, tt.provider)
-			
+
 			for _, expected := range tt.expected {
 				assert.Contains(t, tables, expected, "Expected table %s not found in %v", expected, tables)
 			}
@@ -152,7 +152,7 @@ func TestInvestigationResult_Structure(t *testing.T) {
 		Duration:   "2.5s",
 		Confidence: 0.85,
 	}
-	
+
 	assert.True(t, result.Success)
 	assert.Equal(t, "Test investigation completed", result.Summary)
 	assert.Equal(t, 3, result.QueryCount)
@@ -175,7 +175,7 @@ func TestInvestigationStep_Structure(t *testing.T) {
 		ExecutionTime: "1.2s",
 		Insights:      []string{"Found 1 instance"},
 	}
-	
+
 	assert.Equal(t, 1, step.StepNumber)
 	assert.Equal(t, "Query EC2 instances", step.Description)
 	assert.True(t, step.Success)
@@ -194,7 +194,7 @@ func TestInsight_Structure(t *testing.T) {
 		Recommendation: "Restrict security group rules",
 		Confidence:     0.9,
 	}
-	
+
 	assert.Equal(t, "security", insight.Type)
 	assert.Equal(t, "high", insight.Severity)
 	assert.Equal(t, "Open Security Groups", insight.Title)
@@ -208,20 +208,21 @@ func TestEinoInvestigationAgent_PromptEnhancement(t *testing.T) {
 				{
 					OriginalIntent: "bad query",
 					ErrorType:      "schema",
+					Provider:       "aws",
 					LessonLearned:  "Use proper column names",
 				},
 			},
 		},
 	}
-	
+
 	request := InvestigationRequest{
 		Prompt:   "Find running instances",
 		Provider: "aws",
 		Region:   "us-east-1",
 	}
-	
+
 	enhanced := agent.enhancePromptWithContext(request)
-	
+
 	assert.Contains(t, enhanced, "Find running instances")
 	assert.Contains(t, enhanced, "TARGET PROVIDER: aws")
 	assert.Contains(t, enhanced, "REGION: us-east-1")
@@ -231,13 +232,13 @@ func TestEinoInvestigationAgent_PromptEnhancement(t *testing.T) {
 
 func TestEinoInvestigationAgent_InsightExtraction(t *testing.T) {
 	agent := &EinoInvestigationAgent{}
-	
+
 	tests := []struct {
-		name           string
-		content        string
-		provider       string
-		expectedCount  int
-		expectedTypes  []string
+		name          string
+		content       string
+		provider      string
+		expectedCount int
+		expectedTypes []string
 	}{
 		{
 			name:          "security group issue",
@@ -279,9 +280,9 @@ func TestEinoInvestigationAgent_InsightExtraction(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			insights := agent.extractInsights(tt.content, tt.provider)
-			
+
 			assert.Len(t, insights, tt.expectedCount)
-			
+
 			for i, expectedType := range tt.expectedTypes {
 				if i < len(insights) {
 					assert.Equal(t, expectedType, insights[i].Type)
@@ -298,7 +299,7 @@ func TestAgentMemory_Management(t *testing.T) {
 		Successes: make([]QuerySuccess, 0),
 		Failures:  make([]QueryFailure, 0),
 	}
-	
+
 	// Test adding schemas
 	schema := TableSchema{
 		TableName: "aws_ec2_instance",
@@ -308,25 +309,25 @@ func TestAgentMemory_Management(t *testing.T) {
 			{Name: "instance_state", Type: "text"},
 		},
 	}
-	
+
 	memory.Schemas["aws.aws_ec2_instance"] = schema
 	assert.Len(t, memory.Schemas, 1)
 	assert.Equal(t, "aws_ec2_instance", memory.Schemas["aws.aws_ec2_instance"].TableName)
-	
+
 	// Test adding patterns
 	pattern := QueryPattern{
-		Intent:        "find running instances",
-		Template:      "SELECT * FROM aws_ec2_instance WHERE instance_state = 'running'",
-		Provider:      "aws",
-		SuccessRate:   0.95,
-		UsageCount:    100,
-		Parameters:    []string{"instance_state"},
-		Examples:      []string{"find running instances"},
-		Tags:          []string{"ec2", "instances"},
-		CreatedAt:     "2024-01-01T00:00:00Z",
-		LastUsed:      "2024-01-01T00:00:00Z",
+		Intent:      "find running instances",
+		Template:    "SELECT * FROM aws_ec2_instance WHERE instance_state = 'running'",
+		Provider:    "aws",
+		SuccessRate: 0.95,
+		UsageCount:  100,
+		Parameters:  []string{"instance_state"},
+		Examples:    []string{"find running instances"},
+		Tags:        []string{"ec2", "instances"},
+		CreatedAt:   "2024-01-01T00:00:00Z",
+		LastUsed:    "2024-01-01T00:00:00Z",
 	}
-	
+
 	memory.Patterns["running_instances"] = pattern
 	assert.Len(t, memory.Patterns, 1)
 	assert.Equal(t, 0.95, memory.Patterns["running_instances"].SuccessRate)
@@ -336,7 +337,7 @@ func TestAgentMemory_Management(t *testing.T) {
 func BenchmarkEinoInvestigationAgent_TableIdentification(b *testing.B) {
 	agent := &EinoInvestigationAgent{}
 	prompt := "Find all running EC2 instances with security group issues"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = agent.identifyRelevantTables(prompt, "aws")
@@ -349,13 +350,13 @@ func BenchmarkEinoInvestigationAgent_PromptEnhancement(b *testing.B) {
 			Failures: make([]QueryFailure, 50), // Pre-populate with some failures
 		},
 	}
-	
+
 	request := InvestigationRequest{
 		Prompt:   "Find running instances with security issues",
 		Provider: "aws",
 		Region:   "us-east-1",
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = agent.enhancePromptWithContext(request)
@@ -365,7 +366,7 @@ func BenchmarkEinoInvestigationAgent_PromptEnhancement(b *testing.B) {
 func BenchmarkEinoInvestigationAgent_InsightExtraction(b *testing.B) {
 	agent := &EinoInvestigationAgent{}
 	content := "Found multiple security groups allowing access from 0.0.0.0/0 and several unencrypted S3 buckets and stopped EC2 instances"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = agent.extractInsights(content, "aws")

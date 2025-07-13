@@ -1,0 +1,64 @@
+name: Dependency Updates
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Weekly on Monday at 9 AM
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-dependencies:
+    name: Update Go Dependencies
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+        cache: true
+        
+    - name: Update dependencies
+      run: |
+        go get -u ./...
+        go mod tidy
+        
+    - name: Run tests
+      run: go test -short ./...
+      
+    - name: Check for vulnerabilities
+      run: |
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+        govulncheck ./...
+        
+    - name: Create Pull Request
+      uses: peter-evans/create-pull-request@v6
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: 'chore(deps): update Go dependencies'
+        title: 'Automated dependency updates'
+        body: |
+          ## Dependency Updates
+          
+          This PR updates Go dependencies to their latest versions.
+          
+          ### Changes
+          - Updated all Go dependencies to latest compatible versions
+          - Ran `go mod tidy` to clean up go.mod and go.sum
+          - Verified tests still pass
+          - Checked for security vulnerabilities
+          
+          ### Testing
+          - [x] Basic tests pass
+          - [x] No security vulnerabilities detected
+          - [ ] Manual verification required
+          
+          **Note**: Please review the changes carefully before merging.
+        branch: automated/dependency-updates
+        delete-branch: true

@@ -2,100 +2,110 @@ package agent
 
 import (
 	"context"
+	"time"
 )
 
 // InvestigationRequest represents a user's natural language investigation request
 type InvestigationRequest struct {
-	Prompt    string            `json:"prompt"`
-	Provider  string            `json:"provider"`  // aws, azure, gcp
-	Region    string            `json:"region,omitempty"`
+	Prompt      string            `json:"prompt"`
+	Provider    string            `json:"provider"` // aws, azure, gcp
+	Region      string            `json:"region,omitempty"`
 	Credentials map[string]string `json:"-"` // Not serialized for security
 }
 
 // InvestigationResult represents the final investigation results
 type InvestigationResult struct {
-	Success     bool                     `json:"success"`
-	Steps       []InvestigationStep     `json:"steps"`
-	Summary     string                  `json:"summary"`
-	Insights    []Insight               `json:"insights"`
-	QueryCount  int                     `json:"query_count"`
-	Duration    string                  `json:"duration"`
-	Confidence  float64                 `json:"confidence"`
+	Success    bool                `json:"success"`
+	Steps      []InvestigationStep `json:"steps"`
+	Summary    string              `json:"summary"`
+	Insights   []Insight           `json:"insights"`
+	QueryCount int                 `json:"query_count"`
+	Duration   string              `json:"duration"`
+	Confidence float64             `json:"confidence"`
+	Timestamp  time.Time           `json:"timestamp"`
 }
 
 // InvestigationStep represents a single step in the investigation
 type InvestigationStep struct {
-	StepNumber       int                    `json:"step_number"`
-	Description      string                 `json:"description"`
-	Query            string                 `json:"query"`
-	Results          []map[string]interface{} `json:"results"`
-	Success          bool                   `json:"success"`
-	Error            string                 `json:"error,omitempty"`
-	ExecutionTime    string                 `json:"execution_time"`
-	Insights         []string               `json:"insights"`
+	StepNumber    int                      `json:"step_number"`
+	Description   string                   `json:"description"`
+	Query         string                   `json:"query"`
+	Results       []map[string]interface{} `json:"results"`
+	Success       bool                     `json:"success"`
+	Error         string                   `json:"error,omitempty"`
+	ExecutionTime string                   `json:"execution_time"`
+	Insights      []string                 `json:"insights"`
 }
 
 // Insight represents a key finding from the investigation
 type Insight struct {
-	Type        string  `json:"type"`        // security, cost, performance, compliance
-	Severity    string  `json:"severity"`    // critical, high, medium, low, info
-	Title       string  `json:"title"`
-	Description string  `json:"description"`
-	Impact      string  `json:"impact"`
-	Recommendation string `json:"recommendation"`
-	Confidence  float64 `json:"confidence"`
+	Type           string  `json:"type"`     // security, cost, performance, compliance
+	Severity       string  `json:"severity"` // critical, high, medium, low, info
+	Title          string  `json:"title"`
+	Description    string  `json:"description"`
+	Impact         string  `json:"impact"`
+	Recommendation string  `json:"recommendation"`
+	Confidence     float64 `json:"confidence"`
 }
 
 // TableSchema represents Steampipe table schema information
 type TableSchema struct {
-	TableName   string        `json:"table_name"`
-	Columns     []ColumnInfo  `json:"columns"`
-	Provider    string        `json:"provider"`
-	Description string        `json:"description"`
-	LastUpdated string        `json:"last_updated"`
+	TableName   string       `json:"table_name"`
+	Columns     []ColumnInfo `json:"columns"`
+	Provider    string       `json:"provider"`
+	Description string       `json:"description"`
+	LastUpdated string       `json:"last_updated"`
 }
 
 // ColumnInfo represents information about a table column
 type ColumnInfo struct {
-	Name        string `json:"name"`
-	Type        string `json:"type"`
-	Description string `json:"description"`
-	Required    bool   `json:"required"`
+	Name        string   `json:"name"`
+	Type        string   `json:"type"`
+	Description string   `json:"description"`
+	Required    bool     `json:"required"`
 	Examples    []string `json:"examples,omitempty"`
 }
 
 // QueryPattern represents a learned query pattern for reuse
 type QueryPattern struct {
-	ID            string            `json:"id"`
-	Intent        string            `json:"intent"`        // Natural language intent
-	Template      string            `json:"template"`      // SQL template with placeholders
-	Parameters    []string          `json:"parameters"`    // Parameter names
-	Provider      string            `json:"provider"`
-	SuccessRate   float64           `json:"success_rate"`
-	UsageCount    int               `json:"usage_count"`
-	Examples      []string          `json:"examples"`      // Example natural language inputs
-	Tags          []string          `json:"tags"`
-	CreatedAt     string            `json:"created_at"`
-	LastUsed      string            `json:"last_used"`
+	ID          string    `json:"id"`
+	Intent      string    `json:"intent"`     // Natural language intent
+	Prompt      string    `json:"prompt"`     // Original prompt
+	Template    string    `json:"template"`   // SQL template with placeholders
+	Parameters  []string  `json:"parameters"` // Parameter names
+	Provider    string    `json:"provider"`
+	Success     bool      `json:"success"`    // Whether this pattern was successful
+	Confidence  float64   `json:"confidence"` // Confidence in this pattern
+	SuccessRate float64   `json:"success_rate"`
+	UsageCount  int       `json:"usage_count"`
+	Examples    []string  `json:"examples"` // Example natural language inputs
+	Tags        []string  `json:"tags"`
+	CreatedAt   string    `json:"created_at"`
+	LastUsed    string    `json:"last_used"`
+	Timestamp   time.Time `json:"timestamp"`
 }
 
 // AgentMemory represents the agent's persistent knowledge
 type AgentMemory struct {
-	Schemas      map[string]TableSchema  `json:"schemas"`       // provider.table_name -> schema
-	Patterns     map[string]QueryPattern `json:"patterns"`      // pattern_id -> pattern
-	Successes    []QuerySuccess          `json:"successes"`     // Recent successful queries
-	Failures     []QueryFailure          `json:"failures"`      // Recent failures for learning
-	LastUpdate   string                  `json:"last_update"`
+	Schemas    map[string]TableSchema  `json:"schemas"`   // provider.table_name -> schema
+	Patterns   map[string]QueryPattern `json:"patterns"`  // pattern_id -> pattern
+	Successes  []QuerySuccess          `json:"successes"` // Recent successful queries
+	Failures   []QueryFailure          `json:"failures"`  // Recent failures for learning
+	LastUpdate string                  `json:"last_update"`
 }
 
 // QuerySuccess represents a successful query execution
 type QuerySuccess struct {
 	OriginalIntent string    `json:"original_intent"`
+	Prompt         string    `json:"prompt"` // Original user prompt
 	GeneratedQuery string    `json:"generated_query"`
+	QueryCount     int       `json:"query_count"` // Number of queries executed
 	ResultCount    int       `json:"result_count"`
 	ExecutionTime  string    `json:"execution_time"`
+	Duration       string    `json:"duration"`   // Total duration string
+	Confidence     float64   `json:"confidence"` // Confidence level
 	Provider       string    `json:"provider"`
-	Timestamp      string    `json:"timestamp"`
+	Timestamp      time.Time `json:"timestamp"`
 	PatternUsed    string    `json:"pattern_used,omitempty"`
 }
 
@@ -104,10 +114,10 @@ type QueryFailure struct {
 	OriginalIntent string `json:"original_intent"`
 	GeneratedQuery string `json:"generated_query"`
 	ErrorMessage   string `json:"error_message"`
-	ErrorType      string `json:"error_type"`      // syntax, schema, auth, timeout
+	ErrorType      string `json:"error_type"` // syntax, schema, auth, timeout
 	Provider       string `json:"provider"`
 	Timestamp      string `json:"timestamp"`
-	LessonLearned  string `json:"lesson_learned"`  // What the agent learned
+	LessonLearned  string `json:"lesson_learned"` // What the agent learned
 }
 
 // SteampipeExecutor defines the interface for executing Steampipe queries

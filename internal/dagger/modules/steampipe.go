@@ -45,10 +45,10 @@ func (m *SteampipeModule) RunQuery(ctx context.Context, plugin string, query str
 	if plugin != "" {
 		container = container.WithExec([]string{"steampipe", "plugin", "install", plugin})
 	}
-	
+
 	// Configure Steampipe directories
 	container = container.WithExec([]string{
-		"sh", "-c", 
+		"sh", "-c",
 		"mkdir -p /home/steampipe/.steampipe/config",
 	})
 
@@ -79,7 +79,7 @@ func (m *SteampipeModule) RunQuery(ctx context.Context, plugin string, query str
 
 		// Write the config file
 		container = container.WithExec([]string{
-			"sh", "-c", 
+			"sh", "-c",
 			fmt.Sprintf("echo '%s' > /home/steampipe/.steampipe/config/aws.spc", awsConfig),
 		})
 
@@ -90,7 +90,7 @@ func (m *SteampipeModule) RunQuery(ctx context.Context, plugin string, query str
 		connectionStatus, _ := checkContainer.Stdout(ctx)
 		fmt.Printf("Steampipe AWS connection status (region: %s):\n%s\n", awsRegion, connectionStatus)
 	}
-	
+
 	// Validate query doesn't contain multiple statements
 	if strings.Contains(query, ";") && strings.Count(query, ";") > 1 {
 		// Multiple statements detected - split and execute only the first
@@ -98,7 +98,7 @@ func (m *SteampipeModule) RunQuery(ctx context.Context, plugin string, query str
 		query = strings.TrimSpace(statements[0])
 		slog.Warn("Multiple SQL statements detected, executing only the first", "original_count", len(statements))
 	}
-	
+
 	// Execute the query with explicit timeout and error capture
 	// Escape single quotes in the query to prevent shell injection issues
 	escapedQuery := strings.ReplaceAll(query, "'", "'\"'\"'")
@@ -111,7 +111,7 @@ func (m *SteampipeModule) RunQuery(ctx context.Context, plugin string, query str
 	if err != nil {
 		return "", fmt.Errorf("failed to run steampipe query: %w", err)
 	}
-	
+
 	// Check if we got an error
 	if strings.Contains(stdout, "EXIT_CODE:") || strings.Contains(stdout, "Error:") {
 		return "", fmt.Errorf("steampipe query failed: %s", stdout)
@@ -133,7 +133,7 @@ func (m *SteampipeModule) RunMultipleQueries(ctx context.Context, plugin string,
 
 	// Configure Steampipe directories
 	container = container.WithExec([]string{
-		"sh", "-c", 
+		"sh", "-c",
 		"mkdir -p /home/steampipe/.steampipe/config",
 	})
 
@@ -160,7 +160,7 @@ func (m *SteampipeModule) RunMultipleQueries(ctx context.Context, plugin string,
 
 		// Write the config file
 		container = container.WithExec([]string{
-			"sh", "-c", 
+			"sh", "-c",
 			fmt.Sprintf("echo '%s' > /home/steampipe/.steampipe/config/aws.spc", awsConfig),
 		})
 	}
@@ -215,28 +215,28 @@ func (m *SteampipeModule) GetTableColumns(ctx context.Context, plugin string, ta
 		WHERE table_name = '%s' 
 		ORDER BY ordinal_position
 	`, tableName)
-	
+
 	result, err := m.RunQuery(ctx, plugin, schemaQuery, credentials, "json")
 	if err != nil {
 		// Fallback to empty if query fails
 		slog.Debug("Failed to query table schema", "table", tableName, "error", err)
 		return []string{}, nil
 	}
-	
+
 	// Parse the JSON result to extract column names
 	var schemaResult []map[string]interface{}
 	if err := json.Unmarshal([]byte(result), &schemaResult); err != nil {
 		slog.Debug("Failed to parse schema result", "error", err)
 		return []string{}, nil
 	}
-	
+
 	columns := make([]string, 0, len(schemaResult))
 	for _, row := range schemaResult {
 		if colName, ok := row["column_name"].(string); ok {
 			columns = append(columns, colName)
 		}
 	}
-	
+
 	slog.Debug("Retrieved table columns", "table", tableName, "columns", columns)
 	return columns, nil
 }

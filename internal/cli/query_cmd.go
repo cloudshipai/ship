@@ -36,7 +36,7 @@ func runQuery(cmd *cobra.Command, args []string) error {
 	timeoutMinutes, _ := cmd.Flags().GetInt("timeout")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMinutes)*time.Minute)
 	defer cancel()
-	
+
 	query := args[0]
 
 	if err := checkDockerRunning(); err != nil {
@@ -105,7 +105,7 @@ func runQuery(cmd *cobra.Command, args []string) error {
 				}
 			}
 		}
-		
+
 		if awsProfile != "" {
 			credentials["AWS_PROFILE"] = awsProfile
 		}

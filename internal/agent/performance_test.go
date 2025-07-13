@@ -35,46 +35,46 @@ func TestEinoAgent_PerformanceComparison(t *testing.T) {
 
 	// Test cases that represent common infrastructure investigations
 	testCases := []struct {
-		name        string
-		prompt      string
-		provider    string
+		name         string
+		prompt       string
+		provider     string
 		expectTables int
-		complexity  string
+		complexity   string
 	}{
 		{
-			name:        "Simple EC2 Query",
-			prompt:      "Find running EC2 instances",
-			provider:    "aws",
+			name:         "Simple EC2 Query",
+			prompt:       "Find running EC2 instances",
+			provider:     "aws",
 			expectTables: 2, // aws_ec2_instance, aws_account
-			complexity:  "low",
+			complexity:   "low",
 		},
 		{
-			name:        "Security Investigation",
-			prompt:      "Find security groups allowing 0.0.0.0/0 access with associated instances and IAM roles",
-			provider:    "aws",
+			name:         "Security Investigation",
+			prompt:       "Find security groups allowing 0.0.0.0/0 access with associated instances and IAM roles",
+			provider:     "aws",
 			expectTables: 4, // aws_vpc_security_group, aws_ec2_instance, aws_iam_role, aws_account
-			complexity:  "medium",
+			complexity:   "medium",
 		},
 		{
-			name:        "Complex Multi-Resource Analysis",
-			prompt:      "Analyze EC2 instances, their security groups, attached EBS volumes, IAM roles, and S3 bucket access patterns for cost and security optimization",
-			provider:    "aws",
+			name:         "Complex Multi-Resource Analysis",
+			prompt:       "Analyze EC2 instances, their security groups, attached EBS volumes, IAM roles, and S3 bucket access patterns for cost and security optimization",
+			provider:     "aws",
 			expectTables: 6, // Multiple tables
-			complexity:  "high",
+			complexity:   "high",
 		},
 		{
-			name:        "Storage Security Audit",
-			prompt:      "Find all S3 buckets without encryption, RDS instances publicly accessible, and EBS volumes unencrypted",
-			provider:    "aws",
+			name:         "Storage Security Audit",
+			prompt:       "Find all S3 buckets without encryption, RDS instances publicly accessible, and EBS volumes unencrypted",
+			provider:     "aws",
 			expectTables: 4, // aws_s3_bucket, aws_rds_db_instance, aws_ebs_volume, aws_account
-			complexity:  "medium",
+			complexity:   "medium",
 		},
 		{
-			name:        "Network Security Assessment",
-			prompt:      "Check VPC security groups, NACLs, route tables, and VPC flow logs for potential security issues",
-			provider:    "aws",
+			name:         "Network Security Assessment",
+			prompt:       "Check VPC security groups, NACLs, route tables, and VPC flow logs for potential security issues",
+			provider:     "aws",
 			expectTables: 4, // aws_vpc_security_group, aws_vpc, aws_account, etc.
-			complexity:  "high",
+			complexity:   "high",
 		},
 	}
 
@@ -105,14 +105,14 @@ func TestEinoAgent_PerformanceComparison(t *testing.T) {
 
 			// Record performance metrics
 			result := PerformanceResult{
-				TestCase:           tc.name,
+				TestCase:          tc.name,
 				Complexity:        tc.complexity,
 				TablesIdentified:  len(tables),
 				ExpectedTables:    tc.expectTables,
 				TableIdentTime:    tableIdentTime,
 				PromptEnhanceTime: enhanceTime,
-				TotalTime:        tableIdentTime + enhanceTime,
-				Success:          len(tables) >= 1,
+				TotalTime:         tableIdentTime + enhanceTime,
+				Success:           len(tables) >= 1,
 			}
 			results[tc.name] = result
 
@@ -148,13 +148,13 @@ func TestEinoAgent_ScalabilityBenchmark(t *testing.T) {
 
 	// Test scalability with increasing memory load
 	memorySizes := []int{0, 10, 50, 100, 500}
-	
+
 	for _, size := range memorySizes {
 		t.Run(fmt.Sprintf("Memory_%d_entries", size), func(t *testing.T) {
 			// Populate memory with test data
 			agent.memory.Schemas = make(map[string]TableSchema)
 			agent.memory.Failures = make([]QueryFailure, 0)
-			
+
 			for i := 0; i < size; i++ {
 				agent.memory.Schemas[fmt.Sprintf("aws.table_%d", i)] = TableSchema{
 					TableName: fmt.Sprintf("test_table_%d", i),
@@ -162,8 +162,8 @@ func TestEinoAgent_ScalabilityBenchmark(t *testing.T) {
 				}
 				agent.memory.Failures = append(agent.memory.Failures, QueryFailure{
 					OriginalIntent: fmt.Sprintf("test query %d", i),
-					ErrorType:     "schema",
-					LessonLearned: fmt.Sprintf("lesson %d", i),
+					ErrorType:      "schema",
+					LessonLearned:  fmt.Sprintf("lesson %d", i),
 				})
 			}
 
@@ -222,7 +222,7 @@ func TestEinoAgent_ConcurrencyBenchmark(t *testing.T) {
 		go func(id int) {
 			for j := 0; j < numOperations; j++ {
 				operationStart := time.Now()
-				
+
 				request := InvestigationRequest{
 					Prompt:   fmt.Sprintf("Investigation %d-%d: Find resources with issues", id, j),
 					Provider: "aws",
@@ -297,7 +297,7 @@ func TestEinoAgent_ConcurrencyBenchmark(t *testing.T) {
 func TestEinoAgent_ReliabilityMetrics(t *testing.T) {
 	// This test demonstrates the reliability improvement over the old system
 	// which had ~40% failure rate due to hardcoded solutions
-	
+
 	tempDir := t.TempDir()
 	memoryPath := filepath.Join(tempDir, "agent_memory.json")
 
@@ -315,19 +315,19 @@ func TestEinoAgent_ReliabilityMetrics(t *testing.T) {
 
 	// Test various scenarios that used to fail with the old hardcoded system
 	scenarios := []struct {
-		category    string
-		prompts     []string
-		provider    string
+		category      string
+		prompts       []string
+		provider      string
 		expectSuccess bool
 	}{
 		{
 			category: "Dynamic Resource Discovery",
 			prompts: []string{
 				"Find resources based on custom tags",
-				"Locate instances with specific configurations", 
+				"Locate instances with specific configurations",
 				"Identify resources created in the last week",
 			},
-			provider:     "aws",
+			provider:      "aws",
 			expectSuccess: true,
 		},
 		{
@@ -337,7 +337,7 @@ func TestEinoAgent_ReliabilityMetrics(t *testing.T) {
 				"Show RDS instances with their subnet groups",
 				"List Lambda functions with their IAM roles",
 			},
-			provider:     "aws", 
+			provider:      "aws",
 			expectSuccess: true,
 		},
 		{
@@ -347,17 +347,17 @@ func TestEinoAgent_ReliabilityMetrics(t *testing.T) {
 				"Show buckets without versioning and encryption",
 				"List users without MFA and admin privileges",
 			},
-			provider:     "aws",
+			provider:      "aws",
 			expectSuccess: true,
 		},
 		{
 			category: "Error-Prone Queries",
 			prompts: []string{
 				"Find running instances using wrong column names",
-				"Query non-existent tables gracefully", 
+				"Query non-existent tables gracefully",
 				"Handle malformed query requests",
 			},
-			provider:     "aws",
+			provider:      "aws",
 			expectSuccess: false, // These should be handled gracefully
 		},
 	}
@@ -369,14 +369,14 @@ func TestEinoAgent_ReliabilityMetrics(t *testing.T) {
 	for _, scenario := range scenarios {
 		categorySuccess := 0
 		categoryTotal := len(scenario.prompts)
-		
+
 		for _, prompt := range scenario.prompts {
 			totalTests++
-			
+
 			// Test table identification (core functionality)
 			tables := agent.identifyRelevantTables(prompt, scenario.provider)
 			success := len(tables) > 0
-			
+
 			if success {
 				successfulTests++
 				categorySuccess++
@@ -385,7 +385,7 @@ func TestEinoAgent_ReliabilityMetrics(t *testing.T) {
 			t.Logf("Scenario: %s | Prompt: %s | Success: %v | Tables: %d",
 				scenario.category, prompt, success, len(tables))
 		}
-		
+
 		categoryResults[scenario.category] = CategoryResult{
 			Category:    scenario.category,
 			Total:       categoryTotal,
@@ -399,7 +399,7 @@ func TestEinoAgent_ReliabilityMetrics(t *testing.T) {
 	t.Logf("\n=== RELIABILITY COMPARISON ===")
 	t.Logf("Overall Success Rate: %.1f%% (vs ~60%% for old LLM system)", overallSuccessRate*100)
 	t.Logf("Improvement: +%.1f percentage points", (overallSuccessRate-0.6)*100)
-	
+
 	for category, result := range categoryResults {
 		t.Logf("%s: %.1f%% (%d/%d)", category, result.SuccessRate*100, result.Successful, result.Total)
 	}
@@ -467,8 +467,8 @@ func BenchmarkEinoAgent_PromptEnhancement_WithMemory(b *testing.B) {
 	for i := 0; i < 100; i++ {
 		agent.memory.Failures = append(agent.memory.Failures, QueryFailure{
 			OriginalIntent: fmt.Sprintf("query %d", i),
-			ErrorType:     "schema",
-			LessonLearned: fmt.Sprintf("lesson learned %d", i),
+			ErrorType:      "schema",
+			LessonLearned:  fmt.Sprintf("lesson learned %d", i),
 		})
 	}
 
@@ -487,14 +487,14 @@ func BenchmarkEinoAgent_PromptEnhancement_WithMemory(b *testing.B) {
 // Helper types and functions for performance analysis
 
 type PerformanceResult struct {
-	TestCase           string
+	TestCase          string
 	Complexity        string
 	TablesIdentified  int
 	ExpectedTables    int
 	TableIdentTime    time.Duration
 	PromptEnhanceTime time.Duration
-	TotalTime        time.Duration
-	Success          bool
+	TotalTime         time.Duration
+	Success           bool
 }
 
 type CategoryResult struct {
@@ -506,11 +506,11 @@ type CategoryResult struct {
 
 func analyzePerformanceResults(t *testing.T, results map[string]PerformanceResult) {
 	t.Log("\n=== PERFORMANCE ANALYSIS ===")
-	
+
 	var totalTime time.Duration
 	var totalOperations int
 	successCount := 0
-	
+
 	complexityGroups := map[string][]PerformanceResult{
 		"low":    {},
 		"medium": {},
@@ -550,7 +550,7 @@ func analyzePerformanceResults(t *testing.T, results map[string]PerformanceResul
 		avgTime = avgTime / time.Duration(len(group))
 		successRate = float64(successful) / float64(len(group))
 
-		t.Logf("  %s Complexity: %.1f%% success, %v avg time (%d tests)", 
+		t.Logf("  %s Complexity: %.1f%% success, %v avg time (%d tests)",
 			strings.Title(complexity), successRate*100, avgTime, len(group))
 	}
 }

@@ -2,7 +2,7 @@
 
 # Variables
 BINARY_NAME := ship
-GO_MODULE := github.com/cloudship/ship
+GO_MODULE := github.com/cloudshipai/ship
 VERSION := $(shell git describe --tags --always --dirty)
 BUILD_TIME := $(shell date -u '+%Y-%m-%d %H:%M:%S')
 LDFLAGS := -ldflags "-s -w -X '$(GO_MODULE)/cmd/ship.version=$(VERSION)' -X '$(GO_MODULE)/cmd/ship.commit=$(shell git rev-parse HEAD)' -X '$(GO_MODULE)/cmd/ship.date=$(BUILD_TIME)'"

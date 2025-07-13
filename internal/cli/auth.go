@@ -19,7 +19,7 @@ var (
 var authCmd = &cobra.Command{
 	Use:   "auth",
 	Short: "Authenticate with CloudShip",
-	Long:  `Authenticate with CloudShip using an API key from your CloudShip settings page.
+	Long: `Authenticate with CloudShip using an API key from your CloudShip settings page.
 	
 Get your API key from: https://app.cloudshipai.com/settings/api-keys
 
@@ -51,7 +51,7 @@ func init() {
 
 	authCmd.Flags().StringVar(&authToken, "api-key", "", "CloudShip API key")
 	authCmd.Flags().BoolVar(&logout, "logout", false, "Log out and clear stored credentials")
-	
+
 	// Keep old flag for backwards compatibility
 	authCmd.Flags().StringVar(&authToken, "token", "", "API token (deprecated, use --api-key)")
 	authCmd.Flags().MarkDeprecated("token", "use --api-key instead")
@@ -67,14 +67,14 @@ func handleAuth(token string) error {
 	// Validate API key by attempting a simple API call
 	fmt.Println("Validating API key...")
 	client := cloudship.NewClient(token)
-	
+
 	// Try to list artifacts with a dummy fleet ID to validate the API key
 	// The API will return 401 if the key is invalid
 	testReq := &cloudship.ListArtifactsRequest{
 		FleetID: "test",
 		Limit:   1,
 	}
-	
+
 	_, err = client.ListArtifacts(testReq)
 	if err != nil {
 		// Check if it's an auth error

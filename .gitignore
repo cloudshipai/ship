@@ -17,6 +17,9 @@ coverage.*
 *.coverprofile
 profile.cov
 
+# Config files in root (should be in ~/.ship/)
+.mcp.json
+
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
@@ -33,7 +36,12 @@ go.work.sum
 
 # Ship CLI binary
 ship
+ship-*
+
+# Build artifacts  
 dist/
+*.exe
+*.exe~
 test-fresh/
 
 # Temporary test files and scripts (should be in scripts/ or test/ dirs)

@@ -108,7 +108,7 @@ func runInvestigate(cmd *cobra.Command, args []string) error {
 
 	// Prepare credentials
 	credentials := getProviderCredentials(provider)
-	
+
 	// Set region if provided
 	if region != "" {
 		credentials["AWS_REGION"] = region
@@ -125,7 +125,7 @@ func runInvestigate(cmd *cobra.Command, args []string) error {
 
 	// Execute investigation
 	slog.Info("Starting Eino-powered investigation", "prompt", prompt, "provider", provider)
-	
+
 	result, err := investigationAgent.Investigate(ctx, request)
 	if err != nil {
 		return fmt.Errorf("investigation failed: %w", err)
@@ -149,7 +149,7 @@ func displayInvestigationResult(result *agent.InvestigationResult, prompt, provi
 	fmt.Println("\n" + strings.Repeat("=", 70))
 	fmt.Println("🤖 EINO AGENT INVESTIGATION RESULTS")
 	fmt.Println(strings.Repeat("=", 70))
-	
+
 	fmt.Printf("\n📋 Investigation: %s\n", prompt)
 	fmt.Printf("🔍 Provider: %s", provider)
 	if region != "" {
@@ -195,7 +195,7 @@ func displayInvestigationResult(result *agent.InvestigationResult, prompt, provi
 	fmt.Println(result.Summary)
 
 	fmt.Println("\n" + strings.Repeat("=", 70))
-	
+
 	// Show next steps
 	fmt.Println("\n💡 What's Next:")
 	fmt.Println("- Run 'ship terraform-tools checkov-scan' for detailed security analysis")

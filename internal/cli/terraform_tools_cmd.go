@@ -617,7 +617,7 @@ func pushToCloudShip(cmd *cobra.Command, output string, scanType string, outputF
 
 	// Upload artifact
 	fmt.Printf("\nPushing results to CloudShip...\n")
-	
+
 	resp, err := client.UploadArtifact(req)
 	if err != nil {
 		return err
@@ -627,7 +627,6 @@ func pushToCloudShip(cmd *cobra.Command, output string, scanType string, outputF
 	green := color.New(color.FgGreen)
 	green.Printf("✓ Successfully pushed to CloudShip!\n")
 	fmt.Printf("Artifact ID: %s\n", resp.ArtifactID)
-	
+
 	return nil
 }
-

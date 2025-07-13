@@ -61,11 +61,11 @@ func GetCommonSteampipeTables(provider string) []string {
 			"gcp_pubsub_topic",
 		},
 	}
-	
+
 	if providerTables, ok := tables[provider]; ok {
 		return providerTables
 	}
-	
+
 	// Default return empty if provider not found
 	return []string{}
 }
@@ -74,36 +74,36 @@ func GetCommonSteampipeTables(provider string) []string {
 func GetSteampipeTableExamples(provider string) map[string]string {
 	examples := map[string]map[string]string{
 		"aws": {
-			"Count S3 buckets":          "SELECT COUNT(*) as bucket_count FROM aws_s3_bucket",
-			"List S3 buckets":           "SELECT name, region FROM aws_s3_bucket LIMIT 10",
-			"Check S3 encryption":       "SELECT name, server_side_encryption_configuration FROM aws_s3_bucket LIMIT 5",
-			"Count EC2 instances":       "SELECT COUNT(*) as instance_count FROM aws_ec2_instance",
-			"Count running EC2s":        "SELECT COUNT(*) as running_count FROM aws_ec2_instance WHERE instance_state = 'running'",
-			"List EC2 instances":        "SELECT instance_id, instance_type, instance_state, region, vpc_id FROM aws_ec2_instance",
-			"List IAM users":            "SELECT name, create_date, mfa_enabled, password_last_used FROM aws_iam_user",
-			"IAM users without MFA":     "SELECT name, create_date FROM aws_iam_user WHERE NOT mfa_enabled",
-			"List IAM roles":            "SELECT name, arn, create_date FROM aws_iam_role",
-			"List IAM policies":         "SELECT name, arn, attachment_count FROM aws_iam_policy WHERE is_attachable = true",
-			"Public RDS instances":      "SELECT db_instance_identifier, engine FROM aws_rds_db_instance WHERE publicly_accessible = true",
-			"S3 bucket encryption":      "SELECT name, server_side_encryption_configuration FROM aws_s3_bucket",
-			"Check account info":        "SELECT account_id, arn FROM aws_account",
-			"EC2 security groups":       "SELECT i.instance_id, sg->>'GroupId' as group_id FROM aws_ec2_instance i, jsonb_array_elements(i.security_groups) as sg",
+			"Count S3 buckets":      "SELECT COUNT(*) as bucket_count FROM aws_s3_bucket",
+			"List S3 buckets":       "SELECT name, region FROM aws_s3_bucket LIMIT 10",
+			"Check S3 encryption":   "SELECT name, server_side_encryption_configuration FROM aws_s3_bucket LIMIT 5",
+			"Count EC2 instances":   "SELECT COUNT(*) as instance_count FROM aws_ec2_instance",
+			"Count running EC2s":    "SELECT COUNT(*) as running_count FROM aws_ec2_instance WHERE instance_state = 'running'",
+			"List EC2 instances":    "SELECT instance_id, instance_type, instance_state, region, vpc_id FROM aws_ec2_instance",
+			"List IAM users":        "SELECT name, create_date, mfa_enabled, password_last_used FROM aws_iam_user",
+			"IAM users without MFA": "SELECT name, create_date FROM aws_iam_user WHERE NOT mfa_enabled",
+			"List IAM roles":        "SELECT name, arn, create_date FROM aws_iam_role",
+			"List IAM policies":     "SELECT name, arn, attachment_count FROM aws_iam_policy WHERE is_attachable = true",
+			"Public RDS instances":  "SELECT db_instance_identifier, engine FROM aws_rds_db_instance WHERE publicly_accessible = true",
+			"S3 bucket encryption":  "SELECT name, server_side_encryption_configuration FROM aws_s3_bucket",
+			"Check account info":    "SELECT account_id, arn FROM aws_account",
+			"EC2 security groups":   "SELECT i.instance_id, sg->>'GroupId' as group_id FROM aws_ec2_instance i, jsonb_array_elements(i.security_groups) as sg",
 		},
 		"azure": {
-			"List VMs":                   "SELECT name, location, vm_size FROM azure_compute_virtual_machine",
-			"Check storage encryption":   "SELECT name, encryption FROM azure_storage_account",
-			"List SQL databases":         "SELECT name, edition, service_level_objective FROM azure_sql_database",
+			"List VMs":                 "SELECT name, location, vm_size FROM azure_compute_virtual_machine",
+			"Check storage encryption": "SELECT name, encryption FROM azure_storage_account",
+			"List SQL databases":       "SELECT name, edition, service_level_objective FROM azure_sql_database",
 		},
 		"gcp": {
-			"List compute instances":     "SELECT name, machine_type, status FROM gcp_compute_instance",
-			"Check bucket permissions":   "SELECT name, location, storage_class FROM gcp_storage_bucket",
-			"List Kubernetes clusters":   "SELECT name, location, status FROM gcp_kubernetes_cluster",
+			"List compute instances":   "SELECT name, machine_type, status FROM gcp_compute_instance",
+			"Check bucket permissions": "SELECT name, location, storage_class FROM gcp_storage_bucket",
+			"List Kubernetes clusters": "SELECT name, location, status FROM gcp_kubernetes_cluster",
 		},
 	}
-	
+
 	if providerExamples, ok := examples[provider]; ok {
 		return providerExamples
 	}
-	
+
 	return map[string]string{}
 }

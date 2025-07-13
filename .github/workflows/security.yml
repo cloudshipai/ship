@@ -28,9 +28,9 @@ jobs:
         cache: true
         
     - name: Run Gosec Security Scanner
-      run: |
-        go install github.com/securecodewarrior/gosec/cmd/gosec@latest
-        gosec -fmt sarif -out gosec.sarif ./...
+      uses: securecodewarrior/github-action-gosec@master
+      with:
+        args: '-fmt sarif -out gosec.sarif ./...'
         
     - name: Upload SARIF file
       if: always()

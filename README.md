@@ -11,8 +11,7 @@ CloudshipAI CLI - A powerful command-line tool that brings enterprise-grade infr
 - **💰 Cost Estimation**: Estimate infrastructure costs with Infracost and OpenInfraQuote
 - **📝 Documentation Generation**: Auto-generate beautiful Terraform module documentation
 - **📊 Infrastructure Diagrams**: Visualize your infrastructure with InfraMap integration
-- **🧠 Reliable AI Infrastructure Investigation**: 95%+ accurate natural language queries powered by Eino framework
-- **🔎 Real-time Cloud Analysis**: Investigate live AWS, Azure, and GCP resources with Steampipe
+- **🔍 Infrastructure Diagram Generation**: Create visual diagrams from Terraform configurations
 - **🤖 AI Assistant Integration**: Built-in MCP server for Claude Desktop, Cursor, and other AI tools
 - **🔌 Extensible Module System**: Add custom tools and Dagger functions without modifying core CLI
 - **🐳 Containerized Tools**: All tools run in containers via Dagger - no local installations needed
@@ -148,89 +147,7 @@ cd /path/to/your/terraform/project
 ship terraform-tools generate-diagram . --hcl -o docs/infrastructure-diagram.png
 ```
 
-### 5. AI-Powered Infrastructure Investigation (New & Improved!)
-
-**🚀 Now powered by ByteDance's Eino framework for 95%+ accuracy (previously ~40%)**
-
-Ship CLI's new AI investigation system provides reliable, accurate infrastructure analysis using advanced natural language processing:
-
-#### Reliable AI Investigation with Eino Framework
-
-Query your live cloud infrastructure using natural language with the new Eino-powered AI system:
-
-```bash
-# Configure AWS credentials (Ship CLI will use your existing AWS config)
-export AWS_PROFILE=your-profile  # or use default
-export OPENAI_API_KEY=your-openai-key  # Required for AI analysis
-
-# Ask questions about your infrastructure in natural language
-ship investigate --prompt "Show me all my S3 buckets with their creation dates and regions"
-
-ship investigate --prompt "Check for security issues in my AWS account"
-
-ship investigate --prompt "List all running EC2 instances with their IP addresses"
-
-ship investigate --prompt "Show me any unused or idle resources that might be costing money"
-
-ship investigate --prompt "Find all publicly accessible RDS instances"
-
-# Save results for later review
-ship investigate --prompt "Comprehensive security audit" --save-results
-
-# Use specific region
-ship investigate --prompt "Check EC2 instances in us-west-2" --region us-west-2
-```
-
-#### Advanced Investigation Examples
-
-```bash
-# Security & Compliance
-ship investigate --prompt "Find all security groups allowing inbound traffic from 0.0.0.0/0"
-ship investigate --prompt "Show me IAM users without MFA enabled"
-ship investigate --prompt "List S3 buckets with public access or no encryption"
-ship investigate --prompt "Find RDS instances that are publicly accessible"
-
-# Cost Optimization
-ship investigate --prompt "Find unused EBS volumes and calculate their monthly cost"
-ship investigate --prompt "List EC2 instances that have been stopped for more than 30 days"
-ship investigate --prompt "Show me oversized instances with low CPU utilization"
-
-# Operations & Monitoring
-ship investigate --prompt "List all Lambda functions with errors in the last 24 hours"
-ship investigate --prompt "Show EC2 instances without proper backup tags"
-ship investigate --prompt "Find load balancers with unhealthy targets"
-```
-
-#### What's New in the Eino System:
-
-1. **95%+ Accuracy**: Dramatically improved from the previous ~40% success rate
-2. **Reliable Query Generation**: Uses ByteDance's proven Eino framework for consistent results
-3. **Enhanced Natural Language Understanding**: Better interpretation of complex investigation requests
-4. **Automatic Schema Learning**: Learns from successful queries to improve future responses
-5. **Memory Persistence**: Remembers patterns and improves over time
-6. **Comprehensive Result Display**: Rich formatting with insights, recommendations, and next steps
-7. **Multi-Provider Support**: Enhanced support for AWS, Azure, and GCP
-
-#### Performance Comparison:
-
-| Metric | Old LLM System | New Eino System |
-|--------|---------------|-----------------|
-| **Accuracy** | ~40% | 95%+ |
-| **Query Success Rate** | 60% | 98% |
-| **Response Time** | 15-30s | 8-15s |
-| **Memory Learning** | None | Persistent |
-| **Error Recovery** | Limited | Advanced |
-
-#### How the New System Works:
-1. **Advanced NLP**: Eino framework analyzes your prompt with superior accuracy
-2. **Smart Query Generation**: Generates reliable Steampipe SQL queries based on proven patterns
-3. **Schema-Aware Processing**: Understands cloud provider schemas and relationships
-4. **Intelligent Investigation Plans**: Creates multi-step analysis workflows
-5. **Real-Time Execution**: Executes queries against your live cloud infrastructure with error handling
-6. **Rich Insights**: Provides security findings, cost optimization tips, and actionable recommendations
-7. **Learning & Adaptation**: Improves performance based on successful query patterns
-
-### 6. AI Assistant Integration (MCP)
+### 5. AI Assistant Integration (MCP)
 
 Ship CLI includes a built-in MCP (Model Context Protocol) server that makes all functionality available to AI assistants like Claude Desktop and Cursor:
 
@@ -253,18 +170,19 @@ ship mcp
 ```
 
 **What AI assistants can do with Ship CLI:**
-- **Infrastructure Investigation**: "Check my AWS account for security issues"
 - **Terraform Analysis**: "Analyze this Terraform code for costs and security"
-- **Cost Optimization**: "Find unused resources in my cloud account"
 - **Documentation**: "Generate docs for this Terraform module"
-- **Compliance Audits**: "Run a compliance check on my infrastructure"
+- **Cost Analysis**: "Estimate infrastructure costs for this project"
+- **Security Scanning**: "Run security scans on this Terraform configuration"
+- **Infrastructure Diagrams**: "Generate a visual diagram of this infrastructure"
 
 **Available MCP Tools:**
-- `investigate` - Reliable AI-powered infrastructure investigation with Eino framework
 - `terraform_lint` - Code linting and best practices
-- `terraform_security_scan` - Security analysis
-- `terraform_cost_estimate` - Cost estimation
+- `terraform_checkov_scan` - Security analysis with Checkov
+- `terraform_security_scan` - Security analysis with Trivy
+- `terraform_cost_analysis` - Cost estimation with OpenInfraQuote
 - `terraform_generate_docs` - Documentation generation
+- `terraform_generate_diagram` - Infrastructure diagram generation
 - `cloudship_push` - Upload artifacts for AI analysis
 
 **Pre-built Workflows:**
@@ -273,7 +191,7 @@ ship mcp
 
 See the [MCP Integration Guide](docs/mcp-integration.md) for complete setup instructions.
 
-### 7. CI/CD Integration
+### 6. CI/CD Integration
 
 ```yaml
 # GitHub Actions Example
@@ -303,7 +221,7 @@ jobs:
 
 | Tool | Command | Description | Docker Image |
 |------|---------|-------------|--------------|
-| **Eino AI Agent** | `ship investigate` | Reliable AI-powered infrastructure investigation (95%+ accuracy) | `turbot/steampipe:latest` |
+| **InfraMap** | `ship terraform-tools generate-diagram` | Infrastructure diagram generation | `cycloid/inframap:latest` |
 | **TFLint** | `ship terraform-tools lint` | Terraform linter for syntax and best practices | `ghcr.io/terraform-linters/tflint` |
 | **Checkov** | `ship terraform-tools checkov-scan` | Comprehensive security and compliance scanner | `bridgecrew/checkov` |
 | **Infracost** | `ship terraform-tools cost-estimate` | Cloud cost estimation with breakdown | `infracost/infracost` |
@@ -329,18 +247,16 @@ ship modules list --type docker --source user
 ship modules list --trusted  # Show only trusted modules
 ```
 
-### AI-Powered Investigation
+### Infrastructure Diagrams
 ```bash
-# Natural language infrastructure investigation
-ship ai-investigate --prompt "Show me all S3 buckets" --execute
-ship ai-investigate --prompt "Check for security issues" --execute  
-ship ai-investigate --prompt "Find unused resources costing money" --execute
+# Generate diagram from Terraform files
+ship terraform-tools generate-diagram . --hcl --format png
 
-# Use specific AWS profile/region
-ship ai-investigate --prompt "List running instances" --aws-profile prod --aws-region us-west-2 --execute
+# Generate from state file
+ship terraform-tools generate-diagram terraform.tfstate --format svg
 
-# Preview queries without execution
-ship ai-investigate --prompt "Security audit" --provider aws
+# Filter by provider
+ship terraform-tools generate-diagram . --hcl --provider aws --format png
 ```
 
 ### Linting
@@ -412,31 +328,25 @@ ship terraform-tools generate-docs --format json
 ship terraform-tools generate-docs --show-examples
 ```
 
-### AI Infrastructure Investigation (New Eino Framework)
+### Infrastructure Diagram Generation
 ```bash
-# Reliable AI investigation with natural language
-ship investigate --prompt "Show me my S3 buckets"
+# Generate PNG diagram from Terraform HCL files
+ship terraform-tools generate-diagram . --hcl --format png -o infrastructure.png
 
-# Security analysis with comprehensive insights
-ship investigate --prompt "Check for security issues"
+# Generate SVG diagram from state file
+ship terraform-tools generate-diagram terraform.tfstate --format svg -o current-state.svg
 
-# Use specific cloud provider and region
-ship investigate --prompt "List running instances" --provider aws --region us-west-2
+# Generate DOT format for programmatic processing
+ship terraform-tools generate-diagram . --hcl --format dot -o infrastructure.dot
 
-# Cost analysis investigation with optimization tips
-ship investigate --prompt "Show me expensive resources that might be optimized"
+# Filter by specific cloud provider
+ship terraform-tools generate-diagram . --hcl --provider aws --format png
 
-# Security-focused investigation with detailed findings
-ship investigate --prompt "Find all publicly accessible resources"
+# Generate raw diagram showing all resources
+ship terraform-tools generate-diagram terraform.tfstate --raw --format svg
 
-# Compliance investigation with recommendations
-ship investigate --prompt "Check encryption status across all resources"
-
-# Save investigation results for later review
-ship investigate --prompt "Comprehensive security audit" --save-results
-
-# Use custom memory path for agent learning
-ship investigate --prompt "Analyze security posture" --memory-path ./security-memory.json
+# Generate PDF for documentation
+ship terraform-tools generate-diagram . --hcl --format pdf -o docs/infrastructure.pdf
 ```
 
 ## 🔐 Authentication

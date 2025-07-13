@@ -1,0 +1,4 @@
+Initializing Dagger engine...
+Generating documentation for: .
+✓ Documentation generated!
+Output saved to: README.md

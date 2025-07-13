@@ -1,0 +1,19 @@
+strict digraph G {
+	"aws_nat_gateway.main"->"aws_eip.nat";
+	"aws_nat_gateway.main"->"aws_internet_gateway.main";
+	"aws_lb.main"->"aws_launch_template.web";
+	"aws_launch_template.web"->"aws_db_instance.main";
+	"aws_autoscaling_group.web"->"aws_launch_template.web";
+	"im_out.tcp/80->80"->"aws_lb.main";
+	"im_out.tcp/443->443"->"aws_lb.main";
+	"aws_autoscaling_group.web" [ height=1.15, image="/root/.cache/inframap/assets/aws/Compute/Amazon-EC2-Auto-Scaling.png", imagepos=tc, labelloc=b, shape=plaintext ];
+	"aws_db_instance.main" [ height=1.15, image="/root/.cache/inframap/assets/aws/Database/Amazon-RDS.png", imagepos=tc, labelloc=b, shape=plaintext ];
+	"aws_eip.nat" [ height=1.15, image="/root/.cache/inframap/assets/aws/Compute/Amazon-EC2_Elastic-IP-Address_light-bg.png", imagepos=tc, labelloc=b, shape=plaintext ];
+	"aws_internet_gateway.main" [ height=1.15, image="/root/.cache/inframap/assets/aws/Networking_and_Content_Delivery/Amazon-VPC_Internet-Gateway_light-bg.png", imagepos=tc, labelloc=b, shape=plaintext ];
+	"aws_launch_template.web" [ height=1.15, image="/root/.cache/inframap/assets/aws/Compute/Amazon-EC2-Auto-Scaling.png", imagepos=tc, labelloc=b, shape=plaintext ];
+	"aws_lb.main" [ height=1.15, image="/root/.cache/inframap/assets/aws/Networking_and_Content_Delivery/Elastic-Load-Balancing.png", imagepos=tc, labelloc=b, shape=plaintext ];
+	"aws_nat_gateway.main" [ height=1.15, image="/root/.cache/inframap/assets/aws/Networking_and_Content_Delivery/Amazon-VPC_NAT-Gateway_light-bg.png", imagepos=tc, labelloc=b, shape=plaintext ];
+	"im_out.tcp/443->443" [ height=1.15, image="/root/.cache/inframap/assets/im/baseline_cloud_queue_black.png", imagepos=tc, labelloc=b, shape=plaintext ];
+	"im_out.tcp/80->80" [ height=1.15, image="/root/.cache/inframap/assets/im/baseline_cloud_queue_black.png", imagepos=tc, labelloc=b, shape=plaintext ];
+
+}

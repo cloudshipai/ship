@@ -1,0 +1,6 @@
+Initializing Dagger engine...
+Linting Terraform code in: .
+
+✓ Linting completed!
+
+{"issues":[],"errors":[]}

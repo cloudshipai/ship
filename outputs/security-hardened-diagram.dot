@@ -1,0 +1,8 @@
+strict digraph G {
+	"aws_instance.app"->"aws_db_instance.main";
+	"im_out.tcp/22->22"->"aws_instance.app";
+	"aws_db_instance.main" [ height=1.15, image="/root/.cache/inframap/assets/aws/Database/Amazon-RDS.png", imagepos=tc, labelloc=b, shape=plaintext ];
+	"aws_instance.app" [ height=1.15, image="/root/.cache/inframap/assets/aws/Compute/Amazon-EC2.png", imagepos=tc, labelloc=b, shape=plaintext ];
+	"im_out.tcp/22->22" [ height=1.15, image="/root/.cache/inframap/assets/im/baseline_cloud_queue_black.png", imagepos=tc, labelloc=b, shape=plaintext ];
+
+}

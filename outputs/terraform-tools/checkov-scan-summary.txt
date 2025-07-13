@@ -1,0 +1,50 @@
+Initializing Dagger engine...
+Scanning Terraform code with Checkov in: .
+
+✓ Checkov scan completed!
+
+{
+    "check_type": "terraform",
+    "results": {
+        "passed_checks": [
+            {
+                "check_id": "CKV_AWS_41",
+                "bc_check_id": "BC_AWS_SECRETS_5",
+                "check_name": "Ensure no hard coded AWS access key and secret key exists in provider",
+                "check_result": {
+                    "result": "PASSED",
+                    "evaluated_keys": []
+                },
+                "code_block": [
+                    [
+                        11,
+                        "provider \"aws\" {\n"
+                    ],
+                    [
+                        12,
+                        "  region = var.aws_region\n"
+                    ],
+                    [
+                        13,
+                        "}\n"
+                    ]
+                ],
+                "file_path": "/main.tf",
+                "file_abs_path": "/workspace/main.tf",
+                "repo_file_path": "/main.tf",
+                "file_line_range": [
+                    11,
+                    13
+                ],
+                "resource": "aws.default",
+                "evaluations": null,
+                "check_class": "checkov.terraform.checks.provider.aws.credentials",
+                "fixed_definition": null,
+                "entity_tags": null,
+                "caller_file_path": null,
+                "caller_file_line_range": null,
+                "resource_address": null,
+                "severity": null,
+                "bc_category": null,
+                "benchmarks": null,
+                "description": null,

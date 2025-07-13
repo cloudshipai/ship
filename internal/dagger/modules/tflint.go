@@ -24,16 +24,25 @@ func NewTFLintModule(client *dagger.Client) *TFLintModule {
 
 // LintDirectory lints all Terraform files in a directory
 func (m *TFLintModule) LintDirectory(ctx context.Context, dir string) (string, error) {
-	container := m.client.Container().
+	// Initialize TFLint first
+	initContainer := m.client.Container().
 		From("ghcr.io/terraform-linters/tflint:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{
-			"tflint",
-			"--format", "json",
-		})
+		WithExec([]string{"tflint", "--init"})
 
-	output, err := container.Stdout(ctx)
+	// Sync to ensure init completes
+	_, err := initContainer.Sync(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to initialize tflint: %w", err)
+	}
+
+	// Run TFLint - use a bash wrapper to capture output regardless of exit code
+	lintContainer := initContainer.WithExec([]string{
+		"sh", "-c", "tflint --format json || true",
+	})
+
+	output, err := lintContainer.Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to run tflint: %w", err)
 	}

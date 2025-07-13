@@ -1,651 +1,338 @@
-# Ship CLI - LLM Instructions
+# Ship CLI - MCP (Model Context Protocol) Server
 
-This file contains comprehensive instructions for Large Language Models (LLMs) on how to use, install, and integrate with the Ship CLI tool.
+Ship CLI provides an MCP server that exposes 7 powerful Terraform analysis tools for AI assistants like Claude Code, Cursor, and other MCP-compatible clients.
 
-## What is Ship CLI?
+## Quick Start
 
-Ship CLI is a powerful command-line tool that brings enterprise-grade infrastructure analysis tools to your fingertips. It's designed specifically to work well with AI assistants and LLMs through its built-in MCP (Model Context Protocol) server and AI-powered investigation capabilities.
+1. **Start the MCP Server**:
+   ```bash
+   ship mcp
+   ```
 
-## Installation
+2. **Configure in Claude Code** (add to `~/.config/claude-code/claude_desktop_config.json`):
+   ```json
+   {
+     "mcpServers": {
+       "ship-cli": {
+         "command": "/path/to/ship",
+         "args": ["mcp"]
+       }
+     }
+   }
+   ```
 
-### Method 1: Go Install (Recommended)
-```bash
-# Clear Go module cache first (if you've tried installing before)
-go clean -modcache
+3. **Use the tools** in your AI assistant conversations
 
-# Install latest version
-go install github.com/cloudshipai/ship/cmd/ship@main
+## Available MCP Tools
 
-# Verify installation
-ship version
+### 1. terraform_lint
+**Description**: Run TFLint on Terraform code to check for syntax errors and best practices
+**Parameters**:
+- `directory` (optional): Directory containing Terraform files (default: current directory)  
+- `format` (optional): Output format: default, json, compact
+- `output` (optional): Output file to save lint results
+
+**Example Usage**:
+```javascript
+terraform_lint({
+  directory: "./examples/aws-web-app",
+  format: "json"
+})
 ```
 
-### Method 2: Build from Source
-```bash
-git clone https://github.com/cloudshipai/ship.git
-cd ship
-go build -o ship ./cmd/ship
-sudo mv ship /usr/local/bin/
+### 2. terraform_checkov_scan
+**Description**: Run Checkov security scan on Terraform code for policy compliance
+**Parameters**:
+- `directory` (optional): Directory containing Terraform files (default: current directory)
+- `format` (optional): Output format: cli, json, junit, sarif
+- `output` (optional): Output file to save scan results
+
+**Example Usage**:
+```javascript
+terraform_checkov_scan({
+  directory: "./examples/security-hardened",
+  format: "json"
+})
 ```
 
-## Core Capabilities
+### 3. terraform_security_scan
+**Description**: Run alternative security scan on Terraform code using Trivy
+**Parameters**:
+- `directory` (optional): Directory containing Terraform files (default: current directory)
 
-Ship CLI provides these main functionalities:
-
-1. **Terraform Analysis**: Linting, security scanning, cost estimation, documentation generation
-2. **Infrastructure Diagrams**: Visual representation of Terraform configurations using InfraMap
-3. **AI-Powered Investigation**: Natural language queries against cloud infrastructure
-4. **Real-time Cloud Analysis**: Live AWS/Azure/GCP resource investigation with Steampipe
-5. **MCP Server**: Built-in server for AI assistant integration
-6. **Containerized Tools**: All tools run in containers - no local installations needed
-
-## Quick Start Examples
-
-### Basic Terraform Operations
-```bash
-# Lint Terraform files
-ship terraform-tools lint
-
-# Security scan
-ship terraform-tools security-scan
-
-# Generate documentation
-ship terraform-tools generate-docs > README.md
-
-# Estimate costs (two options)
-ship terraform-tools cost-estimate  # Uses Infracost
-ship terraform-tools cost-analysis  # Uses OpenInfraQuote (more accurate)
-
-# Generate infrastructure diagram
-ship terraform-tools generate-diagram . --hcl --format png -o infrastructure.png
+**Example Usage**:
+```javascript
+terraform_security_scan({
+  directory: "./examples/aws-web-app"
+})
 ```
 
-### AI-Powered Infrastructure Investigation
-```bash
-# Set up AWS credentials first
-export AWS_PROFILE=your-profile
+### 4. terraform_cost_analysis
+**Description**: Analyze infrastructure costs using OpenInfraQuote
+**Parameters**:
+- `directory` (optional): Directory containing Terraform files (default: current directory)
+- `region` (optional): AWS region for pricing (e.g., us-east-1, us-west-2)
+- `format` (optional): Output format: json, table
+- `output` (optional): Output file to save cost analysis
 
-# Ask questions about your infrastructure
-ship ai-investigate --prompt "Show me all my S3 buckets with their creation dates" --execute
-
-ship ai-investigate --prompt "Check for security issues in my AWS account" --execute
-
-ship ai-investigate --prompt "List all running EC2 instances with their costs" --execute
+**Example Usage**:
+```javascript
+terraform_cost_analysis({
+  directory: "./examples/cost-optimized",
+  region: "us-east-1",
+  format: "json"
+})
 ```
 
-### Autonomous AI Agent
-```bash
-# Let AI agent investigate and fix issues automatically
-ship ai-agent --task "Perform complete security audit of AWS infrastructure"
+### 5. terraform_generate_docs
+**Description**: Generate documentation for Terraform modules using terraform-docs
+**Parameters**:
+- `directory` (optional): Directory containing Terraform files (default: current directory)
+- `filename` (optional): Filename to save documentation as (default README.md)
+- `output` (optional): Output file to save documentation
 
-ship ai-agent --task "Optimize costs for our production environment"
-
-ship ai-agent --task "Document all Terraform modules and check for compliance"
+**Example Usage**:
+```javascript
+terraform_generate_docs({
+  directory: "./examples/serverless-api",
+  filename: "TERRAFORM.md"
+})
 ```
 
-## CloudShip Integration
+### 6. terraform_generate_diagram
+**Description**: Generate infrastructure diagrams from Terraform state or HCL files
+**Parameters**:
+- `input` (optional): Input directory or file containing Terraform files (default: current directory)
+- `format` (optional): Output format: png, svg, pdf, dot
+- `output` (optional): Output file to save diagram
+- `hcl` (optional): Generate from HCL files instead of state file (boolean)
+- `provider` (optional): Filter by specific provider (aws, google, azurerm)
 
-Ship CLI can push analysis results to CloudShip for centralized management and AI-powered insights.
+**Example Usage**:
+```javascript
+// For Terraform directories (HCL files)
+terraform_generate_diagram({
+  input: "./examples/aws-web-app",
+  format: "png",
+  hcl: true,
+  output: "infrastructure.png"
+})
 
-### Authentication
-```bash
-# Get your API key from https://app.cloudshipai.com/settings/api-keys
-ship auth --api-key YOUR_API_KEY
-
-# Or use environment variable
-export CLOUDSHIP_API_KEY=your-api-key
-export CLOUDSHIP_FLEET_ID=your-fleet-id
+// For Terraform state files  
+terraform_generate_diagram({
+  input: "terraform.tfstate",
+  format: "svg"
+})
 ```
 
-### Automatic Push
-All terraform-tools commands support automatic push to CloudShip:
-```bash
-# Push results automatically after analysis
-ship terraform-tools security-scan --push
-ship terraform-tools cost-estimate --push --push-tags "production,aws"
-ship terraform-tools lint --push --push-metadata "environment=prod,team=infrastructure"
+### 7. cloudship_push
+**Description**: Upload and analyze infrastructure artifacts with Cloudship AI
+**Parameters**:
+- `file` (required): Path to the file to upload (Terraform plan, SBOM, etc.)
+- `type` (optional): Type of artifact being uploaded (terraform-plan, sbom, dockerfile, kubernetes-manifest)
+
+**Example Usage**:
+```javascript
+cloudship_push({
+  file: "./terraform.tfplan",
+  type: "terraform-plan"
+})
 ```
 
-### Manual Push
-```bash
-# Generate analysis and push manually
-ship terraform-tools checkov-scan -o scan-results.json
-ship push scan-results.json --type security_scan --fleet-id your-fleet-id --tags "critical,production"
+## Best Practices
+
+### 1. Working with Terraform Directories
+Most tools work with Terraform directories. Ensure your directory contains valid `.tf` files:
+```javascript
+terraform_lint({ directory: "./my-terraform-project" })
 ```
 
-## MCP Server Setup for AI Assistants
-
-Ship CLI includes a built-in MCP server that makes all functionality available to AI assistants like Claude Desktop, Cursor, and other MCP-compatible tools.
-
-### Configuration for Claude Desktop
-
-Add this to your Claude Desktop MCP settings file:
-
-**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "ship-cli": {
-      "command": "ship",
-      "args": ["mcp"],
-      "env": {
-        "AWS_PROFILE": "your-aws-profile"
-      }
-    }
-  }
-}
+### 2. Cost Analysis
+For accurate cost analysis, specify the correct AWS region:
+```javascript
+terraform_cost_analysis({
+  directory: "./infrastructure",
+  region: "us-west-2",
+  format: "json"
+})
 ```
 
-### Configuration for Cursor
+### 3. Diagram Generation
+- Use `hcl: true` for Terraform directories with `.tf` files
+- Use `hcl: false` (default) for Terraform state files
+- PNG/SVG formats are best for viewing, DOT format for programmatic processing
 
-Add to your Cursor MCP configuration:
-
-```json
-{
-  "mcpServers": {
-    "ship-cli": {
-      "command": "ship",
-      "args": ["mcp"],
-      "env": {
-        "AWS_PROFILE": "your-aws-profile"
-      }
-    }
-  }
-}
+### 4. Security Scanning
+Combine multiple security tools for comprehensive coverage:
+```javascript
+// Run both Checkov and Trivy scans
+terraform_checkov_scan({ directory: "./project" })
+terraform_security_scan({ directory: "./project" })
 ```
 
-### Available MCP Tools
-
-Once configured, these tools become available to your AI assistant:
-
-- `steampipe_query`: Execute SQL queries against cloud infrastructure
-- `terraform_lint`: Lint Terraform files for errors and best practices
-- `terraform_docs`: Generate documentation for Terraform modules
-- `security_scan`: Scan for security vulnerabilities
-- `cost_analysis`: Estimate infrastructure costs
-- `inframap_diagram`: Generate visual infrastructure diagrams
-
-## Common LLM Use Cases
-
-### 1. Infrastructure Analysis
-Ask your AI assistant:
-- "Use Ship CLI to analyze the security posture of my AWS account"
-- "Generate a cost report for my Terraform infrastructure"
-- "Create documentation for all my Terraform modules"
-- "Show me a visual diagram of my infrastructure"
-
-### 2. Troubleshooting
-- "Help me find why my Terraform plan is failing using Ship CLI"
-- "Use Ship CLI to identify security issues in my cloud resources"
-- "Check if there are any unused resources costing money"
-
-### 3. Automation
-- "Create a Ship CLI command to automatically document my infrastructure"
-- "Set up a security scan workflow using Ship CLI"
-- "Generate a complete infrastructure audit report"
-
-## Advanced AI Integration
-
-### Microservices Architecture
-```bash
-# Run Ship tools as separate HTTP services
-ship ai-services --task "Complete infrastructure analysis" --show-endpoints
-
-# Keep services running for other tools to use
-ship ai-services --task "Security audit" --keep-services
-
-# Export service endpoints for integration
-ship ai-services --task "Cost analysis" --export-endpoints services.json
+### 5. Documentation Generation
+Generate documentation before deploying infrastructure:
+```javascript
+terraform_generate_docs({
+  directory: "./modules/vpc",
+  output: "./docs/vpc-module.md"
+})
 ```
 
-### Service Endpoints Available
-When running in microservices mode, these HTTP endpoints become available:
-- `http://steampipe:8001` - Cloud infrastructure queries
-- `http://cost-analysis:8002` - Cost estimation
-- `http://terraform-docs:8003` - Documentation generation
-- `http://security-scan:8004` - Security scanning
-- `http://inframap:8005` - Infrastructure diagrams
+## Output Handling
 
-## Configuration
+### Large Output Management
+The MCP server automatically handles large outputs (>25000 tokens) by:
+- Providing summaries of extensive scan results
+- Chunking large outputs for better handling
+- Suggesting focused queries for detailed analysis
 
-### AWS Setup
-```bash
-# Configure AWS credentials (Ship CLI will use existing AWS config)
-aws configure
-
-# Or set environment variables
-export AWS_ACCESS_KEY_ID=your-key
-export AWS_SECRET_ACCESS_KEY=your-secret
-export AWS_REGION=us-east-1
+### File Output
+All tools support optional `output` parameter to save results to files:
+```javascript
+terraform_lint({
+  directory: "./project",
+  format: "json",
+  output: "./reports/lint-results.json"
+})
 ```
 
-### OpenAI API (for AI features)
-```bash
-export OPENAI_API_KEY=your-openai-key
+## Example Workflows
+
+### 1. Complete Infrastructure Analysis
+```javascript
+// 1. Lint the code
+terraform_lint({ directory: "./infrastructure" })
+
+// 2. Run security scans
+terraform_checkov_scan({ directory: "./infrastructure" })
+terraform_security_scan({ directory: "./infrastructure" })
+
+// 3. Analyze costs
+terraform_cost_analysis({ 
+  directory: "./infrastructure",
+  region: "us-east-1" 
+})
+
+// 4. Generate documentation
+terraform_generate_docs({ directory: "./infrastructure" })
+
+// 5. Create infrastructure diagram
+terraform_generate_diagram({
+  input: "./infrastructure",
+  hcl: true,
+  format: "png"
+})
 ```
 
-### Anthropic API (alternative)
-```bash
-export ANTHROPIC_API_KEY=your-anthropic-key
+### 2. Security-Focused Review
+```javascript
+// Run comprehensive security analysis
+terraform_checkov_scan({
+  directory: "./security-critical-app",
+  format: "sarif",
+  output: "./security-reports/checkov.sarif"
+})
+
+terraform_security_scan({
+  directory: "./security-critical-app"
+})
+
+terraform_lint({
+  directory: "./security-critical-app",
+  format: "json"
+})
+```
+
+### 3. Cost Optimization Analysis
+```javascript
+// Analyze costs across multiple regions
+terraform_cost_analysis({
+  directory: "./multi-region-app",
+  region: "us-east-1",
+  format: "json"
+})
+
+terraform_cost_analysis({
+  directory: "./multi-region-app", 
+  region: "us-west-2",
+  format: "json"
+})
 ```
 
 ## Troubleshooting
 
-### Installation Issues
-If you get module path errors:
+### Tool Not Found
+If tools fail, ensure:
+1. Ship CLI is properly installed and in PATH
+2. MCP server is running (`ship mcp`)
+3. Your AI assistant is configured to connect to the MCP server
+
+### Large Outputs
+If outputs are truncated:
+1. Use more specific directory scopes
+2. Use filtering options where available
+3. Save to files and read them separately
+
+### Terraform Initialization
+Some tools require Terraform initialization. Run in your project directory:
 ```bash
-go clean -modcache
-GOPROXY=direct go install github.com/cloudshipai/ship/cmd/ship@main
+terraform init
 ```
 
-### Docker/Dagger Issues
-Ship CLI uses Dagger for containerized execution. Ensure Docker is running:
+### Authentication
+For CloudShip features, authenticate first:
 ```bash
-docker --version
-systemctl status docker  # Linux
+ship auth --api-key YOUR_API_KEY
 ```
 
-### AWS Connection Issues
-```bash
-# Test AWS connectivity
-ship aws-steampipe-test
+## Example Project Structure
 
-# Simple Steampipe test
-ship steampipe-simple-test
+Ship CLI includes comprehensive example projects:
+- `examples/aws-web-app/` - Full-stack web application
+- `examples/serverless-api/` - Serverless API with Lambda
+- `examples/security-hardened/` - Security-focused configuration
+- `examples/cost-optimized/` - Cost-efficient infrastructure
+
+Test the tools on these examples:
+```javascript
+terraform_lint({ directory: "./examples/aws-web-app" })
+terraform_generate_diagram({ 
+  input: "./examples/aws-web-app",
+  hcl: true,
+  format: "png"
+})
 ```
 
-## Available Commands Reference
+## Advanced Usage
 
-### Core Commands
-- `ship auth` - Authenticate with Cloudship platform
-- `ship terraform-tools` - Terraform analysis tools
-- `ship ai-investigate` - AI-powered infrastructure investigation
-- `ship ai-agent` - Autonomous AI agent
-- `ship ai-services` - Microservices-based AI investigation
-- `ship investigate` - Manual Steampipe investigations
-- `ship modules` - Manage Ship CLI modules
-- `ship run` - Execute external Dagger modules
+### Custom Output Formats
+Different tools support different output formats:
+- **terraform_lint**: default, json, compact
+- **terraform_checkov_scan**: cli, json, junit, sarif
+- **terraform_cost_analysis**: json, table
+- **terraform_generate_diagram**: png, svg, pdf, dot
 
-### Terraform Tools Subcommands
-- `lint` - TFLint validation
-- `security-scan` - Trivy security scanning
-- `checkov-scan` - Comprehensive Checkov security and compliance scanning
-- `cost-estimate` - Infracost cost analysis
-- `cost-analysis` - OpenInfraQuote advanced cost analysis (more accurate)
-- `generate-docs` - terraform-docs documentation
-- `generate-diagram` - InfraMap infrastructure diagrams
-
-### AI Tools Features
-- Natural language cloud resource queries
-- Autonomous security auditing
-- Cost optimization recommendations
-- Infrastructure documentation generation
-- Visual diagram creation
-- Compliance checking
-
-## Integration Examples for LLMs
-
-### Example 1: Security Audit Workflow
-```bash
-# Step 1: Run comprehensive security scan
-ship ai-agent --task "Perform security audit of AWS infrastructure and provide actionable recommendations"
-
-# Step 2: Generate documentation for findings
-ship terraform-tools generate-docs
-
-# Step 3: Create visual infrastructure overview
-ship terraform-tools generate-diagram . --hcl --format svg -o security-audit-diagram.svg
+### Provider-Specific Analysis
+Filter infrastructure diagrams by cloud provider:
+```javascript
+terraform_generate_diagram({
+  input: "./multi-cloud-setup",
+  hcl: true,
+  provider: "aws",
+  format: "svg"
+})
 ```
 
-### Example 2: Cost Optimization
-```bash
-# Step 1: Analyze current costs
-ship ai-investigate --prompt "Find all resources that might be costing money unnecessarily" --execute
+## Resources Available
 
-# Step 2: Generate detailed cost estimate
-ship terraform-tools cost-analysis  # Uses OpenInfraQuote for accurate AWS pricing
+The MCP server also provides resources:
+- `ship://help` - Complete help and usage information
+- `ship://tools` - List of all available tools and capabilities
 
-# Step 3: Get AI recommendations
-ship ai-agent --task "Analyze infrastructure costs and suggest optimizations"
-```
+Access these through your AI assistant's resource system.
 
-### Example 3: Documentation Generation
-```bash
-# Step 1: Generate all Terraform docs
-ship terraform-tools generate-docs
+---
 
-# Step 2: Create infrastructure diagrams
-ship terraform-tools generate-diagram . --hcl --format png -o architecture.png
-
-# Step 3: AI analysis and documentation
-ship ai-agent --task "Document infrastructure architecture and create comprehensive overview"
-```
-
-## OpenInfraQuote - Advanced Cost Analysis
-
-OpenInfraQuote provides highly accurate AWS cost estimation by analyzing Terraform plans against real AWS pricing data.
-
-### Features
-- 🎯 **Accurate Pricing**: Uses real-time AWS pricing API data
-- 📊 **Detailed Breakdown**: Shows costs per resource with hourly/monthly rates
-- 🌍 **Region-Specific**: Accounts for regional price variations
-- 📈 **100+ Resources**: Supports EC2, RDS, S3, ELB, Lambda, and more
-- 🔄 **JSON Output**: Machine-readable format for automation
-
-### Usage
-```bash
-# Analyze costs for a Terraform directory
-ship terraform-tools cost-analysis
-
-# Analyze a specific plan file
-ship terraform-tools cost-analysis terraform.tfplan.json
-
-# Use specific AWS region for pricing
-ship terraform-tools cost-analysis --aws-region us-west-2
-```
-
-### Example Output
-```json
-{
-  "resources": [
-    {
-      "address": "aws_instance.example",
-      "type": "aws_instance",
-      "price": { "min": 30.368, "max": 30.368 },
-      "products": [
-        {
-          "price_info": { "price": 0.0416, "type": "hourly" },
-          "description": "t3.medium instance in us-east-1"
-        }
-      ]
-    }
-  ],
-  "price": { "min": 70.37, "max": 70.37 }
-}
-```
-
-## Best Practices for LLMs
-
-1. **Always test connectivity first**: Use `ship version` to verify installation
-2. **Set up AWS credentials**: Most features require cloud access
-3. **Use specific prompts**: Be clear about what analysis you want
-4. **Combine tools**: Use multiple Ship CLI commands for comprehensive analysis
-5. **Save outputs**: Use `-o` flags to save diagrams and reports
-6. **Check prerequisites**: Ensure Docker is running for containerized tools
-7. **Use OpenInfraQuote for accurate costs**: More precise than other estimation tools
-8. **Create external Dagger modules**: Don't fork Ship CLI, create independent modules
-
-## Using External Dagger Modules with Ship CLI
-
-Ship CLI is designed to be extensible! You can use any Dagger module without modifying Ship CLI itself. This approach keeps your tools independent and reusable.
-
-### Using Published Dagger Modules
-
-```bash
-# Use any Dagger module directly with Ship CLI
-ship run dagger call --mod github.com/username/my-module@v1.0.0 analyze --source .
-
-# Example: Using a custom security scanner
-ship run dagger call --mod github.com/security/scanner@latest scan \
-  --directory . \
-  --severity high
-
-# Example: Custom cost analyzer
-ship run dagger call --mod github.com/finops/analyzer@v2.1.0 estimate \
-  --terraform-dir . \
-  --currency USD
-```
-
-### Creating Your Own Dagger Module
-
-1. **Initialize a new Dagger module:**
-```bash
-dagger init --sdk=go my-custom-tool
-cd my-custom-tool
-```
-
-2. **Define your tool's functionality (main.go):**
-```go
-package main
-
-import (
-    "context"
-    "dagger.io/dagger"
-)
-
-type MyCustomTool struct{}
-
-// Analyze runs custom analysis on source code
-func (m *MyCustomTool) Analyze(
-    ctx context.Context,
-    // Directory containing code to analyze
-    source *dagger.Directory,
-    // +optional
-    // Output format (json, text, markdown)
-    format string,
-) (string, error) {
-    return dag.Container().
-        From("alpine:latest").
-        WithMountedDirectory("/src", source).
-        WithWorkdir("/src").
-        WithExec([]string{"your-analysis-command", "--format", format}).
-        Stdout(ctx)
-}
-
-// Cost estimates infrastructure costs
-func (m *MyCustomTool) Cost(
-    ctx context.Context,
-    planFile *dagger.File,
-    region string,
-) (string, error) {
-    return dag.Container().
-        From("your-tool:latest").
-        WithFile("/tmp/plan.json", planFile).
-        WithExec([]string{"analyze-cost", "/tmp/plan.json", "--region", region}).
-        Stdout(ctx)
-}
-```
-
-3. **Publish your module:**
-```bash
-# Push to GitHub
-git init
-git add .
-git commit -m "Initial module"
-git remote add origin https://github.com/yourusername/my-custom-tool
-git push -u origin main
-git tag v1.0.0
-git push --tags
-```
-
-4. **Use your module with Ship CLI:**
-```bash
-# Now anyone can use your module!
-ship run dagger call --mod github.com/yourusername/my-custom-tool@v1.0.0 \
-  analyze --source . --format json
-
-# Use the cost function
-ship run dagger call --mod github.com/yourusername/my-custom-tool@v1.0.0 \
-  cost --plan-file terraform.tfplan.json --region us-east-1
-```
-
-### Best Practices for Dagger Modules
-
-1. **Clear function names**: Use descriptive names like `Scan`, `Analyze`, `Generate`
-2. **Document parameters**: Add comments above each parameter
-3. **Support multiple formats**: Allow JSON/text/markdown output
-4. **Error handling**: Return meaningful error messages
-5. **Version your modules**: Use semantic versioning (v1.0.0)
-
-### Example Module Ideas
-
-- **Cloud Security Scanner**: Deep AWS/Azure/GCP security analysis
-- **Kubernetes Validator**: K8s manifest validation and best practices
-- **Database Analyzer**: Schema validation, migration checks
-- **Compliance Checker**: SOC2, HIPAA, PCI-DSS validation
-- **Custom Cost Analyzer**: Organization-specific cost allocation
-- **Performance Profiler**: Infrastructure performance analysis
-
-## Terraform Example Projects
-
-Ship CLI includes comprehensive Terraform examples that demonstrate all features and serve as test cases for your infrastructure analysis. These examples are perfect for AI copilots to copy and use for testing.
-
-### Available Examples
-
-Located in `examples/terraform/` directory:
-
-#### 1. Easy Example: S3 Bucket (`easy-s3-bucket/`)
-```hcl
-# Simple S3 bucket with security best practices
-# Features: encryption, versioning, lifecycle rules, public access blocking
-# Perfect for: Learning Ship CLI basics, simple security scans
-# Estimated cost: ~$1-5/month
-```
-
-**Quick test:**
-```bash
-cd examples/terraform/easy-s3-bucket
-ship terraform-tools lint
-ship terraform-tools security-scan --push
-ship terraform-tools generate-docs
-```
-
-#### 2. Medium Example: Web Application (`medium-web-app/`)
-```hcl
-# Scalable web app infrastructure
-# Features: VPC, ALB, Auto Scaling Group, RDS database
-# Perfect for: Testing cost analysis, security scanning, diagram generation
-# Estimated cost: ~$125/month
-```
-
-**Quick test:**
-```bash
-cd examples/terraform/medium-web-app
-ship terraform-tools security-scan
-ship terraform-tools cost-estimate
-ship terraform-tools generate-diagram . --hcl -o webapp.png
-```
-
-#### 3. Complex Example: Multi-Region Production (`complex-multi-region/`)
-```hcl
-# Production-ready multi-region architecture
-# Features: Primary/DR regions, modules, monitoring, cross-region replication
-# Perfect for: Comprehensive testing of all Ship CLI features
-# Estimated cost: ~$326/month
-```
-
-**Quick test:**
-```bash
-cd examples/terraform/complex-multi-region
-ship terraform-tools checkov-scan
-ship terraform-tools cost-analysis
-ship terraform-tools generate-diagram . --hcl -o infrastructure.png
-```
-
-### Using Examples with AI Copilots
-
-For AI assistants like Cursor, GitHub Copilot, or others:
-
-1. **Copy any example to test Ship CLI:**
-   ```bash
-   # Copy the example you want
-   cp -r examples/terraform/easy-s3-bucket my-test-terraform
-   cd my-test-terraform
-   
-   # Run all Ship CLI commands
-   ship terraform-tools lint
-   ship terraform-tools security-scan --push
-   ship terraform-tools cost-estimate
-   ship terraform-tools generate-docs
-   ```
-
-2. **Test CloudShip integration:**
-   ```bash
-   # Authenticate first
-   ship auth --api-key YOUR_API_KEY
-   
-   # Run with automatic push
-   ship terraform-tools security-scan --push --push-tags "test,example"
-   ship terraform-tools cost-estimate --push --push-metadata "env=test"
-   ```
-
-3. **Generate comprehensive analysis:**
-   ```bash
-   # Run all tools and push results
-   ship terraform-tools lint --push
-   ship terraform-tools security-scan --push
-   ship terraform-tools checkov-scan --push
-   ship terraform-tools cost-estimate --push
-   ship terraform-tools generate-diagram . --hcl -o diagram.png
-   ship terraform-tools generate-docs
-   ```
-
-### Test Results Summary
-
-Based on testing with these examples:
-- ✅ **Linting**: Works perfectly on all complexity levels
-- ✅ **Security Scanning**: Identifies real security issues
-- ✅ **Documentation**: Generates comprehensive README files
-- ✅ **CloudShip Push**: Seamless integration with --push flag
-- ⚠️ **Cost Estimation (Infracost)**: Requires INFRACOST_API_KEY environment variable
-- ✅ **Cost Analysis (OpenInfraQuote)**: Works without API key, uses real AWS pricing
-- ⚠️ **Diagrams**: May appear empty for very complex infrastructures
-
-### Example Findings
-
-**Security issues found in examples:**
-- S3 bucket: Missing access logging, not using CMK encryption
-- Web app: Security groups allow unrestricted ingress, RDS not encrypted
-- Multi-region: Various production-readiness improvements suggested
-
-These are intentional to demonstrate Ship CLI's detection capabilities!
-
-## Demo GIFs Available
-
-The Ship CLI repository includes visual demonstrations (GIF files) showing the tools in action:
-
-- **terraform-tools-clean.gif**: Shows terraform-docs, tflint, and trivy security scanning
-- **openinfraquote-real-demo.gif**: Demonstrates OpenInfraQuote cost analysis with real pricing
-- **terraform-*.gif**: Individual demos for each terraform tool
-
-These demos are located in the repository root and `demos/` directory.
-
-## Key Features for LLMs
-
-### 1. No Local Tool Installation Required
-All tools run in Docker containers via Dagger, making it safe for automated use.
-
-### 2. Extensibility with External Modules
-Create and use custom Dagger modules without forking Ship CLI:
-```bash
-ship run dagger call --mod github.com/your/module@v1.0.0 analyze --source .
-```
-
-### 3. Advanced Cost Analysis with OpenInfraQuote
-More accurate than traditional tools, uses real AWS pricing data:
-```bash
-ship terraform-tools cost-analysis terraform.tfplan.json
-```
-
-### 4. AI-Powered Infrastructure Investigation
-Natural language queries against live cloud infrastructure:
-```bash
-ship ai-investigate --prompt "Find security issues" --execute
-```
-
-### 5. MCP Server Integration
-Built-in server for seamless AI assistant integration.
-
-## Support and Resources
-
-- **GitHub Repository**: https://github.com/cloudshipai/ship
-- **Issues and Bug Reports**: https://github.com/cloudshipai/ship/issues
-- **Documentation**: Check the README.md in the repository
-- **Demo GIFs**: Visual demonstrations in the repository
-- **Example Terraform**: examples/terraform/ directory with easy/medium/complex examples
-- **MCP Protocol**: https://modelcontextprotocol.io/
-- **Dagger Documentation**: https://docs.dagger.io/
-
-This tool is designed to be LLM-friendly and provides extensive AI integration capabilities. All tools run in containers, making it safe and isolated for automated use by AI assistants. The extensibility model allows you to create custom analysis tools without modifying the core Ship CLI.
+For more information, visit: https://github.com/cloudshipai/ship
+COMPLETE_EOF < /dev/null

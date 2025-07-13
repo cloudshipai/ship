@@ -1,0 +1,11 @@
+strict digraph G {
+	"aws_api_gateway_resource.item"->"aws_api_gateway_resource.items";
+	"aws_lambda_function.api"->"aws_dynamodb_table.main";
+	"aws_lambda_function.api"->"aws_s3_bucket.lambda_bucket";
+	"aws_api_gateway_resource.item" [ height=1.15, image="/root/.cache/inframap/assets/aws/Networking_and_Content_Delivery/Amazon-API-Gateway.png", imagepos=tc, labelloc=b, shape=plaintext ];
+	"aws_api_gateway_resource.items" [ height=1.15, image="/root/.cache/inframap/assets/aws/Networking_and_Content_Delivery/Amazon-API-Gateway.png", imagepos=tc, labelloc=b, shape=plaintext ];
+	"aws_dynamodb_table.main" [ height=1.15, image="/root/.cache/inframap/assets/aws/Database/Amazon-DynamoDB_Table_light-bg.png", imagepos=tc, labelloc=b, shape=plaintext ];
+	"aws_lambda_function.api" [ height=1.15, image="/root/.cache/inframap/assets/aws/Compute/AWS-Lambda_Lambda-Function_light-bg.png", imagepos=tc, labelloc=b, shape=plaintext ];
+	"aws_s3_bucket.lambda_bucket" [ height=1.15, image="/root/.cache/inframap/assets/aws/Storage/Amazon-Simple-Storage-Service-S3.png", imagepos=tc, labelloc=b, shape=plaintext ];
+
+}

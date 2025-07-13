@@ -2,7 +2,7 @@
 
 CloudshipAI CLI - A powerful command-line tool that brings enterprise-grade infrastructure analysis tools to your fingertips, all running in containers without local installations.
 
-> **🤖 For LLMs and AI Assistants**: Complete installation and usage instructions specifically designed for AI consumption are available at [llms.txt](https://raw.githubusercontent.com/cloudshipai/ship/main/llms.txt). This includes MCP server setup, integration examples, and best practices for AI-driven infrastructure analysis.
+> **🤖 For LLMs and AI Assistants**: Complete installation and usage instructions specifically designed for AI consumption are available in [llms.txt](./llms.txt). This includes MCP server setup, integration examples, and best practices for AI-driven infrastructure analysis with all 7 MCP tools.
 
 ## 🚀 Features
 

@@ -335,4 +335,3 @@ Access these through your AI assistant's resource system.
 ---
 
 For more information, visit: https://github.com/cloudshipai/ship
-COMPLETE_EOF < /dev/null

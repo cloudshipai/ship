@@ -2,30 +2,31 @@
 
 ## Overview
 
-Ship CLI includes a built-in MCP server that exposes all Ship functionality as tools, resources, and prompts for AI assistants. This allows AI assistants like Claude Desktop, Cursor, and other MCP-compatible clients to use Ship CLI directly.
+Ship CLI includes a built-in MCP server that exposes 7 powerful Terraform analysis tools as MCP tools for AI assistants. This allows AI assistants like Claude Code, Cursor, and other MCP-compatible clients to use Ship CLI directly for infrastructure analysis and Terraform workflows.
 
 ## How It Works
 
 ### 1. MCP Server Architecture
 
 ```
-AI Assistant (Claude Desktop)
+AI Assistant (Claude Code)
         ↓ (MCP Protocol)
 Ship CLI MCP Server
         ↓ (Command Execution)
-Ship CLI Tools (terraform-tools, ai-investigate, etc.)
+Ship CLI Terraform Tools
         ↓ (Containerized Execution)
 Dagger + Docker Containers
 ```
 
-### 2. Available MCP Components
+### 2. Available MCP Tools
 
-#### **Tools** (Actions the AI can take)
-- `terraform_lint` - Run TFLint on Terraform code
-- `terraform_security_scan` - Run Checkov security analysis
-- `terraform_cost_estimate` - Estimate infrastructure costs
-- `terraform_generate_docs` - Generate module documentation
-- `ai_investigate` - Natural language infrastructure investigation
+#### **Terraform Analysis Tools**
+- `terraform_lint` - Run TFLint on Terraform code for syntax and best practices
+- `terraform_checkov_scan` - Run Checkov security scan for policy compliance
+- `terraform_security_scan` - Run Trivy security scan for vulnerabilities
+- `terraform_cost_analysis` - Analyze infrastructure costs with OpenInfraQuote
+- `terraform_generate_docs` - Generate documentation with terraform-docs
+- `terraform_generate_diagram` - Generate infrastructure diagrams with InfraMap
 - `cloudship_push` - Upload artifacts for AI analysis
 
 #### **Resources** (Information the AI can access)
@@ -38,10 +39,10 @@ Dagger + Docker Containers
 
 ### 3. Protocol Flow
 
-1. **AI Assistant Request**: Claude asks to "investigate my AWS security"
-2. **MCP Tool Call**: Assistant calls `ai_investigate` tool with appropriate parameters
-3. **Ship Execution**: MCP server executes `ship ai-investigate --prompt "security" --execute`
-4. **Steampipe Analysis**: Ship runs Steampipe queries against live AWS infrastructure
+1. **AI Assistant Request**: Claude asks to "analyze this Terraform code for security"
+2. **MCP Tool Call**: Assistant calls `terraform_checkov_scan` tool with appropriate parameters
+3. **Ship Execution**: MCP server executes `ship terraform-tools checkov-scan`
+4. **Containerized Analysis**: Ship runs Checkov in a Dagger container
 5. **Result Parsing**: MCP server formats results for the AI assistant
 6. **AI Analysis**: Assistant analyzes results and provides insights
 
@@ -50,8 +51,7 @@ Dagger + Docker Containers
 ### Prerequisites
 
 1. **Ship CLI installed** and configured
-2. **AWS credentials** configured (for infrastructure investigation)
-3. **MCP-compatible AI assistant** (Claude Desktop, Cursor, etc.)
+2. **MCP-compatible AI assistant** (Claude Code, Cursor, etc.)
 
 ### Step 1: Start the MCP Server
 
@@ -65,19 +65,16 @@ ship mcp
 
 ### Step 2: Configure Your AI Assistant
 
-#### For Claude Desktop
+#### For Claude Code
 
-Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+Add to your Claude Code configuration (`~/.config/claude-code/claude_desktop_config.json`):
 
 ```json
 {
   "mcpServers": {
     "ship-cli": {
-      "command": "ship",
-      "args": ["mcp"],
-      "env": {
-        "AWS_PROFILE": "your-aws-profile"
-      }
+      "command": "/path/to/ship",
+      "args": ["mcp"]
     }
   }
 }
@@ -92,10 +89,7 @@ Add to your Cursor MCP settings:
   "mcp": {
     "servers": {
       "ship-cli": {
-        "command": "ship mcp",
-        "env": {
-          "AWS_PROFILE": "your-aws-profile"
-        }
+        "command": "ship mcp"
       }
     }
   }
@@ -104,7 +98,7 @@ Add to your Cursor MCP settings:
 
 ### Step 3: Restart Your AI Assistant
 
-Restart Claude Desktop or Cursor to load the new MCP server configuration.
+Restart Claude Code or Cursor to load the new MCP server configuration.
 
 ### Step 4: Verify Connection
 
@@ -116,36 +110,25 @@ The assistant should be able to access the `ship://tools` resource and list all 
 
 ## Usage Examples
 
-### Infrastructure Investigation
+### Terraform Security Analysis
 
-**You:** "Investigate my AWS account for security issues"
-
-**Assistant Actions:**
-1. Calls `ai_investigate` tool with `prompt="Check for security issues"` and `execute=true`
-2. Ship CLI runs Steampipe queries against your AWS account
-3. Returns findings about open security groups, unencrypted resources, etc.
-4. Assistant analyzes and provides recommendations
-
-### Terraform Analysis
-
-**You:** "Analyze the Terraform code in my current directory for security issues and cost"
+**You:** "Analyze the Terraform code in ./examples/aws-web-app for security issues"
 
 **Assistant Actions:**
-1. Calls `terraform_security_scan` tool for security analysis
-2. Calls `terraform_cost_estimate` tool for cost estimation  
-3. Combines results and provides comprehensive analysis
+1. Calls `terraform_checkov_scan` tool with `directory="./examples/aws-web-app"`
+2. Calls `terraform_security_scan` tool for additional security analysis
+3. Combines results and provides comprehensive security analysis
 
-### Cost Optimization
+### Terraform Cost Analysis
 
-**You:** "Help me find ways to reduce my AWS costs"
+**You:** "Estimate costs for this Terraform infrastructure"
 
 **Assistant Actions:**
-1. Uses the `cost_optimization` prompt template
-2. Calls `ai_investigate` to find unused resources
-3. Calls `terraform_cost_estimate` if Terraform code is present
-4. Provides prioritized cost-saving recommendations
+1. Calls `terraform_cost_analysis` tool for the specified directory
+2. Analyzes cost breakdown by resource type
+3. Provides cost optimization recommendations
 
-### Documentation Generation
+### Infrastructure Documentation
 
 **You:** "Generate documentation for this Terraform module"
 
@@ -154,6 +137,27 @@ The assistant should be able to access the `ship://tools` resource and list all 
 2. Formats the output appropriately
 3. Can suggest improvements or additional documentation
 
+### Infrastructure Diagrams
+
+**You:** "Create a visual diagram of this Terraform infrastructure"
+
+**Assistant Actions:**
+1. Calls `terraform_generate_diagram` tool with `hcl: true`
+2. Generates PNG/SVG diagram of infrastructure
+3. Explains the infrastructure relationships
+
+### Complete Infrastructure Analysis
+
+**You:** "Perform a complete analysis of this Terraform project"
+
+**Assistant Actions:**
+1. Calls `terraform_lint` for code quality
+2. Calls `terraform_checkov_scan` for security compliance
+3. Calls `terraform_cost_analysis` for cost estimation
+4. Calls `terraform_generate_docs` for documentation
+5. Calls `terraform_generate_diagram` for visualization
+6. Provides comprehensive analysis and recommendations
+
 ## Advanced Configuration
 
 ### Environment Variables
@@ -161,8 +165,7 @@ The assistant should be able to access the `ship://tools` resource and list all 
 Set these environment variables to customize the MCP server:
 
 ```bash
-# AWS Configuration
-export AWS_PROFILE=production
+# AWS Configuration (for cost analysis)
 export AWS_REGION=us-west-2
 
 # Ship Configuration  
@@ -172,46 +175,20 @@ export SHIP_CONFIG_DIR=~/.ship
 export SHIP_DEBUG=true
 ```
 
-### Multiple AWS Profiles
-
-To work with multiple AWS profiles, configure separate MCP servers:
-
-```json
-{
-  "mcpServers": {
-    "ship-production": {
-      "command": "ship",
-      "args": ["mcp"],
-      "env": {
-        "AWS_PROFILE": "production"
-      }
-    },
-    "ship-staging": {
-      "command": "ship", 
-      "args": ["mcp"],
-      "env": {
-        "AWS_PROFILE": "staging"
-      }
-    }
-  }
-}
-```
-
 ### Custom Tool Parameters
 
 The MCP tools support all the same parameters as the CLI commands:
 
 ```bash
 # CLI equivalent:
-ship ai-investigate --prompt "List S3 buckets" --provider aws --aws-region us-west-2 --execute
+ship terraform-tools cost-analysis --region us-west-2 --format json
 
 # MCP tool call equivalent:
-ai_investigate(
-  prompt="List S3 buckets",
-  provider="aws", 
-  aws_region="us-west-2",
-  execute=true
-)
+terraform_cost_analysis({
+  directory: "./infrastructure",
+  region: "us-west-2",
+  format: "json"
+})
 ```
 
 ## Troubleshooting
@@ -230,13 +207,13 @@ ai_investigate(
    - Restart the AI assistant
    - Verify Ship CLI is in your PATH
 
-3. **AWS authentication errors**:
+3. **Terraform analysis errors**:
    ```bash
-   # Test AWS credentials
-   aws sts get-caller-identity --profile your-profile
+   # Test Ship CLI functionality
+   ship terraform-tools lint
    
-   # Test Ship CLI AWS access
-   ship ai-investigate --prompt "test connection" --execute
+   # Check if Terraform files are valid
+   terraform validate
    ```
 
 ### Debug Mode
@@ -252,15 +229,31 @@ This will show detailed information about MCP requests and responses.
 ### Common Issues
 
 1. **"Module not found" errors**: Ensure Ship CLI is properly installed and in your PATH
-2. **AWS permission errors**: Verify your AWS credentials have necessary permissions for Steampipe queries
-3. **Timeout issues**: Large infrastructure investigations may take time; the AI assistant should wait for completion
+2. **Terraform validation errors**: Ensure your Terraform code is syntactically valid
+3. **Large output handling**: The MCP server automatically chunks large outputs for better handling
 
 ## Security Considerations
 
-1. **Credential Access**: The MCP server runs with your local credentials - ensure your AI assistant is trusted
-2. **Command Execution**: AI assistants can execute Ship CLI commands - review what tools you expose
-3. **Network Access**: Infrastructure investigation tools make network calls to cloud APIs
-4. **Data Exposure**: Investigation results may contain sensitive infrastructure information
+1. **Local Execution**: All tools run locally in containers - no cloud credentials needed for most tools
+2. **Command Execution**: AI assistants can execute Ship CLI commands - all tools are read-only analysis
+3. **Data Privacy**: All analysis happens locally unless using CloudShip push features
+4. **Container Isolation**: Tools run in isolated Docker containers via Dagger
+
+## Available Tools Reference
+
+For complete tool documentation with parameters and examples, see [llms.txt](../llms.txt).
+
+### Quick Reference
+
+| Tool | Purpose | Key Parameters |
+|------|---------|---------------|
+| `terraform_lint` | Code quality analysis | `directory`, `format`, `output` |
+| `terraform_checkov_scan` | Security compliance | `directory`, `format`, `output` |
+| `terraform_security_scan` | Vulnerability scanning | `directory` |
+| `terraform_cost_analysis` | Cost estimation | `directory`, `region`, `format` |
+| `terraform_generate_docs` | Documentation | `directory`, `filename`, `output` |
+| `terraform_generate_diagram` | Infrastructure diagrams | `input`, `format`, `hcl`, `provider` |
+| `cloudship_push` | Artifact upload | `file`, `type` |
 
 ## Extending the MCP Server
 

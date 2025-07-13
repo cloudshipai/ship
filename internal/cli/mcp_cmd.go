@@ -381,11 +381,6 @@ func addPrompts(s *server.MCPServer) {
 	)
 
 	s.AddPrompt(securityPrompt, func(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-		provider := "aws"
-		if p, ok := request.Params.Arguments["provider"]; ok && p != "" {
-			provider = p
-		}
-
 		return &mcp.GetPromptResult{
 			Description: "Comprehensive security audit workflow",
 			Messages: []mcp.PromptMessage{
@@ -393,7 +388,7 @@ func addPrompts(s *server.MCPServer) {
 					Role: "user",
 					Content: mcp.TextContent{
 						Type: "text",
-						Text: fmt.Sprintf(`Please perform a comprehensive security audit of my Terraform infrastructure. Follow these steps:
+						Text: `Please perform a comprehensive security audit of my Terraform infrastructure. Follow these steps:
 
 1. Run terraform_checkov_scan to identify security issues in infrastructure-as-code
 2. Run terraform_security_scan for additional security analysis  
@@ -404,7 +399,7 @@ func addPrompts(s *server.MCPServer) {
    - Recommendations for improvement
    - Best practices to implement
 
-Please be thorough and provide actionable recommendations.`, provider),
+Please be thorough and provide actionable recommendations.`,
 					},
 				},
 			},
@@ -420,11 +415,6 @@ Please be thorough and provide actionable recommendations.`, provider),
 	)
 
 	s.AddPrompt(costPrompt, func(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-		provider := "aws"
-		if p, ok := request.Params.Arguments["provider"]; ok && p != "" {
-			provider = p
-		}
-
 		return &mcp.GetPromptResult{
 			Description: "Cost optimization analysis workflow",
 			Messages: []mcp.PromptMessage{
@@ -432,7 +422,7 @@ Please be thorough and provide actionable recommendations.`, provider),
 					Role: "user",
 					Content: mcp.TextContent{
 						Type: "text",
-						Text: fmt.Sprintf(`Help me optimize costs for my Terraform infrastructure:
+						Text: `Help me optimize costs for my Terraform infrastructure:
 
 1. Use terraform_cost_analysis to analyze current cost projections
 2. Review Terraform configurations for cost optimization opportunities
@@ -443,7 +433,7 @@ Please be thorough and provide actionable recommendations.`, provider),
    - Medium-term optimizations (reserved instances, storage classes)
    - Long-term architectural improvements
 
-Include estimated cost savings where possible.`, provider),
+Include estimated cost savings where possible.`,
 					},
 				},
 			},

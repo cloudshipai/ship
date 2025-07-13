@@ -75,21 +75,6 @@ func (e *Engine) BuildContainer(contextDir string, dockerfile string) (*dagger.C
 	return container, nil
 }
 
-// RunSteampipeQuery runs a Steampipe query in a container
-func (e *Engine) RunSteampipeQuery(provider, query string) (string, error) {
-	// For now, use the official Steampipe image
-	// In production, we'd use a custom image with pre-installed plugins
-	container := e.client.Container().
-		From("turbot/steampipe:latest").
-		WithExec([]string{"steampipe", "query", query, "--output", "json"})
-
-	output, err := container.Stdout(e.ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to run steampipe query: %w", err)
-	}
-
-	return output, nil
-}
 
 // NewOpenInfraQuoteModule creates a new OpenInfraQuote module
 func (e *Engine) NewOpenInfraQuoteModule() *modules.OpenInfraQuoteModule {
@@ -121,10 +106,6 @@ func (e *Engine) NewInfracostModule() *modules.InfracostModule {
 	return modules.NewInfracostModule(e.client)
 }
 
-// NewSteampipeModule creates a new Steampipe module
-func (e *Engine) NewSteampipeModule() *modules.SteampipeModule {
-	return modules.NewSteampipeModule(e.client)
-}
 
 // NewLLMModule has been removed - use the new Eino agent system instead
 // See internal/agent package for the new AI-powered investigation capabilities

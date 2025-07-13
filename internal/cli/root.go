@@ -23,15 +23,16 @@ var rootCmd = &cobra.Command{
 	Use:   "ship",
 	Short: "CloudshipAI CLI for Terraform analysis and infrastructure tools",
 	Long: `Ship CLI enables both non-technical users and power users to:
-- Push artifacts (terraform plans, SBOMs, etc.) to Cloudship for analysis
 - Run comprehensive Terraform analysis tools in containerized environments
 - Generate infrastructure documentation and diagrams
+- Push artifacts (terraform plans, SBOMs, etc.) to Cloudship for analysis
 - Host an MCP server for AI assistant integrations
 
 Key capabilities:
-- Terraform linting, security scanning, and cost analysis
-- Infrastructure diagram generation from HCL files or state
-- Documentation generation for Terraform modules
+- Terraform linting, security scanning, and cost analysis with TFLint, Checkov, and Trivy
+- Infrastructure diagram generation from HCL files or state with InfraMap
+- Documentation generation for Terraform modules with terraform-docs
+- Cost analysis with OpenInfraQuote and Infracost
 - Containerized tool execution with Dagger for consistency
 - MCP server for Claude Code, Cursor, and other AI assistants`,
 	SilenceUsage: true,

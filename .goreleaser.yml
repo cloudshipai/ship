@@ -93,20 +93,8 @@ release:
     
     **Full Documentation**: https://github.com/cloudshipai/ship#readme
 
-brews:
-  - repository:
-      owner: cloudshipai
-      name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    directory: Formula
-    homepage: https://github.com/cloudshipai/ship
-    description: "CloudshipAI CLI - Infrastructure analysis tools"
-    license: "Apache-2.0"
-    test: |
-      system "#{bin}/ship", "--version"
-    dependencies:
-      - name: docker
-        type: optional
+# Homebrew configuration removed temporarily to fix build issues
+# TODO: Re-add homebrew_casks configuration once we verify the release process
 
 nfpms:
   - id: packages

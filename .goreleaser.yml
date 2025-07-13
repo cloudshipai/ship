@@ -133,20 +133,19 @@ nfpms:
     recommends:
       - git
 
-# Docker builds disabled until Docker Hub credentials are configured
-# dockers:
-#   - image_templates:
-#       - "cloudshipai/ship:{{ .Tag }}"
-#       - "cloudshipai/ship:v{{ .Major }}"
-#       - "cloudshipai/ship:v{{ .Major }}.{{ .Minor }}"
-#       - "cloudshipai/ship:latest"
-#     dockerfile: Dockerfile.goreleaser
-#     use: buildx
-#     goos: linux
-#     goarch: amd64
-#     build_flag_templates:
-#       - "--platform=linux/amd64"
-#       - "--label=org.opencontainers.image.created={{.Date}}"
-#       - "--label=org.opencontainers.image.title={{.ProjectName}}"
-#       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-#       - "--label=org.opencontainers.image.version={{.Version}}"
+dockers:
+  - image_templates:
+      - "cloudshipai/ship:{{ .Tag }}"
+      - "cloudshipai/ship:v{{ .Major }}"
+      - "cloudshipai/ship:v{{ .Major }}.{{ .Minor }}"
+      - "cloudshipai/ship:latest"
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+    goos: linux
+    goarch: amd64
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"

@@ -133,19 +133,21 @@ nfpms:
     recommends:
       - git
 
-dockers:
-  - image_templates:
-      - "cloudshipai/ship:{{ .Tag }}"
-      - "cloudshipai/ship:v{{ .Major }}"
-      - "cloudshipai/ship:v{{ .Major }}.{{ .Minor }}"
-      - "cloudshipai/ship:latest"
-    dockerfile: Dockerfile.goreleaser
-    use: buildx
-    goos: linux
-    goarch: amd64
-    build_flag_templates:
-      - "--platform=linux/amd64"
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.title={{.ProjectName}}"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
+# Docker builds temporarily disabled - Docker Hub secrets need to be properly configured
+# Uncomment when DOCKER_USERNAME and DOCKER_PASSWORD secrets are properly set
+# dockers:
+#   - image_templates:
+#       - "cloudshipai/ship:{{ .Tag }}"
+#       - "cloudshipai/ship:v{{ .Major }}"
+#       - "cloudshipai/ship:v{{ .Major }}.{{ .Minor }}"
+#       - "cloudshipai/ship:latest"
+#     dockerfile: Dockerfile.goreleaser
+#     use: buildx
+#     goos: linux
+#     goarch: amd64
+#     build_flag_templates:
+#       - "--platform=linux/amd64"
+#       - "--label=org.opencontainers.image.created={{.Date}}"
+#       - "--label=org.opencontainers.image.title={{.ProjectName}}"
+#       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+#       - "--label=org.opencontainers.image.version={{.Version}}"

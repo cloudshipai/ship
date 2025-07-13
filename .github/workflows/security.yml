@@ -28,11 +28,12 @@ jobs:
         cache: true
         
     - name: Run Gosec Security Scanner
-      uses: securecodewarrior/github-action-gosec@master
-      with:
-        args: '-fmt sarif -out gosec.sarif ./...'
+      run: |
+        go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+        gosec -fmt sarif -out gosec.sarif ./...
         
     - name: Upload SARIF file
+      if: always()
       uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: gosec.sarif
@@ -51,13 +52,13 @@ jobs:
         go-version: '1.23'
         cache: true
         
-    - name: Run Nancy vulnerability scanner
+    - name: Run Go vulnerability scanner
       run: |
-        go install github.com/sonatypecommunity/nancy@latest
-        go list -json -deps ./... | nancy sleuth
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+        govulncheck ./...
         
     - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
+      uses: aquasecurity/trivy-action@0.28.0
       with:
         scan-type: 'fs'
         scan-ref: '.'
@@ -65,6 +66,7 @@ jobs:
         output: 'trivy-results.sarif'
         
     - name: Upload Trivy scan results
+      if: always()
       uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: 'trivy-results.sarif'

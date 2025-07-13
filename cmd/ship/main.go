@@ -19,14 +19,14 @@ func getVersion() string {
 	if version != "dev" {
 		return version
 	}
-	
+
 	// Try to get version from build info (works with go install)
 	if info, ok := debug.ReadBuildInfo(); ok {
 		if info.Main.Version != "(devel)" && info.Main.Version != "" {
 			return info.Main.Version
 		}
 	}
-	
+
 	return version
 }
 

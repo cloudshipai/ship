@@ -29,14 +29,11 @@ builds:
 archives:
   - name_template: >-
       {{ .ProjectName }}_
-      {{- .Version }}_
-      {{- .Os }}_
+      {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
-    builds:
-      - ship
 
 checksum:
   name_template: 'checksums.txt'
@@ -96,7 +93,7 @@ release:
     
     **Full Documentation**: https://github.com/cloudshipai/ship#readme
 
-brews:
+homebrew:
   - repository:
       owner: cloudshipai
       name: homebrew-tap

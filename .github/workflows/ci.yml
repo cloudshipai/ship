@@ -77,7 +77,23 @@ jobs:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
         run: |
-          go build -v -o ship-${{ matrix.os }}-${{ matrix.arch }} ./cmd/ship
+          # Set version info for CI builds
+          VERSION="dev-${GITHUB_SHA::8}"
+          if [[ "${GITHUB_REF}" =~ ^refs/tags/v[0-9] ]]; then
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          COMMIT="${GITHUB_SHA}"
+          DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          
+          # Build with version information
+          go build -v \
+            -ldflags "-X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}" \
+            -o ship-${{ matrix.os }}-${{ matrix.arch }} \
+            ./cmd/ship
+            
+      - name: Test version output (Linux amd64 only)
+        if: matrix.os == 'linux' && matrix.arch == 'amd64'
+        run: ./ship-linux-amd64 version
 
   goreleaser-check:
     name: GoReleaser Check

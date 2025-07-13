@@ -75,7 +75,6 @@ func (e *Engine) BuildContainer(contextDir string, dockerfile string) (*dagger.C
 	return container, nil
 }
 
-
 // NewOpenInfraQuoteModule creates a new OpenInfraQuote module
 func (e *Engine) NewOpenInfraQuoteModule() *modules.OpenInfraQuoteModule {
 	return modules.NewOpenInfraQuoteModule(e.client)
@@ -105,7 +104,6 @@ func (e *Engine) NewCheckovModule() *modules.CheckovModule {
 func (e *Engine) NewInfracostModule() *modules.InfracostModule {
 	return modules.NewInfracostModule(e.client)
 }
-
 
 // NewLLMModule has been removed - use the new Eino agent system instead
 // See internal/agent package for the new AI-powered investigation capabilities

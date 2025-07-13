@@ -71,7 +71,7 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 }
 
 func addTerraformTools(s *server.MCPServer) {
-	// Terraform Lint Tool  
+	// Terraform Lint Tool
 	lintTool := mcp.NewTool("terraform_lint",
 		mcp.WithDescription("Run TFLint on Terraform code to check for syntax errors and best practices"),
 		mcp.WithString("directory",
@@ -463,7 +463,7 @@ func executeShipCommand(args []string) (*mcp.CallToolResult, error) {
 	}
 
 	outputStr := string(output)
-	
+
 	// Check if output needs to be chunked
 	if needsChunking(outputStr) {
 		return createChunkedResponse(outputStr), nil
@@ -478,10 +478,10 @@ func needsChunking(text string) bool {
 
 func createChunkedResponse(text string) *mcp.CallToolResult {
 	maxChunkSize := maxMCPTokens * charsPerToken
-	
+
 	// Split text into chunks, preferring to break at newlines
 	chunks := smartChunk(text, maxChunkSize)
-	
+
 	if len(chunks) <= 1 {
 		return mcp.NewToolResultText(text)
 	}
@@ -521,13 +521,13 @@ func smartChunk(text string, maxSize int) []string {
 
 	var chunks []string
 	lines := strings.Split(text, "\n")
-	
+
 	currentChunk := ""
 	currentSize := 0
-	
+
 	for _, line := range lines {
 		lineSize := utf8.RuneCountInString(line) + 1 // +1 for newline
-		
+
 		// If adding this line would exceed the chunk size, start a new chunk
 		if currentSize+lineSize > maxSize && currentChunk != "" {
 			chunks = append(chunks, strings.TrimSuffix(currentChunk, "\n"))
@@ -538,12 +538,12 @@ func smartChunk(text string, maxSize int) []string {
 			currentSize += lineSize
 		}
 	}
-	
+
 	// Add the last chunk if it has content
 	if currentChunk != "" {
 		chunks = append(chunks, strings.TrimSuffix(currentChunk, "\n"))
 	}
-	
+
 	return chunks
 }
 
@@ -552,10 +552,10 @@ func getChunkSummary(chunk string) string {
 	if len(lines) == 0 {
 		return "Empty content"
 	}
-	
+
 	// Try to identify the type of content
 	firstLine := strings.TrimSpace(lines[0])
-	
+
 	if strings.Contains(chunk, "CRITICAL") || strings.Contains(chunk, "HIGH") {
 		return "Security scan results with findings"
 	} else if strings.Contains(chunk, "resource \"") {
@@ -573,11 +573,11 @@ func truncateText(text string, maxLen int) string {
 	if utf8.RuneCountInString(text) <= maxLen {
 		return text
 	}
-	
+
 	runes := []rune(text)
 	if len(runes) <= maxLen {
 		return text
 	}
-	
+
 	return string(runes[:maxLen]) + "..."
 }

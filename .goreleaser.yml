@@ -93,7 +93,7 @@ release:
     
     **Full Documentation**: https://github.com/cloudshipai/ship#readme
 
-homebrew:
+brews:
   - repository:
       owner: cloudshipai
       name: homebrew-tap

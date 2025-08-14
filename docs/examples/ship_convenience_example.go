@@ -1,3 +1,6 @@
+//go:build ignore
+// +build ignore
+
 // Package examples demonstrates the convenience functions for the Ship MCP SDK
 //
 // This example shows the three main usage patterns with convenience functions:

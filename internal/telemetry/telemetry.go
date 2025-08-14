@@ -57,7 +57,6 @@ func Init() error {
 		defaultAPIKey,
 		posthog.Config{
 			Endpoint: defaultHost,
-			Timeout:  defaultTimeout,
 		},
 	)
 	if err != nil {
@@ -107,12 +106,6 @@ func TrackMCPCommand(toolName string) {
 			DistinctId: globalClient.anonymousID,
 			Event:      "shp_mcp_command_executed",
 			Properties: properties,
-			Context: &posthog.Context{
-				App: posthog.AppInfo{
-					Name:    "ship-cli",
-					Version: getVersion(),
-				},
-			},
 		})
 
 		if err != nil {

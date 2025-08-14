@@ -1,3 +1,6 @@
+//go:build ignore
+// +build ignore
+
 // Package examples demonstrates how to use the Ship MCP SDK
 //
 // This example shows how to create an MCP server using the Ship SDK

@@ -10,11 +10,7 @@ import (
 )
 
 type Config struct {
-	APIKey     string          `mapstructure:"api_key"`
-	OrgID      string          `mapstructure:"org_id"`
 	DefaultEnv string          `mapstructure:"default_env"`
-	BaseURL    string          `mapstructure:"base_url"`
-	FleetID    string          `mapstructure:"fleet_id"`
 	Telemetry  TelemetryConfig `mapstructure:"telemetry"`
 }
 
@@ -24,7 +20,6 @@ type TelemetryConfig struct {
 }
 
 const (
-	defaultBaseURL = "https://api.cloudship.ai/v1"
 	configFileName = "config"
 	configFileType = "yaml"
 )
@@ -51,18 +46,12 @@ func init() {
 	v.AddConfigPath(configDir)
 
 	// Set defaults
-	v.SetDefault("base_url", defaultBaseURL)
 	v.SetDefault("telemetry.enabled", false)
 
 	// Environment variable binding
 	v.SetEnvPrefix("SHIP")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
-
-	// Backwards compatibility for env vars
-	v.BindEnv("api_key", "CLOUDSHIP_API_KEY")
-	v.BindEnv("base_url", "SHIP_API_URL", "CLOUDSHIP_API_URL")
-	v.BindEnv("fleet_id", "CLOUDSHIP_FLEET_ID")
 }
 
 func GetConfigDir() string {
@@ -89,10 +78,6 @@ func loadViper(v *viper.Viper) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
-	// Backwards compatibility for `token` field
-	if token := v.GetString("token"); token != "" && cfg.APIKey == "" {
-		cfg.APIKey = token
-	}
 
 	return &cfg, nil
 }
@@ -106,16 +91,9 @@ func saveViper(v *viper.Viper, cfg *Config) error {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	v.Set("api_key", cfg.APIKey)
-	v.Set("org_id", cfg.OrgID)
 	v.Set("default_env", cfg.DefaultEnv)
-	v.Set("base_url", cfg.BaseURL)
-	v.Set("fleet_id", cfg.FleetID)
 	v.Set("telemetry.enabled", cfg.Telemetry.Enabled)
 	v.Set("telemetry.session_id", cfg.Telemetry.SessionID)
-
-	// Remove deprecated `token` field
-	v.Set("token", nil)
 
 	if err := v.WriteConfigAs(configPath); err != nil {
 		return fmt.Errorf("failed to write config: %w", err)
@@ -139,8 +117,3 @@ func Clear() error {
 	return nil
 }
 
-func getBaseURL() string {
-	// This function is no longer needed as Viper handles it.
-	// Kept for reference during refactoring.
-	return ""
-}

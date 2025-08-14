@@ -14,14 +14,10 @@ func newTestViper(tempDir string) *viper.Viper {
 	v.SetConfigName(configFileName)
 	v.SetConfigType(configFileType)
 	v.AddConfigPath(tempDir)
-	v.SetDefault("base_url", defaultBaseURL)
 	v.SetDefault("telemetry.enabled", false)
 	v.SetEnvPrefix("SHIP")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
-	v.BindEnv("api_key", "CLOUDSHIP_API_KEY")
-	v.BindEnv("base_url", "SHIP_API_URL", "CLOUDSHIP_API_URL")
-	v.BindEnv("fleet_id", "CLOUDSHIP_FLEET_ID")
 	return v
 }
 
@@ -48,22 +44,15 @@ func TestConfig(t *testing.T) {
 			t.Fatalf("Failed to load empty config: %v", err)
 		}
 
-		if cfg.BaseURL != defaultBaseURL {
-			t.Errorf("Expected base URL %s, got %s", defaultBaseURL, cfg.BaseURL)
-		}
-
-		if cfg.APIKey != "" {
-			t.Errorf("Expected empty token, got %s", cfg.APIKey)
+		if cfg.DefaultEnv != "" {
+			t.Errorf("Expected empty default env, got %s", cfg.DefaultEnv)
 		}
 	})
 
 	t.Run("Save and load config", func(t *testing.T) {
 		v := newTestViper(tempDir)
 		testCfg := &Config{
-			APIKey:     "test-token",
-			OrgID:      "org-123",
 			DefaultEnv: "prod",
-			BaseURL:    "https://test.api.com",
 			Telemetry: TelemetryConfig{
 				Enabled:   true,
 				SessionID: "session-123",
@@ -96,20 +85,8 @@ func TestConfig(t *testing.T) {
 		}
 
 		// Verify loaded config
-		if loadedCfg.APIKey != testCfg.APIKey {
-			t.Errorf("Expected token %s, got %s", testCfg.APIKey, loadedCfg.APIKey)
-		}
-
-		if loadedCfg.OrgID != testCfg.OrgID {
-			t.Errorf("Expected org ID %s, got %s", testCfg.OrgID, loadedCfg.OrgID)
-		}
-
 		if loadedCfg.DefaultEnv != testCfg.DefaultEnv {
 			t.Errorf("Expected default env %s, got %s", testCfg.DefaultEnv, loadedCfg.DefaultEnv)
-		}
-
-		if loadedCfg.BaseURL != testCfg.BaseURL {
-			t.Errorf("Expected base URL %s, got %s", testCfg.BaseURL, loadedCfg.BaseURL)
 		}
 
 		if loadedCfg.Telemetry.Enabled != testCfg.Telemetry.Enabled {
@@ -120,23 +97,23 @@ func TestConfig(t *testing.T) {
 	t.Run("Environment variable override", func(t *testing.T) {
 		v := newTestViper(tempDir)
 		// Set environment variable
-		os.Setenv("SHIP_API_KEY", "env-token")
-		defer os.Unsetenv("SHIP_API_KEY")
+		os.Setenv("SHIP_DEFAULT_ENV", "env-test")
+		defer os.Unsetenv("SHIP_DEFAULT_ENV")
 
 		cfg, err := loadViper(v)
 		if err != nil {
 			t.Fatalf("Failed to load config with env var: %v", err)
 		}
 
-		if cfg.APIKey != "env-token" {
-			t.Errorf("Expected token from env var, got %s", cfg.APIKey)
+		if cfg.DefaultEnv != "env-test" {
+			t.Errorf("Expected default env from env var, got %s", cfg.DefaultEnv)
 		}
 	})
 
 	t.Run("Clear config", func(t *testing.T) {
 		v := newTestViper(tempDir)
 		// Create a config file
-		testCfg := &Config{APIKey: "test"}
+		testCfg := &Config{DefaultEnv: "test"}
 		if err := saveViper(v, testCfg); err != nil {
 			t.Fatalf("Failed to save config: %v", err)
 		}

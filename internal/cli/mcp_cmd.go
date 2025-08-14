@@ -365,9 +365,6 @@ func addTerraformTools(s *server.MCPServer) {
 		mcp.WithString("directory",
 			mcp.Description("Directory containing Terraform files (default: current directory)"),
 		),
-		// mcp.WithBoolean("push",
-		//	mcp.Description("Push results to Cloudship for analysis"),
-		// ),
 	)
 
 	s.AddTool(securityTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -551,14 +548,10 @@ func addResources(s *server.MCPServer) {
 - **docs**: Generate documentation with terraform-docs
 - **diagram**: Generate infrastructure diagrams with InfraMap
 
-## Cloud Operations
-- **push**: Upload artifacts to Cloudship for AI analysis
-- **auth**: Manage authentication and configuration
 
 ## Examples
 - ` + "`ship tf lint`" + ` - Lint current directory
 - ` + "`ship tf diagram . --hcl --format png`" + ` - Generate infrastructure diagram
-- ` + "`ship push terraform.tfplan --type terraform-plan`" + ` - Upload Terraform plan for analysis
 `
 
 		return []mcp.ResourceContents{

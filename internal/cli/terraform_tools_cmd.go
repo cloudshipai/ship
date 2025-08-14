@@ -1,14 +1,10 @@
 package cli
 
 import (
-	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
-	"github.com/cloudshipai/ship/internal/cloudship"
-	"github.com/cloudshipai/ship/internal/config"
 	"github.com/cloudshipai/ship/internal/dagger"
 	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/fatih/color"
@@ -82,21 +78,6 @@ func init() {
 	terraformToolsCmd.AddCommand(infracostCmd)
 	terraformToolsCmd.AddCommand(infraMapCmd)
 
-	// Add common push flags to all terraform-tools subcommands
-	for _, cmd := range []*cobra.Command{
-		costAnalysisCmd,
-		securityScanCmd,
-		generateDocsCmd,
-		lintCmd,
-		checkovScanCmd,
-		infracostCmd,
-		infraMapCmd,
-	} {
-		cmd.Flags().Bool("push", false, "Automatically push results to CloudShip")
-		cmd.Flags().String("push-fleet-id", "", "Fleet ID for push (overrides config/env)")
-		cmd.Flags().StringSlice("push-tags", []string{}, "Tags for the pushed artifact")
-		cmd.Flags().StringToString("push-metadata", map[string]string{}, "Additional metadata as key=value pairs")
-	}
 
 	// Add output file flags
 	generateDocsCmd.Flags().StringP("output", "o", "", "Output file to save documentation (default: print to stdout)")
@@ -203,13 +184,6 @@ func runCostAnalysis(cmd *cobra.Command, args []string) error {
 	// Get output flag
 	outputFile, _ := cmd.Flags().GetString("output")
 
-	// Handle push flag
-	shouldPush, _ := cmd.Flags().GetBool("push")
-	if shouldPush {
-		if err := pushToCloudShip(cmd, output, "cost_analysis", outputFile); err != nil {
-			return fmt.Errorf("failed to push to CloudShip: %w", err)
-		}
-	}
 
 	// Save or print output
 	return saveOrPrintOutput(output, outputFile, "Cost analysis completed!")
@@ -249,13 +223,6 @@ func runSecurityScan(cmd *cobra.Command, args []string) error {
 	// Get output flag
 	outputFile, _ := cmd.Flags().GetString("output")
 
-	// Handle push flag
-	shouldPush, _ := cmd.Flags().GetBool("push")
-	if shouldPush {
-		if err := pushToCloudShip(cmd, output, "security_scan", outputFile); err != nil {
-			return fmt.Errorf("failed to push to CloudShip: %w", err)
-		}
-	}
 
 	// Save or print output
 	return saveOrPrintOutput(output, outputFile, "Security scan completed!")
@@ -304,13 +271,6 @@ func runGenerateDocs(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("documentation generation failed: %w", err)
 	}
 
-	// Handle push flag
-	shouldPush, _ := cmd.Flags().GetBool("push")
-	if shouldPush {
-		if err := pushToCloudShip(cmd, output, "terraform_docs", outputFile); err != nil {
-			return fmt.Errorf("failed to push to CloudShip: %w", err)
-		}
-	}
 
 	// Save or print output
 	return saveOrPrintOutput(output, outputFile, "Documentation generated!")
@@ -350,13 +310,6 @@ func runLint(cmd *cobra.Command, args []string) error {
 	// Get output flag
 	outputFile, _ := cmd.Flags().GetString("output")
 
-	// Handle push flag
-	shouldPush, _ := cmd.Flags().GetBool("push")
-	if shouldPush {
-		if err := pushToCloudShip(cmd, output, "lint_results", outputFile); err != nil {
-			return fmt.Errorf("failed to push to CloudShip: %w", err)
-		}
-	}
 
 	// Save or print output
 	return saveOrPrintOutput(output, outputFile, "Linting completed!")
@@ -396,13 +349,6 @@ func runCheckovScan(cmd *cobra.Command, args []string) error {
 	// Get output flag
 	outputFile, _ := cmd.Flags().GetString("output")
 
-	// Handle push flag
-	shouldPush, _ := cmd.Flags().GetBool("push")
-	if shouldPush {
-		if err := pushToCloudShip(cmd, output, "checkov_scan", outputFile); err != nil {
-			return fmt.Errorf("failed to push to CloudShip: %w", err)
-		}
-	}
 
 	// Save or print output
 	return saveOrPrintOutput(output, outputFile, "Checkov scan completed!")
@@ -447,13 +393,6 @@ func runInfracost(cmd *cobra.Command, args []string) error {
 	// Get output flag
 	outputFile, _ := cmd.Flags().GetString("output")
 
-	// Handle push flag
-	shouldPush, _ := cmd.Flags().GetBool("push")
-	if shouldPush {
-		if err := pushToCloudShip(cmd, output, "infracost_estimate", outputFile); err != nil {
-			return fmt.Errorf("failed to push to CloudShip: %w", err)
-		}
-	}
 
 	// Save or print output
 	return saveOrPrintOutput(output, outputFile, "Cost estimation completed!")
@@ -522,13 +461,6 @@ func runInfraMap(cmd *cobra.Command, args []string) error {
 	// Get output flag
 	outputFile, _ := cmd.Flags().GetString("output")
 
-	// Handle push flag
-	shouldPush, _ := cmd.Flags().GetBool("push")
-	if shouldPush {
-		if err := pushToCloudShip(cmd, output, "infrastructure_diagram", outputFile); err != nil {
-			return fmt.Errorf("failed to push to CloudShip: %w", err)
-		}
-	}
 
 	// For binary formats, we need to write as binary
 	if format != "dot" && outputFile != "" {
@@ -545,88 +477,3 @@ func runInfraMap(cmd *cobra.Command, args []string) error {
 	return saveOrPrintOutput(output, outputFile, "Infrastructure diagram generated!")
 }
 
-// pushToCloudShip handles pushing results to CloudShip
-func pushToCloudShip(cmd *cobra.Command, output string, scanType string, outputFile string) error {
-	// Load config
-	cfg, err := config.Load()
-	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
-	}
-
-	// Check for API key
-	if cfg.APIKey == "" {
-		return fmt.Errorf("not authenticated - run 'ship auth --api-key YOUR_KEY' first")
-	}
-
-	// Get fleet ID from flag, config, or env
-	fleetID, _ := cmd.Flags().GetString("push-fleet-id")
-	if fleetID == "" {
-		fleetID = cfg.FleetID
-	}
-	if fleetID == "" {
-		return fmt.Errorf("fleet ID required - use --push-fleet-id flag or set CLOUDSHIP_FLEET_ID")
-	}
-
-	// Get tags and metadata
-	tags, _ := cmd.Flags().GetStringSlice("push-tags")
-	metadata, _ := cmd.Flags().GetStringToString("push-metadata")
-
-	// Create client
-	client := cloudship.NewClient(cfg.APIKey)
-
-	// Prepare metadata
-	meta := map[string]interface{}{
-		"scan_type":      scanType,
-		"scan_timestamp": time.Now().UTC().Format(time.RFC3339),
-		"source":         "ship-cli/v0.5.1",
-		"tags":           tags,
-		"command":        cmd.CommandPath(),
-	}
-
-	// Add custom metadata
-	for k, v := range metadata {
-		meta[k] = v
-	}
-
-	// Add ship ID if available
-	if shipID := os.Getenv("SHIP_ID"); shipID != "" {
-		meta["ship_id"] = shipID
-	}
-
-	// Add execution ID if available
-	if execID := os.Getenv("EXECUTION_ID"); execID != "" {
-		meta["execution_id"] = execID
-	}
-
-	// Determine filename
-	fileName := outputFile
-	if fileName == "" {
-		fileName = fmt.Sprintf("%s-%s.json", scanType, time.Now().Format("20060102-150405"))
-	} else {
-		fileName = filepath.Base(fileName)
-	}
-
-	// Create upload request
-	req := &cloudship.UploadArtifactRequest{
-		FleetID:  fleetID,
-		FileName: fileName,
-		FileType: "application/json",
-		Content:  base64.StdEncoding.EncodeToString([]byte(output)),
-		Metadata: meta,
-	}
-
-	// Upload artifact
-	fmt.Printf("\nPushing results to CloudShip...\n")
-
-	resp, err := client.UploadArtifact(req)
-	if err != nil {
-		return err
-	}
-
-	// Success
-	green := color.New(color.FgGreen)
-	green.Printf("✓ Successfully pushed to CloudShip!\n")
-	fmt.Printf("Artifact ID: %s\n", resp.ArtifactID)
-
-	return nil
-}

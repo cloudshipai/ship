@@ -21,11 +21,10 @@ func Execute(v, c, d string) error {
 
 var rootCmd = &cobra.Command{
 	Use:   "ship",
-	Short: "CloudshipAI CLI for Terraform analysis and infrastructure tools",
+	Short: "Ship CLI for Terraform analysis and infrastructure tools",
 	Long: `Ship CLI enables both non-technical users and power users to:
 - Run comprehensive Terraform analysis tools in containerized environments
 - Generate infrastructure documentation and diagrams
-- Push artifacts (terraform plans, SBOMs, etc.) to Cloudship for analysis
 - Host an MCP server for AI assistant integrations
 
 Key capabilities:

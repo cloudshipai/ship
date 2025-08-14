@@ -16,27 +16,27 @@ import (
 )
 
 var terraformToolsCmd = &cobra.Command{
-	Use:   "terraform-tools",
+	Use:   "tf",
 	Short: "Run Terraform analysis tools",
 	Long:  `Run various Terraform analysis tools including cost estimation, security scanning, and documentation generation`,
 }
 
 var costAnalysisCmd = &cobra.Command{
-	Use:   "cost-analysis [plan-file]",
+	Use:   "cost [plan-file]",
 	Short: "Analyze Terraform costs using OpenInfraQuote",
 	Args:  cobra.MaximumNArgs(1),
 	RunE:  runCostAnalysis,
 }
 
 var securityScanCmd = &cobra.Command{
-	Use:   "security-scan [directory]",
-	Short: "Scan Terraform code for security issues using InfraScan",
+	Use:   "trivy [directory]",
+	Short: "Scan Terraform code for security issues using Trivy",
 	Args:  cobra.MaximumNArgs(1),
 	RunE:  runSecurityScan,
 }
 
 var generateDocsCmd = &cobra.Command{
-	Use:   "generate-docs [directory]",
+	Use:   "docs [directory]",
 	Short: "Generate documentation for Terraform modules",
 	Args:  cobra.MaximumNArgs(1),
 	RunE:  runGenerateDocs,
@@ -50,21 +50,21 @@ var lintCmd = &cobra.Command{
 }
 
 var checkovScanCmd = &cobra.Command{
-	Use:   "checkov-scan [directory]",
+	Use:   "checkov [directory]",
 	Short: "Scan Terraform code for security issues using Checkov",
 	Args:  cobra.MaximumNArgs(1),
 	RunE:  runCheckovScan,
 }
 
 var infracostCmd = &cobra.Command{
-	Use:   "cost-estimate [directory]",
+	Use:   "infracost [directory]",
 	Short: "Estimate cloud costs using Infracost",
 	Args:  cobra.MaximumNArgs(1),
 	RunE:  runInfracost,
 }
 
 var infraMapCmd = &cobra.Command{
-	Use:   "generate-diagram [input]",
+	Use:   "diagram [input]",
 	Short: "Generate infrastructure diagram using InfraMap",
 	Long: `Generate visual infrastructure diagrams from Terraform state files or HCL configurations.
 InfraMap creates human-readable graphs showing infrastructure dependencies and relationships.`,
@@ -578,7 +578,7 @@ func pushToCloudShip(cmd *cobra.Command, output string, scanType string, outputF
 	meta := map[string]interface{}{
 		"scan_type":      scanType,
 		"scan_timestamp": time.Now().UTC().Format(time.RFC3339),
-		"source":         fmt.Sprintf("ship-cli/v%s", getVersion()),
+		"source":         "ship-cli/v0.5.1",
 		"tags":           tags,
 		"command":        cmd.CommandPath(),
 	}

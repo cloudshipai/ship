@@ -112,42 +112,6 @@ func (d *BuiltinDiscovery) DiscoverModules(ctx context.Context) ([]*Module, erro
 			Source:  "builtin",
 			Trusted: true,
 		},
-		{
-			APIVersion: "ship.cloudship.ai/v1",
-			Kind:       "Module",
-			Metadata: ModuleMetadata{
-				Name:        "ai-investigate",
-				Version:     "1.0.0",
-				Description: "AI-powered infrastructure investigation",
-				Author:      "CloudshipAI",
-			},
-			Spec: ModuleSpec{
-				Type: ModuleTypeDocker,
-				Commands: []ModuleCommand{
-					{
-						Name:        "investigate",
-						Description: "Investigate infrastructure using natural language",
-						Flags: []ModuleFlag{
-							{
-								Name:        "prompt",
-								Type:        "string",
-								Required:    true,
-								Description: "Natural language investigation prompt",
-							},
-							{
-								Name:        "provider",
-								Type:        "string",
-								Default:     "aws",
-								Description: "Cloud provider",
-								Enum:        []string{"aws", "azure", "gcp"},
-							},
-						},
-					},
-				},
-			},
-			Source:  "builtin",
-			Trusted: true,
-		},
 	}, nil
 }
 

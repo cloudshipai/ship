@@ -68,20 +68,7 @@ func (e *DockerExecutor) executeViaShipCLI(ctx context.Context, module *Module, 
 
 	switch module.Metadata.Name {
 	case "terraform-tools":
-		shipArgs = append(shipArgs, "terraform-tools", command)
-	case "ai-investigate":
-		shipArgs = append(shipArgs, "ai-investigate")
-
-		// Add flags
-		if prompt, ok := flags["prompt"].(string); ok {
-			shipArgs = append(shipArgs, "--prompt", prompt)
-		}
-		if provider, ok := flags["provider"].(string); ok {
-			shipArgs = append(shipArgs, "--provider", provider)
-		}
-		if execute, ok := flags["execute"].(bool); ok && execute {
-			shipArgs = append(shipArgs, "--execute")
-		}
+		shipArgs = append(shipArgs, "tf", command)
 	default:
 		return nil, fmt.Errorf("unknown built-in module: %s", module.Metadata.Name)
 	}

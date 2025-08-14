@@ -71,11 +71,28 @@ install: build
 	@echo "Installing $(BINARY_NAME) to /usr/local/bin..."
 	sudo cp $(BINARY_NAME) /usr/local/bin/
 
+## local-install: Install binary to ~/.local/bin (no sudo required)
+.PHONY: local-install
+local-install: build
+	@echo "Installing $(BINARY_NAME) to ~/.local/bin..."
+	@mkdir -p ~/.local/bin
+	cp $(BINARY_NAME) ~/.local/bin/
+	@echo "✅ $(BINARY_NAME) installed to ~/.local/bin/"
+	@echo ""
+	@echo "Make sure ~/.local/bin is in your PATH:"
+	@echo "  export PATH=\"\$$HOME/.local/bin:\$$PATH\""
+
 ## uninstall: Remove binary from /usr/local/bin
 .PHONY: uninstall
 uninstall:
 	@echo "Removing $(BINARY_NAME) from /usr/local/bin..."
 	sudo rm -f /usr/local/bin/$(BINARY_NAME)
+
+## local-uninstall: Remove binary from ~/.local/bin
+.PHONY: local-uninstall
+local-uninstall:
+	@echo "Removing $(BINARY_NAME) from ~/.local/bin..."
+	rm -f ~/.local/bin/$(BINARY_NAME)
 
 ## deps: Download dependencies
 .PHONY: deps

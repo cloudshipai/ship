@@ -16,13 +16,24 @@ import (
 )
 
 var mcpCmd = &cobra.Command{
-	Use:   "mcp",
-	Short: "Start MCP (Model Context Protocol) server",
-	Long: `Start an MCP server that exposes Ship CLI tools for use with AI assistants.
-	
-This allows AI assistants like Claude, Cursor, or other MCP-compatible clients to use Ship CLI
-functionality directly. The server exposes tools for Terraform analysis, cost estimation,
-security scanning, documentation generation, and cloud resource management.`,
+	Use:   "mcp [tool]",
+	Short: "Start MCP server for a specific tool or all tools",
+	Long: `Start an MCP server that exposes specific Ship CLI tools for AI assistants.
+
+Available tools:
+  lint       - TFLint for syntax and best practices
+  checkov    - Checkov security scanning
+  trivy      - Trivy security scanning
+  cost       - OpenInfraQuote cost analysis
+  docs       - terraform-docs documentation
+  diagram    - InfraMap diagram generation
+  all        - All tools (default if no tool specified)
+
+Examples:
+  ship mcp lint      # MCP server for just TFLint
+  ship mcp checkov   # MCP server for just Checkov
+  ship mcp all       # MCP server for all tools`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: runMCPServer,
 }
 
@@ -39,40 +50,57 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 	host, _ := cmd.Flags().GetString("host")
 	useStdio, _ := cmd.Flags().GetBool("stdio")
 
+	// Determine which tool to serve
+	toolName := "all"
+	if len(args) > 0 {
+		toolName = args[0]
+	}
+
 	// Create MCP server
-	s := server.NewMCPServer(
-		"ship-cli",
-		"1.0.0",
-	)
+	serverName := fmt.Sprintf("ship-%s", toolName)
+	s := server.NewMCPServer(serverName, "1.0.0")
 
-	// Add tools for terraform analysis
-	addTerraformTools(s)
-
-	// Investigation tools removed - focusing on Terraform analysis
-
-	// Add tools for general cloud operations
-	addCloudTools(s)
+	// Add specific tools based on argument
+	switch toolName {
+	case "lint":
+		addLintTool(s)
+	case "checkov":
+		addCheckovTool(s)
+	case "trivy", "security":
+		addTrivyTool(s)
+	case "cost":
+		addCostTool(s)
+	case "docs":
+		addDocsTool(s)
+	case "diagram":
+		addDiagramTool(s)
+	case "all":
+		addTerraformTools(s)
+	default:
+		return fmt.Errorf("unknown tool: %s. Available: lint, checkov, trivy, cost, docs, diagram, all", toolName)
+	}
 
 	// Add resources for documentation and help
 	addResources(s)
 
-	// Add prompts for common use cases
-	addPrompts(s)
+	// Add prompts only for 'all' mode
+	if toolName == "all" {
+		addPrompts(s)
+	}
 
 	// Start server
 	if useStdio || port == 0 {
-		fmt.Fprintf(os.Stderr, "Starting Ship CLI MCP server on stdio...\n")
+		fmt.Fprintf(os.Stderr, "Starting %s MCP server on stdio...\n", serverName)
 		return server.ServeStdio(s)
 	} else {
-		fmt.Fprintf(os.Stderr, "Starting Ship CLI MCP server on %s:%d...\n", host, port)
-		// Note: HTTP serving may require additional setup in this library version
+		fmt.Fprintf(os.Stderr, "Starting %s MCP server on %s:%d...\n", serverName, host, port)
 		return fmt.Errorf("HTTP server not implemented in this version, use --stdio")
 	}
 }
 
-func addTerraformTools(s *server.MCPServer) {
-	// Terraform Lint Tool
-	lintTool := mcp.NewTool("terraform_lint",
+// Individual tool functions
+func addLintTool(s *server.MCPServer) {
+	lintTool := mcp.NewTool("lint",
 		mcp.WithDescription("Run TFLint on Terraform code to check for syntax errors and best practices"),
 		mcp.WithString("directory",
 			mcp.Description("Directory containing Terraform files (default: current directory)"),
@@ -87,7 +115,7 @@ func addTerraformTools(s *server.MCPServer) {
 	)
 
 	s.AddTool(lintTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"terraform-tools", "lint"}
+		args := []string{"tf", "lint"}
 
 		if dir := request.GetString("directory", ""); dir != "" {
 			args = append(args, dir)
@@ -101,9 +129,10 @@ func addTerraformTools(s *server.MCPServer) {
 
 		return executeShipCommand(args)
 	})
+}
 
-	// Terraform Security Scan Tool (Checkov)
-	checkovTool := mcp.NewTool("terraform_checkov_scan",
+func addCheckovTool(s *server.MCPServer) {
+	checkovTool := mcp.NewTool("checkov",
 		mcp.WithDescription("Run Checkov security scan on Terraform code for policy compliance"),
 		mcp.WithString("directory",
 			mcp.Description("Directory containing Terraform files (default: current directory)"),
@@ -118,7 +147,7 @@ func addTerraformTools(s *server.MCPServer) {
 	)
 
 	s.AddTool(checkovTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"terraform-tools", "checkov-scan"}
+		args := []string{"tf", "checkov"}
 
 		if dir := request.GetString("directory", ""); dir != "" {
 			args = append(args, dir)
@@ -132,34 +161,29 @@ func addTerraformTools(s *server.MCPServer) {
 
 		return executeShipCommand(args)
 	})
+}
 
-	// Terraform Security Scan Tool (Alternative)
-	securityTool := mcp.NewTool("terraform_security_scan",
-		mcp.WithDescription("Run alternative security scan on Terraform code using Trivy"),
+func addTrivyTool(s *server.MCPServer) {
+	trivyTool := mcp.NewTool("trivy",
+		mcp.WithDescription("Run Trivy security scan on Terraform code using Trivy"),
 		mcp.WithString("directory",
 			mcp.Description("Directory containing Terraform files (default: current directory)"),
 		),
-		// mcp.WithBoolean("push",
-		//	mcp.Description("Push results to Cloudship for analysis"),
-		// ),
 	)
 
-	s.AddTool(securityTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"terraform-tools", "security-scan"}
+	s.AddTool(trivyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"tf", "trivy"}
 
 		if dir := request.GetString("directory", ""); dir != "" {
 			args = append(args, dir)
 		}
-		// Push functionality disabled during staging
-		// if push := request.GetBool("push", false); push {
-		//	args = append(args, "--push")
-		// }
 
 		return executeShipCommand(args)
 	})
+}
 
-	// Terraform Cost Analysis Tool
-	costAnalysisTool := mcp.NewTool("terraform_cost_analysis",
+func addCostTool(s *server.MCPServer) {
+	costTool := mcp.NewTool("cost",
 		mcp.WithDescription("Analyze infrastructure costs using OpenInfraQuote"),
 		mcp.WithString("directory",
 			mcp.Description("Directory containing Terraform files (default: current directory)"),
@@ -176,8 +200,8 @@ func addTerraformTools(s *server.MCPServer) {
 		),
 	)
 
-	s.AddTool(costAnalysisTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"terraform-tools", "cost-analysis"}
+	s.AddTool(costTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"tf", "cost"}
 
 		if dir := request.GetString("directory", ""); dir != "" {
 			args = append(args, dir)
@@ -194,9 +218,10 @@ func addTerraformTools(s *server.MCPServer) {
 
 		return executeShipCommand(args)
 	})
+}
 
-	// Terraform Documentation Tool
-	docsTool := mcp.NewTool("terraform_generate_docs",
+func addDocsTool(s *server.MCPServer) {
+	docsTool := mcp.NewTool("docs",
 		mcp.WithDescription("Generate documentation for Terraform modules using terraform-docs"),
 		mcp.WithString("directory",
 			mcp.Description("Directory containing Terraform files (default: current directory)"),
@@ -210,7 +235,7 @@ func addTerraformTools(s *server.MCPServer) {
 	)
 
 	s.AddTool(docsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"terraform-tools", "generate-docs"}
+		args := []string{"tf", "docs"}
 
 		if dir := request.GetString("directory", ""); dir != "" {
 			args = append(args, dir)
@@ -224,9 +249,10 @@ func addTerraformTools(s *server.MCPServer) {
 
 		return executeShipCommand(args)
 	})
+}
 
-	// Terraform Diagram Generation Tool
-	diagramTool := mcp.NewTool("terraform_generate_diagram",
+func addDiagramTool(s *server.MCPServer) {
+	diagramTool := mcp.NewTool("diagram",
 		mcp.WithDescription("Generate infrastructure diagrams from Terraform state"),
 		mcp.WithString("input",
 			mcp.Description("Input directory or file containing Terraform files (default: current directory)"),
@@ -248,7 +274,207 @@ func addTerraformTools(s *server.MCPServer) {
 	)
 
 	s.AddTool(diagramTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"terraform-tools", "generate-diagram"}
+		args := []string{"tf", "diagram"}
+
+		if input := request.GetString("input", ""); input != "" {
+			args = append(args, input)
+		}
+		if format := request.GetString("format", ""); format != "" {
+			args = append(args, "--format", format)
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		if hcl := request.GetBool("hcl", false); hcl {
+			args = append(args, "--hcl")
+		}
+		if provider := request.GetString("provider", ""); provider != "" {
+			args = append(args, "--provider", provider)
+		}
+
+		return executeShipCommand(args)
+	})
+}
+
+func addTerraformTools(s *server.MCPServer) {
+	// Terraform Lint Tool
+	lintTool := mcp.NewTool("lint",
+		mcp.WithDescription("Run TFLint on Terraform code to check for syntax errors and best practices"),
+		mcp.WithString("directory",
+			mcp.Description("Directory containing Terraform files (default: current directory)"),
+		),
+		mcp.WithString("format",
+			mcp.Description("Output format: default, json, compact"),
+			mcp.Enum("default", "json", "compact"),
+		),
+		mcp.WithString("output",
+			mcp.Description("Output file to save lint results"),
+		),
+	)
+
+	s.AddTool(lintTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"tf", "lint"}
+
+		if dir := request.GetString("directory", ""); dir != "" {
+			args = append(args, dir)
+		}
+		if format := request.GetString("format", ""); format != "" {
+			args = append(args, "--format", format)
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+
+		return executeShipCommand(args)
+	})
+
+	// Terraform Security Scan Tool (Checkov)
+	checkovTool := mcp.NewTool("checkov",
+		mcp.WithDescription("Run Checkov security scan on Terraform code for policy compliance"),
+		mcp.WithString("directory",
+			mcp.Description("Directory containing Terraform files (default: current directory)"),
+		),
+		mcp.WithString("format",
+			mcp.Description("Output format: cli, json, junit, sarif"),
+			mcp.Enum("cli", "json", "junit", "sarif"),
+		),
+		mcp.WithString("output",
+			mcp.Description("Output file to save scan results"),
+		),
+	)
+
+	s.AddTool(checkovTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"tf", "checkov"}
+
+		if dir := request.GetString("directory", ""); dir != "" {
+			args = append(args, dir)
+		}
+		if format := request.GetString("format", ""); format != "" {
+			args = append(args, "--format", format)
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+
+		return executeShipCommand(args)
+	})
+
+	// Terraform Security Scan Tool (Alternative)
+	securityTool := mcp.NewTool("trivy",
+		mcp.WithDescription("Run alternative security scan on Terraform code using Trivy"),
+		mcp.WithString("directory",
+			mcp.Description("Directory containing Terraform files (default: current directory)"),
+		),
+		// mcp.WithBoolean("push",
+		//	mcp.Description("Push results to Cloudship for analysis"),
+		// ),
+	)
+
+	s.AddTool(securityTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"tf", "trivy"}
+
+		if dir := request.GetString("directory", ""); dir != "" {
+			args = append(args, dir)
+		}
+		// Push functionality disabled during staging
+		// if push := request.GetBool("push", false); push {
+		//	args = append(args, "--push")
+		// }
+
+		return executeShipCommand(args)
+	})
+
+	// Terraform Cost Analysis Tool
+	costAnalysisTool := mcp.NewTool("cost",
+		mcp.WithDescription("Analyze infrastructure costs using OpenInfraQuote"),
+		mcp.WithString("directory",
+			mcp.Description("Directory containing Terraform files (default: current directory)"),
+		),
+		mcp.WithString("region",
+			mcp.Description("AWS region for pricing (e.g., us-east-1, us-west-2)"),
+		),
+		mcp.WithString("format",
+			mcp.Description("Output format: json, table"),
+			mcp.Enum("json", "table"),
+		),
+		mcp.WithString("output",
+			mcp.Description("Output file to save cost analysis"),
+		),
+	)
+
+	s.AddTool(costAnalysisTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"tf", "cost"}
+
+		if dir := request.GetString("directory", ""); dir != "" {
+			args = append(args, dir)
+		}
+		if region := request.GetString("region", ""); region != "" {
+			args = append(args, "--region", region)
+		}
+		if format := request.GetString("format", ""); format != "" {
+			args = append(args, "--format", format)
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+
+		return executeShipCommand(args)
+	})
+
+	// Terraform Documentation Tool
+	docsTool := mcp.NewTool("docs",
+		mcp.WithDescription("Generate documentation for Terraform modules using terraform-docs"),
+		mcp.WithString("directory",
+			mcp.Description("Directory containing Terraform files (default: current directory)"),
+		),
+		mcp.WithString("filename",
+			mcp.Description("Filename to save documentation as (default README.md)"),
+		),
+		mcp.WithString("output",
+			mcp.Description("Output file to save documentation"),
+		),
+	)
+
+	s.AddTool(docsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"tf", "docs"}
+
+		if dir := request.GetString("directory", ""); dir != "" {
+			args = append(args, dir)
+		}
+		if filename := request.GetString("filename", ""); filename != "" {
+			args = append(args, "--filename", filename)
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+
+		return executeShipCommand(args)
+	})
+
+	// Terraform Diagram Generation Tool
+	diagramTool := mcp.NewTool("diagram",
+		mcp.WithDescription("Generate infrastructure diagrams from Terraform state"),
+		mcp.WithString("input",
+			mcp.Description("Input directory or file containing Terraform files (default: current directory)"),
+		),
+		mcp.WithString("format",
+			mcp.Description("Output format: png, svg, pdf, dot"),
+			mcp.Enum("png", "svg", "pdf", "dot"),
+		),
+		mcp.WithString("output",
+			mcp.Description("Output file to save diagram"),
+		),
+		mcp.WithBoolean("hcl",
+			mcp.Description("Generate from HCL files instead of state file"),
+		),
+		mcp.WithString("provider",
+			mcp.Description("Filter by specific provider (aws, google, azurerm)"),
+			mcp.Enum("aws", "google", "azurerm"),
+		),
+	)
+
+	s.AddTool(diagramTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"tf", "diagram"}
 
 		if input := request.GetString("input", ""); input != "" {
 			args = append(args, input)
@@ -273,33 +499,7 @@ func addTerraformTools(s *server.MCPServer) {
 // Investigation tools removed to focus on Terraform analysis workflows
 
 func addCloudTools(s *server.MCPServer) {
-	// Push artifacts to Cloudship for analysis
-	pushTool := mcp.NewTool("cloudship_push",
-		mcp.WithDescription("Upload and analyze infrastructure artifacts with Cloudship AI"),
-		mcp.WithString("file",
-			mcp.Required(),
-			mcp.Description("Path to the file to upload (Terraform plan, SBOM, etc.)"),
-		),
-		mcp.WithString("type",
-			mcp.Description("Type of artifact being uploaded"),
-			mcp.Enum("terraform-plan", "sbom", "dockerfile", "kubernetes-manifest"),
-		),
-	)
-
-	s.AddTool(pushTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"push"}
-
-		if file, err := request.RequireString("file"); err == nil {
-			args = append(args, file)
-		} else {
-			return mcp.NewToolResultError("file parameter is required"), nil
-		}
-		if artifactType := request.GetString("type", ""); artifactType != "" {
-			args = append(args, "--type", artifactType)
-		}
-
-		return executeShipCommand(args)
-	})
+	// Cloud tools functionality removed - focusing on Terraform analysis only
 }
 
 func addResources(s *server.MCPServer) {
@@ -345,19 +545,19 @@ func addResources(s *server.MCPServer) {
 
 ## Terraform Tools
 - **lint**: Run TFLint for syntax and best practices
-- **checkov-scan**: Security scanning with Checkov
-- **security-scan**: Alternative security scanning with Trivy
-- **cost-analysis**: Cost analysis with OpenInfraQuote
-- **generate-docs**: Generate documentation with terraform-docs
-- **generate-diagram**: Generate infrastructure diagrams with InfraMap
+- **checkov**: Security scanning with Checkov
+- **trivy**: Alternative security scanning with Trivy
+- **cost**: Cost analysis with OpenInfraQuote
+- **docs**: Generate documentation with terraform-docs
+- **diagram**: Generate infrastructure diagrams with InfraMap
 
 ## Cloud Operations
 - **push**: Upload artifacts to Cloudship for AI analysis
 - **auth**: Manage authentication and configuration
 
 ## Examples
-- ` + "`ship terraform-tools lint`" + ` - Lint current directory
-- ` + "`ship terraform-tools generate-diagram . --hcl --format png`" + ` - Generate infrastructure diagram
+- ` + "`ship tf lint`" + ` - Lint current directory
+- ` + "`ship tf diagram . --hcl --format png`" + ` - Generate infrastructure diagram
 - ` + "`ship push terraform.tfplan --type terraform-plan`" + ` - Upload Terraform plan for analysis
 `
 

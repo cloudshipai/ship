@@ -60,77 +60,34 @@ func init() {
 }
 
 func runModulesList(cmd *cobra.Command, args []string) error {
-	ctx := cmd.Context()
-
-	// Get filter flags
-	typeFilter, _ := cmd.Flags().GetString("type")
-	sourceFilter, _ := cmd.Flags().GetString("source")
-	trustedOnly, _ := cmd.Flags().GetBool("trusted")
-
-	// Create module manager
-	manager := modules.NewManager(modules.ModuleConfig{
-		AllowUntrusted: true, // Allow all for listing
-	})
-
-	// Load modules
-	if err := manager.LoadModules(ctx); err != nil {
-		return fmt.Errorf("failed to load modules: %w", err)
-	}
-
-	// Filter modules
-	allModules := manager.GetModules()
-	var filteredModules []*modules.Module
-
-	for _, module := range allModules {
-		// Apply filters
-		if typeFilter != "" && string(module.Spec.Type) != typeFilter {
-			continue
-		}
-		if sourceFilter != "" && module.Source != sourceFilter {
-			continue
-		}
-		if trustedOnly && !module.Trusted {
-			continue
-		}
-
-		filteredModules = append(filteredModules, module)
-	}
-
-	// Display modules
-	if len(filteredModules) == 0 {
-		fmt.Println("No modules found matching the specified criteria.")
-		return nil
+	// Display available MCP tools instead of Docker modules
+	mcpTools := []struct {
+		Name        string
+		Description string
+		Type        string
+	}{
+		{"lint", "TFLint for syntax and best practices", "terraform"},
+		{"checkov", "Checkov security scanning", "security"},
+		{"trivy", "Trivy security scanning", "security"},
+		{"cost", "OpenInfraQuote cost analysis", "cost"},
+		{"docs", "terraform-docs documentation", "documentation"},
+		{"diagram", "InfraMap diagram generation", "visualization"},
+		{"all", "All tools combined", "meta"},
 	}
 
 	// Create table writer
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tVERSION\tTYPE\tSOURCE\tTRUSTED\tDESCRIPTION")
-	fmt.Fprintln(w, "----\t-------\t----\t------\t-------\t-----------")
+	fmt.Fprintln(w, "NAME\tTYPE\tDESCRIPTION")
+	fmt.Fprintln(w, "----\t----\t-----------")
 
-	for _, module := range filteredModules {
-		trusted := "No"
-		if module.Trusted {
-			trusted = "Yes"
-		}
-
-		description := module.Metadata.Description
-		if len(description) > 50 {
-			description = description[:47] + "..."
-		}
-
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
-			module.Metadata.Name,
-			module.Metadata.Version,
-			module.Spec.Type,
-			module.Source,
-			trusted,
-			description,
-		)
+	for _, tool := range mcpTools {
+		fmt.Fprintf(w, "%s\t%s\t%s\n", tool.Name, tool.Type, tool.Description)
 	}
 
 	w.Flush()
 
-	fmt.Printf("\nTotal: %d modules\n", len(filteredModules))
+	fmt.Printf("\nTotal: %d MCP tools available\n", len(mcpTools))
+	
 	return nil
 }
 

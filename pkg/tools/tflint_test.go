@@ -15,16 +15,16 @@ func TestNewTFLintTool(t *testing.T) {
 
 	assert.Equal(t, "tflint", tool.Name())
 	assert.Equal(t, "Run TFLint on Terraform code to check for syntax errors and best practices", tool.Description())
-	
+
 	params := tool.Parameters()
 	assert.Len(t, params, 6)
-	
+
 	// Verify parameter names
 	paramNames := make(map[string]bool)
 	for _, param := range params {
 		paramNames[param.Name] = true
 	}
-	
+
 	expectedParams := []string{"directory", "format", "config", "enable_rules", "disable_rules", "init"}
 	for _, expected := range expectedParams {
 		assert.True(t, paramNames[expected], "Expected parameter %s not found", expected)
@@ -34,12 +34,12 @@ func TestNewTFLintTool(t *testing.T) {
 func TestTFLintParameterTypes(t *testing.T) {
 	tool := NewTFLintTool()
 	params := tool.Parameters()
-	
+
 	paramMap := make(map[string]ship.Parameter)
 	for _, param := range params {
 		paramMap[param.Name] = param
 	}
-	
+
 	t.Run("string parameters", func(t *testing.T) {
 		stringParams := []string{"directory", "format", "config", "enable_rules", "disable_rules"}
 		for _, name := range stringParams {
@@ -48,14 +48,14 @@ func TestTFLintParameterTypes(t *testing.T) {
 			assert.Equal(t, "string", param.Type, "Parameter %s should be string type", name)
 		}
 	})
-	
+
 	t.Run("boolean parameters", func(t *testing.T) {
 		param, exists := paramMap["init"]
 		assert.True(t, exists)
 		assert.Equal(t, "boolean", param.Type)
 		assert.False(t, param.Required)
 	})
-	
+
 	t.Run("format enum", func(t *testing.T) {
 		param, exists := paramMap["format"]
 		assert.True(t, exists)
@@ -82,7 +82,7 @@ func TestTFLintExecution(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.NotEmpty(t, result.Content)
-		
+
 		// Verify metadata
 		assert.Equal(t, "json", result.Metadata["format"])
 		assert.Equal(t, ".", result.Metadata["directory"])
@@ -104,7 +104,7 @@ func TestTFLintExecution(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.NotEmpty(t, result.Content)
-		
+
 		// Verify metadata
 		assert.Equal(t, false, result.Metadata["initialized"])
 	})
@@ -120,7 +120,7 @@ func TestTFLintExecution(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
-		
+
 		// Verify metadata
 		assert.Equal(t, ".tflint.hcl", result.Metadata["config_file"])
 		assert.Equal(t, "compact", result.Metadata["format"])
@@ -141,9 +141,9 @@ func TestTFLintParameterHelpers(t *testing.T) {
 
 	t.Run("getBoolParam", func(t *testing.T) {
 		params := map[string]interface{}{
-			"bool_true":   true,
-			"bool_false":  false,
-			"string_true": "true",
+			"bool_true":    true,
+			"bool_false":   false,
+			"string_true":  "true",
 			"string_false": "false",
 			"string_TRUE":  "TRUE",
 		}

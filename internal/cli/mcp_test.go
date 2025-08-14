@@ -60,7 +60,7 @@ func TestMCPServerIntegration(t *testing.T) {
 		toolsRequest := mcp.ListToolsRequest{}
 		toolsResult, err := mcpClient.ListTools(ctx, toolsRequest)
 		require.NoError(t, err)
-		
+
 		// Verify we get the lint tool
 		require.Len(t, toolsResult.Tools, 1)
 		tool := toolsResult.Tools[0]
@@ -97,16 +97,16 @@ func TestMCPServerIntegration(t *testing.T) {
 		toolsRequest := mcp.ListToolsRequest{}
 		toolsResult, err := mcpClient.ListTools(ctx, toolsRequest)
 		require.NoError(t, err)
-		
+
 		// Verify we get all 6 tools (lint, checkov, trivy, cost, docs, diagram)
 		assert.Len(t, toolsResult.Tools, 6)
-		
+
 		// Check that tool names are clean (no prefixes)
 		toolNames := make([]string, len(toolsResult.Tools))
 		for i, tool := range toolsResult.Tools {
 			toolNames[i] = tool.Name
 		}
-		
+
 		expectedTools := []string{"checkov", "cost", "diagram", "docs", "lint", "trivy"}
 		for _, expectedTool := range expectedTools {
 			assert.Contains(t, toolNames, expectedTool, "Missing expected tool: %s", expectedTool)
@@ -152,18 +152,18 @@ func TestMCPServerIntegration(t *testing.T) {
 			resourcesRequest := mcp.ListResourcesRequest{}
 			resourcesResult, err := mcpClient.ListResources(ctx, resourcesRequest)
 			require.NoError(t, err)
-			
+
 			// Should have help and tools resources
 			assert.Len(t, resourcesResult.Resources, 2)
-			
+
 			resourceNames := make([]string, len(resourcesResult.Resources))
 			for i, resource := range resourcesResult.Resources {
 				resourceNames[i] = resource.URI
 			}
-			
+
 			assert.Contains(t, resourceNames, "ship://help")
 			assert.Contains(t, resourceNames, "ship://tools")
-			
+
 			t.Logf("Resources found: %v", resourceNames)
 		} else {
 			t.Log("Server does not support resources")
@@ -216,10 +216,10 @@ resource "aws_instance" "example" {
 
 		callResult, err := mcpClient.CallTool(ctx, callRequest)
 		require.NoError(t, err)
-		
+
 		// Verify we got a result
 		assert.NotEmpty(t, callResult.Content)
-		
+
 		// The result should contain some text content
 		if len(callResult.Content) > 0 {
 			if textContent, ok := callResult.Content[0].(mcp.TextContent); ok {

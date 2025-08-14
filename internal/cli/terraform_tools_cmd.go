@@ -78,7 +78,6 @@ func init() {
 	terraformToolsCmd.AddCommand(infracostCmd)
 	terraformToolsCmd.AddCommand(infraMapCmd)
 
-
 	// Add output file flags
 	generateDocsCmd.Flags().StringP("output", "o", "", "Output file to save documentation (default: print to stdout)")
 	generateDocsCmd.Flags().StringP("filename", "f", "README.md", "Filename to save documentation as")
@@ -184,7 +183,6 @@ func runCostAnalysis(cmd *cobra.Command, args []string) error {
 	// Get output flag
 	outputFile, _ := cmd.Flags().GetString("output")
 
-
 	// Save or print output
 	return saveOrPrintOutput(output, outputFile, "Cost analysis completed!")
 }
@@ -222,7 +220,6 @@ func runSecurityScan(cmd *cobra.Command, args []string) error {
 
 	// Get output flag
 	outputFile, _ := cmd.Flags().GetString("output")
-
 
 	// Save or print output
 	return saveOrPrintOutput(output, outputFile, "Security scan completed!")
@@ -271,7 +268,6 @@ func runGenerateDocs(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("documentation generation failed: %w", err)
 	}
 
-
 	// Save or print output
 	return saveOrPrintOutput(output, outputFile, "Documentation generated!")
 }
@@ -310,7 +306,6 @@ func runLint(cmd *cobra.Command, args []string) error {
 	// Get output flag
 	outputFile, _ := cmd.Flags().GetString("output")
 
-
 	// Save or print output
 	return saveOrPrintOutput(output, outputFile, "Linting completed!")
 }
@@ -348,7 +343,6 @@ func runCheckovScan(cmd *cobra.Command, args []string) error {
 
 	// Get output flag
 	outputFile, _ := cmd.Flags().GetString("output")
-
 
 	// Save or print output
 	return saveOrPrintOutput(output, outputFile, "Checkov scan completed!")
@@ -392,7 +386,6 @@ func runInfracost(cmd *cobra.Command, args []string) error {
 
 	// Get output flag
 	outputFile, _ := cmd.Flags().GetString("output")
-
 
 	// Save or print output
 	return saveOrPrintOutput(output, outputFile, "Cost estimation completed!")
@@ -461,7 +454,6 @@ func runInfraMap(cmd *cobra.Command, args []string) error {
 	// Get output flag
 	outputFile, _ := cmd.Flags().GetString("output")
 
-
 	// For binary formats, we need to write as binary
 	if format != "dot" && outputFile != "" {
 		// Write binary output
@@ -476,4 +468,3 @@ func runInfraMap(cmd *cobra.Command, args []string) error {
 	// For text formats or stdout
 	return saveOrPrintOutput(output, outputFile, "Infrastructure diagram generated!")
 }
-

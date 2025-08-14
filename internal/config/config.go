@@ -78,7 +78,6 @@ func loadViper(v *viper.Viper) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
-
 	return &cfg, nil
 }
 
@@ -116,4 +115,3 @@ func Clear() error {
 	}
 	return nil
 }
-

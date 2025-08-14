@@ -17,10 +17,10 @@ func NewEngine(ctx context.Context) (*Engine, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("context cannot be nil")
 	}
-	
+
 	// TODO: Initialize actual Dagger client here
 	// For now, we'll use a placeholder
-	
+
 	return &Engine{
 		ctx:    ctx,
 		client: nil, // Placeholder
@@ -36,13 +36,13 @@ func (e *Engine) Container() *ContainerBuilder {
 			err:    fmt.Errorf("engine is closed"),
 		}
 	}
-	
+
 	return &ContainerBuilder{
-		engine: e,
-		image:  "",
-		mounts: make(map[string]string),
-		env:    make(map[string]string),
-		workdir: "",
+		engine:   e,
+		image:    "",
+		mounts:   make(map[string]string),
+		env:      make(map[string]string),
+		workdir:  "",
 		commands: [][]string{},
 	}
 }
@@ -59,10 +59,10 @@ func (e *Engine) Close() error {
 	if e.closed {
 		return nil
 	}
-	
+
 	e.closed = true
 	// TODO: Close actual Dagger client here
-	
+
 	return nil
 }
 

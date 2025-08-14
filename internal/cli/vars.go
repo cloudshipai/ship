@@ -116,7 +116,7 @@ func getToolVariables(toolName string) (map[string]interface{}, error) {
 
 func getAllToolVariables() (map[string]interface{}, error) {
 	allVars := make(map[string]interface{})
-	
+
 	tools := []string{"lint", "checkov", "trivy", "cost", "docs", "diagram"}
 	for _, tool := range tools {
 		vars, err := getToolVariables(tool)
@@ -125,19 +125,19 @@ func getAllToolVariables() (map[string]interface{}, error) {
 		}
 		allVars[tool] = vars
 	}
-	
+
 	return allVars, nil
 }
 
 func getLintVariables() map[string]interface{} {
 	return map[string]interface{}{
 		"lint": map[string]interface{}{
-			"format":     "default",
-			"output":     "",
-			"directory":  ".",
-			"config":     ".tflint.hcl",
-			"recursive":  true,
-			"module":     true,
+			"format":    "default",
+			"output":    "",
+			"directory": ".",
+			"config":    ".tflint.hcl",
+			"recursive": true,
+			"module":    true,
 		},
 	}
 }
@@ -145,15 +145,15 @@ func getLintVariables() map[string]interface{} {
 func getCheckovVariables() map[string]interface{} {
 	return map[string]interface{}{
 		"checkov": map[string]interface{}{
-			"format":       "cli",
-			"output":       "",
-			"directory":    ".",
-			"config_file":  ".checkov.yml",
-			"framework":    "terraform",
-			"check":        "",
-			"skip_check":   "",
-			"compact":      false,
-			"quiet":        false,
+			"format":      "cli",
+			"output":      "",
+			"directory":   ".",
+			"config_file": ".checkov.yml",
+			"framework":   "terraform",
+			"check":       "",
+			"skip_check":  "",
+			"compact":     false,
+			"quiet":       false,
 		},
 	}
 }
@@ -174,11 +174,11 @@ func getTrivyVariables() map[string]interface{} {
 func getCostVariables() map[string]interface{} {
 	return map[string]interface{}{
 		"cost": map[string]interface{}{
-			"directory": ".",
-			"region":    "us-east-1",
-			"format":    "table",
-			"output":    "",
-			"currency":  "USD",
+			"directory":  ".",
+			"region":     "us-east-1",
+			"format":     "table",
+			"output":     "",
+			"currency":   "USD",
 			"usage_file": "",
 		},
 	}
@@ -215,7 +215,7 @@ func getOutputPath(devFlag, stagingFlag, prodFlag bool) (string, error) {
 	envFlags := []bool{devFlag, stagingFlag, prodFlag}
 	envCount := 0
 	var envName string
-	
+
 	for i, flag := range envFlags {
 		if flag {
 			envCount++
@@ -229,30 +229,30 @@ func getOutputPath(devFlag, stagingFlag, prodFlag bool) (string, error) {
 			}
 		}
 	}
-	
+
 	if envCount > 1 {
 		return "", fmt.Errorf("only one environment flag can be specified")
 	}
-	
+
 	// If no environment flag, use current directory
 	if envCount == 0 {
 		return "./variables.yml", nil
 	}
-	
+
 	// Use XDG config path for station environments
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to get home directory: %w", err)
 	}
-	
+
 	stationPath := filepath.Join(homeDir, ".config", "station", "environments", envName, "variables.yml")
-	
+
 	// Ensure directory exists
 	dir := filepath.Dir(stationPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
-	
+
 	return stationPath, nil
 }
 
@@ -261,7 +261,7 @@ func printVariables(variables map[string]interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal variables to YAML: %w", err)
 	}
-	
+
 	fmt.Print(string(yamlData))
 	return nil
 }
@@ -275,34 +275,34 @@ func writeVariablesToFile(variables map[string]interface{}, outputPath string) e
 		if err != nil {
 			return fmt.Errorf("failed to read existing file %s: %w", outputPath, err)
 		}
-		
+
 		if err := yaml.Unmarshal(existingData, &existingVars); err != nil {
 			return fmt.Errorf("failed to parse existing YAML: %w", err)
 		}
-		
+
 		// Merge variables
 		if existingVars == nil {
 			existingVars = make(map[string]interface{})
 		}
-		
+
 		for key, value := range variables {
 			existingVars[key] = value
 		}
-		
+
 		variables = existingVars
 	}
-	
+
 	// Marshal to YAML
 	yamlData, err := yaml.Marshal(variables)
 	if err != nil {
 		return fmt.Errorf("failed to marshal variables to YAML: %w", err)
 	}
-	
+
 	// Write to file
 	if err := os.WriteFile(outputPath, yamlData, 0644); err != nil {
 		return fmt.Errorf("failed to write to file %s: %w", outputPath, err)
 	}
-	
+
 	fmt.Printf("Variables exported to: %s\n", outputPath)
 	return nil
 }

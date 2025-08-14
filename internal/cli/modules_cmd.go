@@ -87,7 +87,7 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 	w.Flush()
 
 	fmt.Printf("\nTotal: %d MCP tools available\n", len(mcpTools))
-	
+
 	return nil
 }
 

@@ -146,7 +146,7 @@ func executeTFLint(ctx context.Context, params map[string]interface{}, engine *d
 
 	// Get stderr for any warnings/errors
 	stderr, _ := container.Stderr(ctx)
-	
+
 	// Combine output and stderr if both exist
 	finalOutput := output
 	if stderr != "" {
@@ -156,12 +156,12 @@ func executeTFLint(ctx context.Context, params map[string]interface{}, engine *d
 	return &ship.ToolResult{
 		Content: finalOutput,
 		Metadata: map[string]interface{}{
-			"format":       format,
-			"directory":    directory,
-			"config_file":  configFile,
-			"initialized":  shouldInit,
-			"tool":         "tflint",
-			"image":        TFLintImage,
+			"format":      format,
+			"directory":   directory,
+			"config_file": configFile,
+			"initialized": shouldInit,
+			"tool":        "tflint",
+			"image":       TFLintImage,
 		},
 	}, nil
 }

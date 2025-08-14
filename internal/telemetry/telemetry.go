@@ -20,8 +20,8 @@ const (
 )
 
 type Client struct {
-	posthog    posthog.Client
-	enabled    bool
+	posthog     posthog.Client
+	enabled     bool
 	anonymousID string
 }
 
@@ -128,12 +128,12 @@ func generateAnonymousID() string {
 	// Use hostname and other stable machine characteristics
 	hostname, _ := os.Hostname()
 	userHomeDir, _ := os.UserHomeDir()
-	
+
 	// Create a hash of stable machine characteristics
 	hasher := sha256.New()
 	hasher.Write([]byte(fmt.Sprintf("ship-cli-%s-%s", hostname, userHomeDir)))
 	hash := hasher.Sum(nil)
-	
+
 	// Return first 16 chars of hex encoded hash
 	return fmt.Sprintf("ship-%x", hash)[:21]
 }

@@ -1,6 +1,6 @@
 # Ship CLI
 
-CloudshipAI CLI - A powerful command-line tool that brings enterprise-grade infrastructure analysis tools to your fingertips, all running in containers without local installations.
+A powerful command-line tool that brings enterprise-grade infrastructure analysis tools to your fingertips, all running in containers without local installations.
 
 > **🤖 For LLMs and AI Assistants**: Complete installation and usage instructions specifically designed for AI consumption are available in [llms.txt](./llms.txt). This includes MCP server setup, integration examples, and best practices for AI-driven infrastructure analysis with all 7 MCP tools.
 
@@ -17,6 +17,32 @@ CloudshipAI CLI - A powerful command-line tool that brings enterprise-grade infr
 - **🐳 Containerized Tools**: All tools run in containers via Dagger - no local installations needed
 - **☁️ Cloud Integration**: Seamlessly works with AWS, Azure, GCP, and other cloud providers
 - **🔧 CI/CD Ready**: Perfect for integration into your existing pipelines
+
+## 📊 Privacy & Telemetry
+
+Ship CLI collects anonymous usage telemetry to help us improve the tool. This data is completely anonymous and helps us understand which features are most valuable.
+
+**What we collect:**
+- Command usage patterns (e.g., which MCP tools are used)
+- Tool execution frequency
+- Anonymous system identifiers (no personal information)
+
+**What we DON'T collect:**
+- File contents or code
+- Personal information
+- Project names or paths
+- Error details or sensitive data
+
+**Opt-out anytime:**
+```bash
+# Disable telemetry via environment variable
+export SHIP_TELEMETRY=false
+
+# Or disable in config
+ship vars set telemetry.enabled false
+```
+
+The telemetry system is powered by [PostHog](https://posthog.com) and uses industry-standard privacy practices.
 
 ## 📚 Table of Contents
 
@@ -80,10 +106,10 @@ go run ./cmd/ship [command]
 cd your-terraform-project
 
 # Run a comprehensive analysis
-ship terraform-tools lint                # Check for errors and best practices
-ship terraform-tools checkov-scan        # Security scanning
-ship terraform-tools cost-estimate       # Estimate AWS/Azure/GCP costs
-ship terraform-tools generate-docs       # Generate documentation
+ship tf lint                # Check for errors and best practices
+ship tf checkov             # Security scanning
+ship tf cost                # Estimate AWS/Azure/GCP costs
+ship tf docs                # Generate documentation
 ```
 
 ### 2. Real-World Example
@@ -94,60 +120,40 @@ git clone https://github.com/terraform-aws-modules/terraform-aws-vpc.git
 cd terraform-aws-vpc/examples/simple
 
 # Run all tools
-ship terraform-tools lint
-ship terraform-tools checkov-scan
-ship terraform-tools security-scan
-ship terraform-tools cost-estimate
-ship terraform-tools generate-docs > README.md
-ship terraform-tools generate-diagram . --hcl -o infrastructure.png
+ship tf lint
+ship tf checkov
+ship tf trivy
+ship tf cost
+ship tf docs > README.md
+ship tf diagram . --hcl -o infrastructure.png
 ```
 
-### 3. CloudShip Integration
-
-Authenticate and push analysis results to CloudShip:
-
-```bash
-# Authenticate with CloudShip
-ship auth --api-key YOUR_API_KEY
-
-# Set your default fleet ID (optional)
-export CLOUDSHIP_FLEET_ID=your-fleet-id
-
-# Push results automatically to CloudShip
-ship terraform-tools security-scan --push
-ship terraform-tools cost-estimate --push --push-tags "production,aws"
-
-# Or push manually
-ship terraform-tools lint -o lint-results.json
-ship push lint-results.json --type lint_results --fleet-id your-fleet-id
-```
-
-### 4. Generate Infrastructure Diagrams
+### 3. Generate Infrastructure Diagrams
 
 Visualize your infrastructure with InfraMap integration:
 
 ```bash
 # Generate diagram from Terraform files (no state file needed!)
-ship terraform-tools generate-diagram . --hcl --format png -o infrastructure.png
+ship tf diagram . --hcl --format png -o infrastructure.png
 
 # Generate from existing state file
-ship terraform-tools generate-diagram terraform.tfstate -o current-state.png
+ship tf diagram terraform.tfstate -o current-state.png
 
 # Generate SVG for web documentation
-ship terraform-tools generate-diagram . --hcl --format svg -o architecture.svg
+ship tf diagram . --hcl --format svg -o architecture.svg
 
 # Filter by provider (AWS only)
-ship terraform-tools generate-diagram terraform.tfstate --provider aws -o aws-resources.png
+ship tf diagram terraform.tfstate --provider aws -o aws-resources.png
 
 # Show all resources without filtering (raw mode)
-ship terraform-tools generate-diagram . --hcl --raw -o complete-diagram.png
+ship tf diagram . --hcl --raw -o complete-diagram.png
 
 # Real-world example
 cd /path/to/your/terraform/project
-ship terraform-tools generate-diagram . --hcl -o docs/infrastructure-diagram.png
+ship tf diagram . --hcl -o docs/infrastructure-diagram.png
 ```
 
-### 5. AI Assistant Integration (MCP)
+### 4. AI Assistant Integration (MCP)
 
 Ship CLI includes a built-in MCP (Model Context Protocol) server that makes all functionality available to AI assistants like Claude Desktop and Cursor:
 
@@ -177,13 +183,12 @@ ship mcp
 - **Infrastructure Diagrams**: "Generate a visual diagram of this infrastructure"
 
 **Available MCP Tools:**
-- `terraform_lint` - Code linting and best practices
-- `terraform_checkov_scan` - Security analysis with Checkov
-- `terraform_security_scan` - Security analysis with Trivy
-- `terraform_cost_analysis` - Cost estimation with OpenInfraQuote
-- `terraform_generate_docs` - Documentation generation
-- `terraform_generate_diagram` - Infrastructure diagram generation
-- `cloudship_push` - Upload artifacts for AI analysis
+- `lint` - Code linting and best practices
+- `checkov` - Security analysis with Checkov
+- `trivy` - Security analysis with Trivy
+- `cost` - Cost estimation with OpenInfraQuote
+- `docs` - Documentation generation
+- `diagram` - Infrastructure diagram generation
 
 **Pre-built Workflows:**
 - `security_audit` - Comprehensive security audit process
@@ -191,7 +196,7 @@ ship mcp
 
 See the [MCP Integration Guide](docs/mcp-integration.md) for complete setup instructions.
 
-### 6. CI/CD Integration
+### 5. CI/CD Integration
 
 ```yaml
 # GitHub Actions Example
@@ -209,10 +214,10 @@ jobs:
           go install github.com/cloudshipai/ship/cmd/ship@latest
       
       - name: Run Security Scan
-        run: ship terraform-tools checkov-scan
+        run: ship tf checkov
       
       - name: Estimate Costs
-        run: ship terraform-tools cost-estimate
+        run: ship tf cost
         env:
           INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
 ```
@@ -221,13 +226,13 @@ jobs:
 
 | Tool | Command | Description | Docker Image |
 |------|---------|-------------|--------------|
-| **InfraMap** | `ship terraform-tools generate-diagram` | Infrastructure diagram generation | `cycloid/inframap:latest` |
-| **TFLint** | `ship terraform-tools lint` | Terraform linter for syntax and best practices | `ghcr.io/terraform-linters/tflint` |
-| **Checkov** | `ship terraform-tools checkov-scan` | Comprehensive security and compliance scanner | `bridgecrew/checkov` |
-| **Infracost** | `ship terraform-tools cost-estimate` | Cloud cost estimation with breakdown | `infracost/infracost` |
-| **Trivy** | `ship terraform-tools security-scan` | Vulnerability scanner for IaC | `aquasec/trivy` |
-| **terraform-docs** | `ship terraform-tools generate-docs` | Auto-generate module documentation | `quay.io/terraform-docs/terraform-docs` |
-| **OpenInfraQuote** | `ship terraform-tools cost-analysis` | Alternative cost analysis tool | `gruebel/openinfraquote` |
+| **InfraMap** | `ship tf diagram` | Infrastructure diagram generation | `cycloid/inframap:latest` |
+| **TFLint** | `ship tf lint` | Terraform linter for syntax and best practices | `ghcr.io/terraform-linters/tflint` |
+| **Checkov** | `ship tf checkov` | Comprehensive security and compliance scanner | `bridgecrew/checkov` |
+| **Infracost** | `ship tf infracost` | Cloud cost estimation with breakdown | `infracost/infracost` |
+| **Trivy** | `ship tf trivy` | Vulnerability scanner for IaC | `aquasec/trivy` |
+| **terraform-docs** | `ship tf docs` | Auto-generate module documentation | `quay.io/terraform-docs/terraform-docs` |
+| **OpenInfraQuote** | `ship tf cost` | Alternative cost analysis tool | `gruebel/openinfraquote` |
 
 ## 📋 Command Reference
 
@@ -250,37 +255,37 @@ ship modules list --trusted  # Show only trusted modules
 ### Infrastructure Diagrams
 ```bash
 # Generate diagram from Terraform files
-ship terraform-tools generate-diagram . --hcl --format png
+ship tf diagram . --hcl --format png
 
 # Generate from state file
-ship terraform-tools generate-diagram terraform.tfstate --format svg
+ship tf diagram terraform.tfstate --format svg
 
 # Filter by provider
-ship terraform-tools generate-diagram . --hcl --provider aws --format png
+ship tf diagram . --hcl --provider aws --format png
 ```
 
 ### Linting
 ```bash
 # Basic linting
-ship terraform-tools lint
+ship tf lint
 
 # Lint specific directory
-ship terraform-tools lint ./modules/vpc
+ship tf lint ./modules/vpc
 
 # Lint with custom config
-ship terraform-tools lint --config .tflint.hcl
+ship tf lint --config .tflint.hcl
 ```
 
 ### Security Scanning
 ```bash
 # Checkov scan (recommended)
-ship terraform-tools checkov-scan
+ship tf checkov
 
 # Trivy scan (alternative)
-ship terraform-tools security-scan
+ship tf trivy
 
 # Scan specific frameworks
-ship terraform-tools checkov-scan --framework terraform,arm
+ship tf checkov --framework terraform,arm
 ```
 
 ### Cost Estimation
@@ -288,25 +293,25 @@ ship terraform-tools checkov-scan --framework terraform,arm
 #### Using Infracost
 ```bash
 # Estimate costs for current directory
-ship terraform-tools cost-estimate
+ship tf infracost
 
 # Estimate with specific cloud provider
-ship terraform-tools cost-estimate --cloud aws
+ship tf infracost --cloud aws
 
 # Compare costs between branches
-ship terraform-tools cost-estimate --compare-to main
+ship tf infracost --compare-to main
 ```
 
 #### Using OpenInfraQuote (More Accurate)
 ```bash
 # Analyze costs with OpenInfraQuote
-ship terraform-tools cost-analysis
+ship tf cost
 
 # Analyze specific plan file
-ship terraform-tools cost-analysis terraform.tfplan.json
+ship tf cost terraform.tfplan.json
 
 # Use specific AWS region for pricing
-ship terraform-tools cost-analysis --aws-region us-west-2
+ship tf cost --region us-west-2
 ```
 
 **OpenInfraQuote Features:**
@@ -319,34 +324,31 @@ ship terraform-tools cost-analysis --aws-region us-west-2
 ### Documentation
 ```bash
 # Generate markdown documentation
-ship terraform-tools generate-docs
+ship tf docs
 
-# Generate JSON output
-ship terraform-tools generate-docs --format json
+# Generate with specific filename
+ship tf docs --filename API.md
 
-# Include examples in docs
-ship terraform-tools generate-docs --show-examples
+# Save to specific output file
+ship tf docs --output documentation.md
 ```
 
 ### Infrastructure Diagram Generation
 ```bash
 # Generate PNG diagram from Terraform HCL files
-ship terraform-tools generate-diagram . --hcl --format png -o infrastructure.png
+ship tf diagram . --hcl --format png -o infrastructure.png
 
 # Generate SVG diagram from state file
-ship terraform-tools generate-diagram terraform.tfstate --format svg -o current-state.svg
+ship tf diagram terraform.tfstate --format svg -o current-state.svg
 
 # Generate DOT format for programmatic processing
-ship terraform-tools generate-diagram . --hcl --format dot -o infrastructure.dot
+ship tf diagram . --hcl --format dot -o infrastructure.dot
 
 # Filter by specific cloud provider
-ship terraform-tools generate-diagram . --hcl --provider aws --format png
-
-# Generate raw diagram showing all resources
-ship terraform-tools generate-diagram terraform.tfstate --raw --format svg
+ship tf diagram . --hcl --provider aws --format png
 
 # Generate PDF for documentation
-ship terraform-tools generate-diagram . --hcl --format pdf -o docs/infrastructure.pdf
+ship tf diagram . --hcl --format pdf -o docs/infrastructure.pdf
 ```
 
 ## 🔐 Authentication

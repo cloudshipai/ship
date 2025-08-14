@@ -10,6 +10,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/cloudshipai/ship/internal/telemetry"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
@@ -55,6 +56,9 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		toolName = args[0]
 	}
+
+	// Track MCP command usage
+	telemetry.TrackMCPCommand(toolName)
 
 	// Create MCP server
 	serverName := fmt.Sprintf("ship-%s", toolName)

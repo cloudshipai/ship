@@ -6,6 +6,7 @@ import (
 	"runtime/debug"
 
 	"github.com/cloudshipai/ship/internal/cli"
+	"github.com/cloudshipai/ship/internal/telemetry"
 )
 
 var (
@@ -31,6 +32,16 @@ func getVersion() string {
 }
 
 func main() {
+	// Initialize telemetry
+	if err := telemetry.Init(); err != nil {
+		// Don't fail the CLI if telemetry fails
+		fmt.Fprintf(os.Stderr, "Warning: Failed to initialize telemetry: %v\n", err)
+	}
+	defer telemetry.Close()
+
+	// Set version for telemetry
+	os.Setenv("SHIP_VERSION", getVersion())
+
 	if err := cli.Execute(getVersion(), commit, date); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)

@@ -1,22 +1,33 @@
 # Ship CLI
 
-A powerful command-line tool that brings enterprise-grade infrastructure analysis tools to your fingertips, all running in containers without local installations.
+A collection of CloudShip AI team curated MCP servers that run on top of Dagger engine with the ability to use it as a framework to build MCP servers that run securely in containers.
+
+Ship provides both a powerful CLI for infrastructure analysis and a comprehensive SDK for building custom Model Context Protocol (MCP) servers that integrate with AI assistants like Claude, Cursor, and others.
 
 > **🤖 For LLMs and AI Assistants**: Complete installation and usage instructions specifically designed for AI consumption are available in [llms.txt](./llms.txt). This includes MCP server setup, integration examples, and best practices for AI-driven infrastructure analysis with all 7 MCP tools.
 
 ## 🚀 Features
 
+### CLI Tools
 - **🔍 Terraform Linting**: Catch errors and enforce best practices with TFLint
 - **🛡️ Security Scanning**: Multi-cloud security analysis with Checkov and Trivy
 - **💰 Cost Estimation**: Estimate infrastructure costs with Infracost and OpenInfraQuote
 - **📝 Documentation Generation**: Auto-generate beautiful Terraform module documentation
 - **📊 Infrastructure Diagrams**: Visualize your infrastructure with InfraMap integration
-- **🔍 Infrastructure Diagram Generation**: Create visual diagrams from Terraform configurations
 - **🤖 AI Assistant Integration**: Built-in MCP server for Claude Desktop, Cursor, and other AI tools
-- **🔌 Extensible Module System**: Add custom tools and Dagger functions without modifying core CLI
 - **🐳 Containerized Tools**: All tools run in containers via Dagger - no local installations needed
 - **☁️ Cloud Integration**: Seamlessly works with AWS, Azure, GCP, and other cloud providers
 - **🔧 CI/CD Ready**: Perfect for integration into your existing pipelines
+
+### Ship SDK Framework
+- **🏗️ MCP Server Builder**: Fluent API for building custom MCP servers
+- **🔧 Container Tool Framework**: Run any tool securely in Docker containers via Dagger
+- **📦 Pre-built Ship Tools**: Curated collection of infrastructure tools ready to use
+- **🎯 Three Usage Patterns**: Pure framework, cherry-pick tools, or everything plus custom extensions
+- **🔒 Security First**: All tools run in isolated containers with no local dependencies
+- **⚡ Performance Optimized**: Leverages Dagger's caching and parallel execution
+- **🧪 Test Coverage**: Comprehensive test suite with integration tests
+- **📚 Rich Documentation**: Complete API reference and usage examples
 
 ## 📊 Privacy & Telemetry
 
@@ -48,6 +59,8 @@ The telemetry system is powered by [PostHog](https://posthog.com) and uses indus
 
 - [Installation](#-installation)
 - [Quick Start](#-quick-start)
+  - [CLI Usage](#1-basic-cli-usage)
+  - [Ship SDK Framework](#2-ship-sdk-framework)
 - [Demo](#-demo)
 - [Available Tools](#️-available-tools)
 - [Command Reference](#-command-reference)
@@ -72,7 +85,17 @@ The telemetry system is powered by [PostHog](https://posthog.com) and uses indus
 
 ## 📦 Installation
 
-### Quick Install with Go
+### Quick Install with curl (Recommended)
+
+```bash
+# Install Ship CLI and SDK with one command
+curl -fsSL https://raw.githubusercontent.com/cloudshipai/ship/main/install.sh | bash
+
+# Verify installation
+ship version
+```
+
+### Install with Go
 
 ```bash
 # Install directly with Go
@@ -80,6 +103,15 @@ go install github.com/cloudshipai/ship/cmd/ship@latest
 
 # Verify installation
 ship version
+```
+
+### For Ship SDK Development
+
+```bash
+# Add Ship SDK to your Go project
+go mod init my-mcp-server
+go get github.com/cloudshipai/ship/pkg/ship
+go get github.com/cloudshipai/ship/pkg/tools  # Optional: for Ship tools
 ```
 
 ### From Source
@@ -99,7 +131,7 @@ go run ./cmd/ship [command]
 
 ## 🏃 Quick Start
 
-### 1. Basic Usage
+### 1. Basic CLI Usage
 
 ```bash
 # Navigate to your Terraform project
@@ -112,7 +144,109 @@ ship tf cost                # Estimate AWS/Azure/GCP costs
 ship tf docs                # Generate documentation
 ```
 
-### 2. Real-World Example
+### 2. Ship SDK Framework
+
+Build your own MCP servers using the Ship SDK:
+
+#### Quick Example: Echo Server
+
+```bash
+# Create a new Go project
+mkdir my-mcp-server && cd my-mcp-server
+go mod init my-mcp-server
+go get github.com/cloudshipai/ship/pkg/ship
+```
+
+Create `main.go`:
+
+```go
+package main
+
+import (
+    "context"
+    "log"
+    "github.com/cloudshipai/ship/pkg/ship"
+    "github.com/cloudshipai/ship/pkg/dagger"
+)
+
+func main() {
+    // Create a simple echo tool
+    echoTool := ship.NewContainerTool("echo", ship.ContainerToolConfig{
+        Description: "Echo a message",
+        Image:       "alpine:latest",
+        Parameters: []ship.Parameter{
+            {Name: "message", Type: "string", Description: "Message to echo", Required: true},
+        },
+        Execute: func(ctx context.Context, params map[string]interface{}, engine *dagger.Engine) (*ship.ToolResult, error) {
+            message := params["message"].(string)
+            result, err := engine.Container().From("alpine:latest").WithExec([]string{"echo", message}).Stdout(ctx)
+            if err != nil {
+                return &ship.ToolResult{Error: err}, err
+            }
+            return &ship.ToolResult{Content: result}, nil
+        },
+    })
+
+    // Build and start the MCP server
+    server := ship.NewServer("echo-server", "1.0.0").AddTool(echoTool).Build()
+    if err := server.ServeStdio(); err != nil {
+        log.Fatalf("Server failed: %v", err)
+    }
+}
+```
+
+```bash
+# Build and run your MCP server
+go build -o echo-server .
+./echo-server
+```
+
+#### Three Usage Patterns
+
+**1. Pure Ship SDK (Custom Tools Only):**
+```go
+server := ship.NewServer("custom-server", "1.0.0").
+    AddContainerTool("my-tool", ship.ContainerToolConfig{...}).
+    Build()
+```
+
+**2. Cherry-Pick Ship Tools:**
+```go
+import "github.com/cloudshipai/ship/pkg/tools"
+
+server := ship.NewServer("hybrid-server", "1.0.0").
+    AddTool(tools.NewTFLintTool()).
+    AddContainerTool("my-custom-tool", config).
+    Build()
+```
+
+**3. Everything Plus Custom Extensions:**
+```go
+import "github.com/cloudshipai/ship/pkg/tools/all"
+
+server := all.AddAllTools(
+    ship.NewServer("full-server", "1.0.0").
+    AddContainerTool("my-extension", config),
+).Build()
+```
+
+#### Integration with AI Assistants
+
+Configure your custom MCP server in Claude Code:
+
+```json
+{
+  "mcpServers": {
+    "my-server": {
+      "command": "/path/to/my-mcp-server"
+    }
+  }
+}
+```
+
+📚 **Learn More**: Check out the [Ship SDK Documentation](docs/ship-sdk-overview.md) for complete guides, API reference, and examples.
+
+### 3. Real-World CLI Example
 
 ```bash
 # Clone a sample Terraform project
@@ -128,7 +262,7 @@ ship tf docs > README.md
 ship tf diagram . --hcl -o infrastructure.png
 ```
 
-### 3. Generate Infrastructure Diagrams
+### 4. Generate Infrastructure Diagrams
 
 Visualize your infrastructure with InfraMap integration:
 
@@ -153,7 +287,7 @@ cd /path/to/your/terraform/project
 ship tf diagram . --hcl -o docs/infrastructure-diagram.png
 ```
 
-### 4. AI Assistant Integration (MCP)
+### 5. AI Assistant Integration (MCP)
 
 Ship CLI includes a built-in MCP (Model Context Protocol) server that makes all functionality available to AI assistants like Claude Desktop and Cursor:
 
@@ -196,7 +330,7 @@ ship mcp
 
 See the [MCP Integration Guide](docs/mcp-integration.md) for complete setup instructions.
 
-### 5. CI/CD Integration
+### 6. CI/CD Integration
 
 ```yaml
 # GitHub Actions Example
@@ -406,12 +540,21 @@ We welcome contributions! See our [Contributing Guide](CONTRIBUTING.md) for deta
 
 ## 📚 Documentation
 
+### CLI Documentation
 - [CLI Reference](docs/cli-reference.md) - Complete command reference
 - [MCP Integration Guide](docs/mcp-integration.md) - AI assistant integration setup
 - [Dynamic Module Discovery](docs/dynamic-module-discovery.md) - Extensible module system
 - [Dagger Modules](docs/dagger-modules.md) - How to add new tools
 - [Development Guide](docs/development-tasks.md) - For contributors
 - [Technical Spec](docs/technical-spec.md) - Architecture and design
+
+### Ship SDK Documentation
+- [📖 Ship SDK Overview](docs/ship-sdk-overview.md) - Framework introduction and concepts
+- [🚀 Quick Start Guide](docs/ship-sdk-quickstart.md) - Step-by-step getting started
+- [📋 API Reference](docs/ship-sdk-api-reference.md) - Complete API documentation
+- [🎯 Usage Patterns](docs/ship-sdk-usage-patterns.md) - Advanced patterns and best practices
+- [🛠️ Ship Tools Reference](docs/ship-tools-reference.md) - Pre-built tools documentation
+- [❓ FAQ](docs/ship-sdk-faq.md) - Frequently asked questions
 
 ## 🧪 Testing
 

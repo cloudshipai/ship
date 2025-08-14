@@ -46,3 +46,26 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      - name: Update install script
+        run: |
+          # Update install.sh with the new version
+          sed -i "s/SHIP_VERSION=\".*\"/SHIP_VERSION=\"${GITHUB_REF#refs/tags/}\"/" install.sh
+          
+          # Commit the updated install.sh back to main branch
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git checkout main
+          git add install.sh
+          git commit -m "Update install.sh for ${GITHUB_REF#refs/tags/}" || exit 0
+          git push origin main
+
+  test-install:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test install script
+        run: |
+          # Test the install script with the new release
+          curl -fsSL https://raw.githubusercontent.com/cloudshipai/ship/main/install.sh | bash
+          ship version

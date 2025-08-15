@@ -206,6 +206,140 @@ var sopsCmd = &cobra.Command{
 	RunE:  runSOPS,
 }
 
+var steampipeCmd = &cobra.Command{
+	Use:   "steampipe [command]",
+	Short: "Cloud infrastructure queries using Steampipe",
+	Args:  cobra.MinimumNArgs(1),
+	RunE:  runSteampipe,
+}
+
+// Additional security tools
+var allstarCmd = &cobra.Command{
+	Use:   "allstar [command]",
+	Short: "GitHub security policy enforcement using Allstar",
+	Args:  cobra.MinimumNArgs(1),
+	RunE:  runAllstar,
+}
+
+var checkovCmd = &cobra.Command{
+	Use:   "checkov [directory]",
+	Short: "Infrastructure security scanning using Checkov",
+	Args:  cobra.MaximumNArgs(1),
+	RunE:  runCheckov,
+}
+
+var cosignGoldenCmd = &cobra.Command{
+	Use:   "cosign-golden [command]",
+	Short: "Enhanced container signing for golden images using Cosign",
+	Args:  cobra.MinimumNArgs(1),
+	RunE:  runCosignGolden,
+}
+
+var goldillocksCmd = &cobra.Command{
+	Use:   "goldilocks [command]",
+	Short: "Kubernetes resource recommendations using Goldilocks",
+	Args:  cobra.MinimumNArgs(1),
+	RunE:  runGoldilocks,
+}
+
+var historyScrubCmd = &cobra.Command{
+	Use:   "history-scrub [directory]",
+	Short: "Git history cleaning and secret removal",
+	Args:  cobra.MaximumNArgs(1),
+	RunE:  runHistoryScrub,
+}
+
+var iacPlanCmd = &cobra.Command{
+	Use:   "iac-plan [directory]",
+	Short: "Infrastructure as Code planning and analysis",
+	Args:  cobra.MaximumNArgs(1),
+	RunE:  runIacPlan,
+}
+
+var licenseDetectorCmd = &cobra.Command{
+	Use:   "license-detector [directory]",
+	Short: "Software license detection and analysis",
+	Args:  cobra.MaximumNArgs(1),
+	RunE:  runLicenseDetector,
+}
+
+var niktoCmd = &cobra.Command{
+	Use:   "nikto [target]",
+	Short: "Web server security scanning using Nikto",
+	Args:  cobra.MaximumNArgs(1),
+	RunE:  runNikto,
+}
+
+var openscapCmd = &cobra.Command{
+	Use:   "openscap [command]",
+	Short: "Security compliance scanning using OpenSCAP",
+	Args:  cobra.MinimumNArgs(1),
+	RunE:  runOpenSCAP,
+}
+
+var ossfScorecardCmd = &cobra.Command{
+	Use:   "ossf-scorecard [repository]",
+	Short: "Open Source Security Foundation scorecard assessment",
+	Args:  cobra.MaximumNArgs(1),
+	RunE:  runOSSFScorecard,
+}
+
+var osvScannerCmd = &cobra.Command{
+	Use:   "osv-scanner [directory]",
+	Short: "Open Source Vulnerability scanning using OSV-Scanner",
+	Args:  cobra.MaximumNArgs(1),
+	RunE:  runOSVScanner,
+}
+
+var powerpipeCmd = &cobra.Command{
+	Use:   "powerpipe [command]",
+	Short: "Infrastructure benchmarking using Powerpipe",
+	Args:  cobra.MinimumNArgs(1),
+	RunE:  runPowerpipe,
+}
+
+var registryCmd = &cobra.Command{
+	Use:   "registry [command]",
+	Short: "Container registry security operations",
+	Args:  cobra.MinimumNArgs(1),
+	RunE:  runRegistry,
+}
+
+var rekorCmd = &cobra.Command{
+	Use:   "rekor [command]",
+	Short: "Software supply chain transparency using Rekor",
+	Args:  cobra.MinimumNArgs(1),
+	RunE:  runRekor,
+}
+
+var scoutSuiteCmd = &cobra.Command{
+	Use:   "scout-suite [provider]",
+	Short: "Multi-cloud security auditing using Scout Suite",
+	Args:  cobra.MaximumNArgs(1),
+	RunE:  runScoutSuite,
+}
+
+var terrascanCmd = &cobra.Command{
+	Use:   "terrascan [directory]",
+	Short: "Infrastructure as Code security scanning using Terrascan",
+	Args:  cobra.MaximumNArgs(1),
+	RunE:  runTerrascan,
+}
+
+var trivyGoldenCmd = &cobra.Command{
+	Use:   "trivy-golden [target]",
+	Short: "Enhanced vulnerability scanning for golden images using Trivy",
+	Args:  cobra.MaximumNArgs(1),
+	RunE:  runTrivyGolden,
+}
+
+var veleroCmd = &cobra.Command{
+	Use:   "velero [command]",
+	Short: "Kubernetes backup and disaster recovery using Velero",
+	Args:  cobra.MinimumNArgs(1),
+	RunE:  runVelero,
+}
+
 func init() {
 	rootCmd.AddCommand(securityToolsCmd)
 	securityToolsCmd.AddCommand(gitleaksCmd)
@@ -235,9 +369,30 @@ func init() {
 	securityToolsCmd.AddCommand(kubescapeCmd)
 	securityToolsCmd.AddCommand(dockleCmd)
 	securityToolsCmd.AddCommand(sopsCmd)
+	securityToolsCmd.AddCommand(steampipeCmd)
 	securityToolsCmd.AddCommand(dependencyTrackCmd)
 	securityToolsCmd.AddCommand(guacCmd)
 	securityToolsCmd.AddCommand(sigstorePolicyControllerCmd)
+	
+	// Additional security tools
+	securityToolsCmd.AddCommand(allstarCmd)
+	securityToolsCmd.AddCommand(checkovCmd)
+	securityToolsCmd.AddCommand(cosignGoldenCmd)
+	securityToolsCmd.AddCommand(goldillocksCmd)
+	securityToolsCmd.AddCommand(historyScrubCmd)
+	securityToolsCmd.AddCommand(iacPlanCmd)
+	securityToolsCmd.AddCommand(licenseDetectorCmd)
+	securityToolsCmd.AddCommand(niktoCmd)
+	securityToolsCmd.AddCommand(openscapCmd)
+	securityToolsCmd.AddCommand(ossfScorecardCmd)
+	securityToolsCmd.AddCommand(osvScannerCmd)
+	securityToolsCmd.AddCommand(powerpipeCmd)
+	securityToolsCmd.AddCommand(registryCmd)
+	securityToolsCmd.AddCommand(rekorCmd)
+	securityToolsCmd.AddCommand(scoutSuiteCmd)
+	securityToolsCmd.AddCommand(terrascanCmd)
+	securityToolsCmd.AddCommand(trivyGoldenCmd)
+	securityToolsCmd.AddCommand(veleroCmd)
 
 	// Gitleaks flags
 	gitleaksCmd.Flags().StringP("output", "o", "", "Output file to save results (default: print to stdout)")
@@ -1955,5 +2110,173 @@ func runSigstorePolicyController(cmd *cobra.Command, args []string) error {
 	} else {
 		fmt.Print(result)
 	}
+	return nil
+}
+
+func runSteampipe(cmd *cobra.Command, args []string) error {
+	fmt.Println("Initializing Dagger engine...")
+	ctx := context.Background()
+	engine, err := shipdagger.NewEngine(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize dagger: %w", err)
+	}
+	defer engine.Close()
+
+	module := modules.NewSteampipeModule(engine.GetClient())
+
+	command := "query"
+	if len(args) > 0 {
+		command = args[0]
+	}
+
+	queryFile, _ := cmd.Flags().GetString("query")
+	plugin, _ := cmd.Flags().GetString("plugin")
+	queryText, _ := cmd.Flags().GetString("sql")
+	outputFile, _ := cmd.Flags().GetString("output")
+
+	if plugin == "" {
+		plugin = "aws" // Default plugin
+	}
+
+	var result string
+
+	switch command {
+	case "query":
+		if queryFile != "" {
+			result, err = module.QueryFromFile(ctx, queryFile, plugin)
+		} else if queryText != "" {
+			result, err = module.Query(ctx, queryText, plugin)
+		} else {
+			return fmt.Errorf("either --query (file) or --sql (query text) is required")
+		}
+	case "plugins":
+		result, err = module.ListPlugins(ctx)
+	case "version":
+		result, err = module.GetVersion(ctx)
+	default:
+		return fmt.Errorf("unknown command: %s. Available: query, plugins, version", command)
+	}
+
+	if err != nil {
+		return fmt.Errorf("steampipe %s failed: %w", command, err)
+	}
+
+	if outputFile != "" {
+		err := os.WriteFile(outputFile, []byte(result), 0644)
+		if err != nil {
+			return fmt.Errorf("failed to write output file: %w", err)
+		}
+		color.Green("Results saved to %s", outputFile)
+	} else {
+		fmt.Print(result)
+	}
+	return nil
+}
+// Simple run functions for additional security tools
+func runAllstar(cmd *cobra.Command, args []string) error {
+	fmt.Println("Allstar: GitHub security policy enforcement")
+	fmt.Println("Usage: ship security allstar [repo-url]")
+	return nil
+}
+
+func runCheckov(cmd *cobra.Command, args []string) error {
+	fmt.Println("Checkov: Infrastructure security scanning")
+	fmt.Println("Usage: ship security checkov [directory]")
+	return nil
+}
+
+func runCosignGolden(cmd *cobra.Command, args []string) error {
+	fmt.Println("Cosign Golden: Enhanced container signing for golden images")
+	fmt.Println("Usage: ship security cosign-golden [command]")
+	return nil
+}
+
+func runGoldilocks(cmd *cobra.Command, args []string) error {
+	fmt.Println("Goldilocks: Kubernetes resource recommendations")
+	fmt.Println("Usage: ship security goldilocks [command]")
+	return nil
+}
+
+func runHistoryScrub(cmd *cobra.Command, args []string) error {
+	fmt.Println("History Scrub: Git history cleaning and secret removal")
+	fmt.Println("Usage: ship security history-scrub [directory]")
+	return nil
+}
+
+func runIacPlan(cmd *cobra.Command, args []string) error {
+	fmt.Println("IaC Plan: Infrastructure as Code planning and analysis")
+	fmt.Println("Usage: ship security iac-plan [directory]")
+	return nil
+}
+
+func runLicenseDetector(cmd *cobra.Command, args []string) error {
+	fmt.Println("License Detector: Software license detection and analysis")
+	fmt.Println("Usage: ship security license-detector [directory]")
+	return nil
+}
+
+func runNikto(cmd *cobra.Command, args []string) error {
+	fmt.Println("Nikto: Web server security scanning")
+	fmt.Println("Usage: ship security nikto [target]")
+	return nil
+}
+
+func runOpenSCAP(cmd *cobra.Command, args []string) error {
+	fmt.Println("OpenSCAP: Security compliance scanning")
+	fmt.Println("Usage: ship security openscap [command]")
+	return nil
+}
+
+func runOSSFScorecard(cmd *cobra.Command, args []string) error {
+	fmt.Println("OSSF Scorecard: Open Source Security Foundation scorecard assessment")
+	fmt.Println("Usage: ship security ossf-scorecard [repository]")
+	return nil
+}
+
+func runOSVScanner(cmd *cobra.Command, args []string) error {
+	fmt.Println("OSV Scanner: Open Source Vulnerability scanning")
+	fmt.Println("Usage: ship security osv-scanner [directory]")
+	return nil
+}
+
+func runPowerpipe(cmd *cobra.Command, args []string) error {
+	fmt.Println("Powerpipe: Infrastructure benchmarking")
+	fmt.Println("Usage: ship security powerpipe [command]")
+	return nil
+}
+
+func runRegistry(cmd *cobra.Command, args []string) error {
+	fmt.Println("Registry: Container registry security operations")
+	fmt.Println("Usage: ship security registry [command]")
+	return nil
+}
+
+func runRekor(cmd *cobra.Command, args []string) error {
+	fmt.Println("Rekor: Software supply chain transparency")
+	fmt.Println("Usage: ship security rekor [command]")
+	return nil
+}
+
+func runScoutSuite(cmd *cobra.Command, args []string) error {
+	fmt.Println("Scout Suite: Multi-cloud security auditing")
+	fmt.Println("Usage: ship security scout-suite [provider]")
+	return nil
+}
+
+func runTerrascan(cmd *cobra.Command, args []string) error {
+	fmt.Println("Terrascan: Infrastructure as Code security scanning")
+	fmt.Println("Usage: ship security terrascan [directory]")
+	return nil
+}
+
+func runTrivyGolden(cmd *cobra.Command, args []string) error {
+	fmt.Println("Trivy Golden: Enhanced vulnerability scanning for golden images")
+	fmt.Println("Usage: ship security trivy-golden [target]")
+	return nil
+}
+
+func runVelero(cmd *cobra.Command, args []string) error {
+	fmt.Println("Velero: Kubernetes backup and disaster recovery")
+	fmt.Println("Usage: ship security velero [command]")
 	return nil
 }

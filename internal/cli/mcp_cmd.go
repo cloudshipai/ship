@@ -91,6 +91,10 @@ Available tools:
   cost         - OpenInfraQuote cost analysis
   docs         - terraform-docs documentation
   diagram      - InfraMap diagram generation
+  terraform-docs - Terraform documentation generation
+  tflint       - Terraform linting
+  terrascan    - Infrastructure as Code security scanning
+  openinfraquote - Infrastructure cost estimation
   
   # Security Tools
   gitleaks     - Secret detection with Gitleaks
@@ -131,6 +135,9 @@ Available tools:
   kubescape    - Kubernetes security scanning
   dockle       - Container image linting
   sops         - Secrets management with Mozilla SOPS
+  dependency-track - OWASP Dependency-Track SBOM analysis
+  guac         - GUAC supply chain analysis
+  sigstore-policy-controller - Sigstore Policy Controller
   
   # Cloud & Infrastructure Tools
   cloudquery   - Cloud asset inventory
@@ -405,7 +412,7 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 		if isExternalMCPServer(toolName) {
 			return runMCPProxy(cmd, toolName)
 		}
-		return fmt.Errorf("unknown tool: %s. Available: lint, checkov, trivy, cost, docs, diagram, all, filesystem, memory, brave-search", toolName)
+		return fmt.Errorf("unknown tool: %s. Run 'ship mcp --help' to see all available tools", toolName)
 	}
 
 	// Add resources for documentation and help
@@ -1010,7 +1017,7 @@ func addSecurityTools(s *server.MCPServer) {
 	addHistoryScrubTool(s)
 	addTrivyGoldenTool(s)
 	addIacPlanTool(s)
-	
+
 	// Supply chain security tools
 	addDependencyTrackTool(s)
 	addGuacTool(s)

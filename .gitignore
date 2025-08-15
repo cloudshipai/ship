@@ -81,3 +81,4 @@ Thumbs.db
 # Logs
 *.log
 logs/
+# Testing CI fix

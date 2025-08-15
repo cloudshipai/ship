@@ -194,14 +194,35 @@ install_binary() {
     temp_dir=$(mktemp -d)
     cd "$temp_dir"
     
-    # Construct download URL - GoReleaser uses ProjectName_Version_Os_Arch format
-    local filename="ship_${version#v}_${platform}"
-    local archive_name="${filename}.tar.gz"
+    # Construct download URL - GoReleaser uses ProjectName_Os_Arch format (no version)
+    # Convert platform to GoReleaser format
+    local goreleaser_platform
+    case "$platform" in
+        linux_amd64)
+            goreleaser_platform="Linux_x86_64"
+            ;;
+        linux_arm64)
+            goreleaser_platform="Linux_arm64"
+            ;;
+        darwin_amd64)
+            goreleaser_platform="Darwin_x86_64"
+            ;;
+        darwin_arm64)
+            goreleaser_platform="Darwin_arm64"
+            ;;
+        windows_amd64)
+            goreleaser_platform="Windows_x86_64"
+            ;;
+        windows_arm64)
+            goreleaser_platform="Windows_arm64"
+            ;;
+        *)
+            log_error "Unsupported platform for GoReleaser: $platform"
+            ;;
+    esac
     
-    # Handle Windows zip format
-    if [[ "$platform" == "windows"* ]]; then
-        archive_name="${filename}.zip"
-    fi
+    local filename="ship_${goreleaser_platform}"
+    local archive_name="${filename}.tar.gz"
     
     local download_url="https://github.com/$REPO/releases/download/$version/$archive_name"
     
@@ -215,15 +236,7 @@ install_binary() {
     
     # Extract the archive
     log_info "Extracting archive..."
-    if [[ "$archive_name" == *.tar.gz ]]; then
-        tar -xzf "$archive_name"
-    elif [[ "$archive_name" == *.zip ]]; then
-        if command_exists unzip; then
-            unzip -q "$archive_name"
-        else
-            log_error "unzip is required to extract Windows binaries. Please install unzip."
-        fi
-    fi
+    tar -xzf "$archive_name"
     
     # Find the binary
     local binary_path

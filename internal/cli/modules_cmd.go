@@ -66,21 +66,89 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 		Description string
 		Type        string
 	}{
-		// Built-in Ship tools
+		// Terraform Tools
 		{"lint", "TFLint for syntax and best practices", "terraform"},
 		{"checkov", "Checkov security scanning", "terraform"},
 		{"trivy", "Trivy security scanning", "terraform"},
 		{"cost", "OpenInfraQuote cost analysis", "terraform"},
 		{"docs", "terraform-docs documentation", "terraform"},
 		{"diagram", "InfraMap diagram generation", "terraform"},
+		{"terraform-docs", "Terraform documentation generation", "terraform"},
+		{"tflint", "Terraform linting", "terraform"},
+		{"terrascan", "Infrastructure as Code security scanning", "terraform"},
+		{"openinfraquote", "Infrastructure cost estimation", "terraform"},
 		
-		// Security Tools
+		// Security Tools (Core)
 		{"gitleaks", "Secret detection with Gitleaks", "security"},
 		{"grype", "Vulnerability scanning with Grype", "security"},
 		{"syft", "SBOM generation with Syft", "security"},
 		{"prowler", "Multi-cloud security assessment", "security"},
 		{"trufflehog", "Verified secret detection", "security"},
 		{"cosign", "Container signing and verification", "security"},
+		
+		// Security Tools (High-Priority Supply Chain)
+		{"slsa-verifier", "SLSA provenance verification", "security"},
+		{"in-toto", "Supply chain attestation", "security"},
+		{"gatekeeper", "OPA Gatekeeper policy validation", "security"},
+		{"kubescape", "Kubernetes security scanning", "security"},
+		{"dockle", "Container image linting", "security"},
+		{"sops", "Secrets management with Mozilla SOPS", "security"},
+		
+		// Security Tools (Supply Chain)
+		{"dependency-track", "OWASP Dependency-Track SBOM analysis", "security"},
+		{"guac", "GUAC supply chain analysis", "security"},
+		{"sigstore-policy-controller", "Sigstore Policy Controller", "security"},
+		
+		// Security Tools (Additional)
+		{"actionlint", "GitHub Actions workflow linting", "security"},
+		{"semgrep", "Static analysis security scanning", "security"},
+		{"hadolint", "Dockerfile security linting", "security"},
+		{"cfn-nag", "CloudFormation security scanning", "security"},
+		{"conftest", "OPA policy testing", "security"},
+		{"git-secrets", "Git secrets scanning", "security"},
+		{"kube-bench", "Kubernetes security benchmarks", "security"},
+		{"kube-hunter", "Kubernetes penetration testing", "security"},
+		{"zap", "Web application security testing", "security"},
+		{"falco", "Runtime security monitoring", "security"},
+		{"nikto", "Web server security scanning", "security"},
+		{"openscap", "Security compliance scanning", "security"},
+		{"ossf-scorecard", "Open Source Security Foundation scorecard", "security"},
+		{"scout-suite", "Multi-cloud security auditing", "security"},
+		{"steampipe", "Cloud infrastructure queries", "security"},
+		{"powerpipe", "Infrastructure benchmarking", "security"},
+		{"velero", "Kubernetes backup and disaster recovery", "security"},
+		{"goldilocks", "Kubernetes resource recommendations", "security"},
+		{"allstar", "GitHub security policy enforcement", "security"},
+		{"rekor", "Software supply chain transparency", "security"},
+		{"osv-scanner", "Open Source Vulnerability scanning", "security"},
+		{"license-detector", "Software license detection", "security"},
+		{"registry", "Container registry operations", "security"},
+		{"cosign-golden", "Enhanced Cosign for golden images", "security"},
+		{"history-scrub", "Git history cleaning and secret removal", "security"},
+		{"trivy-golden", "Enhanced Trivy for golden images", "security"},
+		{"iac-plan", "Infrastructure as Code planning", "security"},
+		
+		// Cloud & Infrastructure Tools
+		{"cloudquery", "Cloud asset inventory", "cloud"},
+		{"custodian", "Cloud governance engine", "cloud"},
+		{"terraformer", "Infrastructure import and management", "cloud"},
+		{"infracost", "Infrastructure cost estimation", "cloud"},
+		{"inframap", "Infrastructure visualization", "cloud"},
+		{"infrascan", "Infrastructure security scanning", "cloud"},
+		{"aws-iam-rotation", "AWS IAM credential rotation", "cloud"},
+		{"tfstate-reader", "Terraform state analysis", "cloud"},
+		{"packer", "Machine image building", "cloud"},
+		{"fleet", "GitOps for Kubernetes", "cloud"},
+		{"kuttl", "Kubernetes testing framework", "cloud"},
+		{"litmus", "Chaos engineering for Kubernetes", "cloud"},
+		{"cert-manager", "Certificate management", "cloud"},
+		{"step-ca", "Certificate authority operations", "cloud"},
+		{"check-ssl-cert", "SSL certificate validation", "cloud"},
+		{"k8s-network-policy", "Kubernetes network policy management", "cloud"},
+		{"kyverno", "Kubernetes policy management", "cloud"},
+		{"kyverno-multitenant", "Multi-tenant Kyverno policies", "cloud"},
+		{"github-admin", "GitHub administration tools", "cloud"},
+		{"github-packages", "GitHub Packages security", "cloud"},
 		
 		// AWS IAM Tools
 		{"cloudsplaining", "AWS IAM security assessment", "aws-iam"},
@@ -92,7 +160,10 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 		{"terraform", "All Terraform tools", "meta"},
 		{"security", "All security tools", "meta"},
 		{"aws-iam", "All AWS IAM tools", "meta"},
+		{"cloud", "All cloud infrastructure tools", "meta"},
+		{"kubernetes", "All Kubernetes tools", "meta"},
 		{"all", "All tools combined", "meta"},
+		
 		// External MCP servers
 		{"filesystem", "Filesystem operations MCP server", "mcp-external"},
 		{"memory", "Memory/knowledge storage MCP server", "mcp-external"},
@@ -110,8 +181,38 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 
 	w.Flush()
 
-	fmt.Printf("\nTotal: %d tools available (%d built-in, %d external MCP servers)\n", 
-		len(mcpTools), 7, len(mcpTools)-7)
+	// Count tools by type
+	terraformTools := 0
+	securityTools := 0
+	cloudTools := 0
+	awsIamTools := 0
+	metaTools := 0
+	externalServers := 0
+	
+	for _, tool := range mcpTools {
+		switch tool.Type {
+		case "terraform":
+			terraformTools++
+		case "security":
+			securityTools++
+		case "cloud":
+			cloudTools++
+		case "aws-iam":
+			awsIamTools++
+		case "meta":
+			metaTools++
+		case "mcp-external":
+			externalServers++
+		}
+	}
+	
+	totalBuiltinTools := terraformTools + securityTools + cloudTools + awsIamTools
+	
+	fmt.Printf("\nTotal: %d tools available\n", len(mcpTools))
+	fmt.Printf("  - Built-in tools: %d (%d terraform, %d security, %d cloud, %d aws-iam)\n", 
+		totalBuiltinTools, terraformTools, securityTools, cloudTools, awsIamTools)
+	fmt.Printf("  - Collections: %d\n", metaTools)
+	fmt.Printf("  - External MCP servers: %d\n", externalServers)
 
 	return nil
 }

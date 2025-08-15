@@ -60,12 +60,13 @@ func init() {
 }
 
 func runModulesList(cmd *cobra.Command, args []string) error {
-	// Display available MCP tools instead of Docker modules
+	// Display available MCP tools and external MCP servers
 	mcpTools := []struct {
 		Name        string
 		Description string
 		Type        string
 	}{
+		// Built-in Ship tools
 		{"lint", "TFLint for syntax and best practices", "terraform"},
 		{"checkov", "Checkov security scanning", "security"},
 		{"trivy", "Trivy security scanning", "security"},
@@ -73,6 +74,10 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 		{"docs", "terraform-docs documentation", "documentation"},
 		{"diagram", "InfraMap diagram generation", "visualization"},
 		{"all", "All tools combined", "meta"},
+		// External MCP servers
+		{"filesystem", "Filesystem operations MCP server", "mcp-external"},
+		{"memory", "Memory/knowledge storage MCP server", "mcp-external"},
+		{"brave-search", "Brave search MCP server", "mcp-external"},
 	}
 
 	// Create table writer
@@ -86,7 +91,8 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 
 	w.Flush()
 
-	fmt.Printf("\nTotal: %d MCP tools available\n", len(mcpTools))
+	fmt.Printf("\nTotal: %d tools available (%d built-in, %d external MCP servers)\n", 
+		len(mcpTools), 7, len(mcpTools)-7)
 
 	return nil
 }
@@ -95,7 +101,17 @@ func runModulesInfo(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	moduleName := args[0]
 
-	// Create module manager
+	// Check if this is an external MCP server first
+	if isExternalMCPServerModule(moduleName) {
+		return showMCPServerInfo(moduleName)
+	}
+
+	// Check if this is a built-in MCP tool
+	if isBuiltinMCPTool(moduleName) {
+		return showBuiltinToolInfo(moduleName)
+	}
+
+	// Create module manager for custom modules
 	manager := modules.NewManager(modules.ModuleConfig{
 		AllowUntrusted: true,
 	})
@@ -399,4 +415,345 @@ echo "%s completed successfully"
 	}
 
 	return nil
+}
+
+// isExternalMCPServerModule checks if the given name is an external MCP server
+func isExternalMCPServerModule(serverName string) bool {
+	externalServers := []string{"filesystem", "memory", "brave-search"}
+	for _, server := range externalServers {
+		if server == serverName {
+			return true
+		}
+	}
+	return false
+}
+
+// isBuiltinMCPTool checks if the given name is a built-in MCP tool
+func isBuiltinMCPTool(toolName string) bool {
+	builtinTools := []string{"lint", "checkov", "trivy", "cost", "docs", "diagram", "all"}
+	for _, tool := range builtinTools {
+		if tool == toolName {
+			return true
+		}
+	}
+	return false
+}
+
+// showMCPServerInfo displays information about an external MCP server
+func showMCPServerInfo(serverName string) error {
+	// Get the actual hardcoded server configuration from the mcp_cmd.go file
+	// We need to access the hardcodedMCPServers map from mcp_cmd.go
+	serverConfigs := getHardcodedMCPServerConfigs()
+	
+	config, exists := serverConfigs[serverName]
+	if !exists {
+		return fmt.Errorf("external MCP server '%s' not found", serverName)
+	}
+
+	fmt.Printf("External MCP Server: %s\n", config.Name)
+	fmt.Printf("Type: mcp-external\n")
+	fmt.Printf("Description: %s\n", getServerDescription(serverName))
+	fmt.Printf("Transport: %s\n", config.Transport)
+	fmt.Printf("Command: %s %s\n", config.Command, strings.Join(config.Args, " "))
+	fmt.Printf("Source: hardcoded\n")
+	fmt.Printf("Trusted: true\n")
+
+	// Display variables if any are defined
+	if len(config.Variables) > 0 {
+		fmt.Printf("\nVariables:\n")
+		for _, variable := range config.Variables {
+			required := ""
+			if variable.Required {
+				required = " (required)"
+			}
+			
+			secret := ""
+			if variable.Secret {
+				secret = " (secret)"
+			}
+			
+			defaultInfo := ""
+			if variable.Default != "" {
+				if variable.Secret {
+					defaultInfo = " [default: <hidden>]"
+				} else {
+					defaultInfo = fmt.Sprintf(" [default: %s]", variable.Default)
+				}
+			}
+			
+			fmt.Printf("  %s%s%s%s\n", variable.Name, defaultInfo, required, secret)
+			fmt.Printf("    %s\n", variable.Description)
+		}
+	}
+
+	fmt.Printf("\nUsage:\n")
+	fmt.Printf("  ship mcp %s    # Start MCP server proxy\n", serverName)
+	
+	// Show usage examples with variables
+	if len(config.Variables) > 0 {
+		fmt.Printf("\nExamples with variables:\n")
+		
+		// Generate example command with required variables
+		requiredVars := []string{}
+		for _, variable := range config.Variables {
+			if variable.Required {
+				if variable.Secret {
+					requiredVars = append(requiredVars, fmt.Sprintf("--var %s=<your_%s>", variable.Name, strings.ToLower(variable.Name)))
+				} else {
+					requiredVars = append(requiredVars, fmt.Sprintf("--var %s=<value>", variable.Name))
+				}
+			}
+		}
+		
+		if len(requiredVars) > 0 {
+			fmt.Printf("  ship mcp %s %s\n", serverName, strings.Join(requiredVars, " "))
+		}
+		
+		// Show example with optional variables
+		if hasOptionalVariables(config.Variables) {
+			optionalExample := getOptionalVariableExample(serverName, config.Variables)
+			if optionalExample != "" {
+				fmt.Printf("  ship mcp %s %s\n", serverName, optionalExample)
+			}
+		}
+	}
+
+	fmt.Printf("\nNote: This is an external MCP server that Ship proxies.\n")
+	fmt.Printf("Tools are discovered dynamically when the server starts.\n")
+
+	return nil
+}
+
+// showBuiltinToolInfo displays information about a built-in MCP tool
+func showBuiltinToolInfo(toolName string) error {
+	toolConfigs := map[string]struct {
+		Name        string
+		Description string
+		Type        string
+		Examples    []string
+	}{
+		"lint": {
+			Name:        "lint",
+			Description: "TFLint for Terraform syntax checking and best practices validation",
+			Type:        "terraform",
+			Examples:    []string{"ship tf lint", "ship tf lint --format json", "ship mcp lint"},
+		},
+		"checkov": {
+			Name:        "checkov",
+			Description: "Checkov security and compliance scanning for Terraform",
+			Type:        "security",
+			Examples:    []string{"ship tf checkov", "ship tf checkov --format sarif", "ship mcp checkov"},
+		},
+		"trivy": {
+			Name:        "trivy",
+			Description: "Trivy security scanning for Terraform configurations",
+			Type:        "security",
+			Examples:    []string{"ship tf trivy", "ship mcp trivy"},
+		},
+		"cost": {
+			Name:        "cost",
+			Description: "OpenInfraQuote cost analysis for Terraform infrastructure",
+			Type:        "cost",
+			Examples:    []string{"ship tf cost", "ship tf cost --region us-east-1", "ship mcp cost"},
+		},
+		"docs": {
+			Name:        "docs",
+			Description: "terraform-docs documentation generation for Terraform modules",
+			Type:        "documentation",
+			Examples:    []string{"ship tf docs", "ship tf docs --filename USAGE.md", "ship mcp docs"},
+		},
+		"diagram": {
+			Name:        "diagram",
+			Description: "InfraMap infrastructure diagram generation from Terraform",
+			Type:        "visualization",
+			Examples:    []string{"ship tf diagram", "ship tf diagram --format svg", "ship mcp diagram"},
+		},
+		"all": {
+			Name:        "all",
+			Description: "All built-in Ship tools combined in a single MCP server",
+			Type:        "meta",
+			Examples:    []string{"ship mcp all", "ship mcp"},
+		},
+	}
+
+	config, exists := toolConfigs[toolName]
+	if !exists {
+		return fmt.Errorf("built-in tool '%s' not found", toolName)
+	}
+
+	fmt.Printf("Built-in Tool: %s\n", config.Name)
+	fmt.Printf("Type: %s\n", config.Type)
+	fmt.Printf("Description: %s\n", config.Description)
+	fmt.Printf("Source: built-in\n")
+	fmt.Printf("Trusted: true\n")
+
+	fmt.Printf("\nUsage:\n")
+	for _, example := range config.Examples {
+		fmt.Printf("  %s\n", example)
+	}
+
+	fmt.Printf("\nNote: This is a built-in Ship tool that runs in containerized environments via Dagger.\n")
+
+	return nil
+}
+
+// getHardcodedMCPServerConfigs returns the hardcoded MCP server configurations
+// This is a reference to the same data structure in mcp_cmd.go
+func getHardcodedMCPServerConfigs() map[string]struct {
+	Name        string
+	Description string
+	Command     string
+	Args        []string
+	Transport   string
+	Variables   []struct {
+		Name        string
+		Description string
+		Required    bool
+		Default     string
+		Secret      bool
+	}
+} {
+	return map[string]struct {
+		Name        string
+		Description string
+		Command     string
+		Args        []string
+		Transport   string
+		Variables   []struct {
+			Name        string
+			Description string
+			Required    bool
+			Default     string
+			Secret      bool
+		}
+	}{
+		"filesystem": {
+			Name:        "filesystem",
+			Description: "Filesystem operations MCP server with tools for file and directory management",
+			Command:     "npx",
+			Args:        []string{"-y", "@modelcontextprotocol/server-filesystem", "/tmp"},
+			Transport:   "stdio",
+			Variables: []struct {
+				Name        string
+				Description string
+				Required    bool
+				Default     string
+				Secret      bool
+			}{
+				{
+					Name:        "FILESYSTEM_ROOT",
+					Description: "Root directory for filesystem operations (overrides /tmp default)",
+					Required:    false,
+					Default:     "/tmp",
+					Secret:      false,
+				},
+			},
+		},
+		"memory": {
+			Name:        "memory",
+			Description: "Memory/knowledge storage MCP server for persistent data storage",
+			Command:     "npx",
+			Args:        []string{"-y", "@modelcontextprotocol/server-memory"},
+			Transport:   "stdio",
+			Variables: []struct {
+				Name        string
+				Description string
+				Required    bool
+				Default     string
+				Secret      bool
+			}{
+				{
+					Name:        "MEMORY_STORAGE_PATH",
+					Description: "Path for persistent memory storage",
+					Required:    false,
+					Default:     "/tmp/mcp-memory",
+					Secret:      false,
+				},
+				{
+					Name:        "MEMORY_MAX_SIZE",
+					Description: "Maximum memory storage size (e.g., 100MB)",
+					Required:    false,
+					Default:     "50MB",
+					Secret:      false,
+				},
+			},
+		},
+		"brave-search": {
+			Name:        "brave-search",
+			Description: "Brave search MCP server for web search capabilities",
+			Command:     "npx",
+			Args:        []string{"-y", "@modelcontextprotocol/server-brave-search"},
+			Transport:   "stdio",
+			Variables: []struct {
+				Name        string
+				Description string
+				Required    bool
+				Default     string
+				Secret      bool
+			}{
+				{
+					Name:        "BRAVE_API_KEY",
+					Description: "Brave Search API key for search functionality",
+					Required:    true,
+					Default:     "",
+					Secret:      true,
+				},
+				{
+					Name:        "BRAVE_SEARCH_COUNT",
+					Description: "Number of search results to return (default: 10)",
+					Required:    false,
+					Default:     "10",
+					Secret:      false,
+				},
+			},
+		},
+	}
+}
+
+// getServerDescription returns a user-friendly description for the server
+func getServerDescription(serverName string) string {
+	descriptions := map[string]string{
+		"filesystem":   "Filesystem operations MCP server with tools for file and directory management",
+		"memory":       "Memory/knowledge storage MCP server for persistent data storage",
+		"brave-search": "Brave search MCP server for web search capabilities",
+	}
+	if desc, exists := descriptions[serverName]; exists {
+		return desc
+	}
+	return "External MCP server"
+}
+
+// hasOptionalVariables checks if any variables are optional
+func hasOptionalVariables(variables []struct {
+	Name        string
+	Description string
+	Required    bool
+	Default     string
+	Secret      bool
+}) bool {
+	for _, variable := range variables {
+		if !variable.Required {
+			return true
+		}
+	}
+	return false
+}
+
+// getOptionalVariableExample generates an example with optional variables
+func getOptionalVariableExample(serverName string, variables []struct {
+	Name        string
+	Description string
+	Required    bool
+	Default     string
+	Secret      bool
+}) string {
+	examples := map[string]string{
+		"filesystem":   "--var FILESYSTEM_ROOT=/custom/path",
+		"memory":       "--var MEMORY_STORAGE_PATH=/data --var MEMORY_MAX_SIZE=100MB",
+		"brave-search": "--var BRAVE_SEARCH_COUNT=20",
+	}
+	if example, exists := examples[serverName]; exists {
+		return example
+	}
+	return ""
 }

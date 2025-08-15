@@ -208,7 +208,7 @@ adapter.AttachToServer(ctx, yourExistingMCPServer)
 
 #### Integration with AI Assistants
 
-Configure your custom MCP server in Claude Code:
+Configure Ship MCP servers in Claude Code:
 
 ```json
 {
@@ -216,8 +216,77 @@ Configure your custom MCP server in Claude Code:
     "ship-terraform": {
       "command": "ship",
       "args": ["mcp", "all"]
+    },
+    "ship-filesystem": {
+      "command": "ship",
+      "args": ["mcp", "filesystem"],
+      "env": {
+        "FILESYSTEM_ROOT": "/workspace"
+      }
+    },
+    "ship-search": {
+      "command": "ship", 
+      "args": ["mcp", "brave-search", "--var", "BRAVE_API_KEY=your_key"]
     }
   }
+}
+```
+
+#### Ship Framework Mode with External MCP Servers
+
+Use external MCP servers in your Ship framework applications:
+
+```go
+package main
+
+import (
+    "context"
+    "log"
+    "github.com/cloudshipai/ship/pkg/ship"
+)
+
+func main() {
+    ctx := context.Background()
+    
+    // Create Ship server with external MCP server integration
+    server := ship.NewServer("my-app", "1.0.0")
+    
+    // Add built-in Ship tools
+    server.AddTool(tools.NewTFLintTool())
+    
+    // Add external MCP servers as proxy tools
+    filesystemConfig := ship.MCPServerConfig{
+        Name:      "filesystem",
+        Command:   "npx",
+        Args:      []string{"-y", "@modelcontextprotocol/server-filesystem", "/workspace"},
+        Transport: "stdio",
+        Env: map[string]string{
+            "FILESYSTEM_ROOT": "/workspace",
+        },
+    }
+    
+    // Create proxy for external MCP server
+    proxy := ship.NewMCPProxy(filesystemConfig)
+    if err := proxy.Connect(ctx); err != nil {
+        log.Fatalf("Failed to connect to filesystem MCP server: %v", err)
+    }
+    defer proxy.Close()
+    
+    // Discover and add external tools
+    externalTools, err := proxy.DiscoverTools(ctx)
+    if err != nil {
+        log.Fatalf("Failed to discover external tools: %v", err)
+    }
+    
+    for _, tool := range externalTools {
+        server.AddTool(tool)
+    }
+    
+    // Build and start server
+    mcpServer := server.Build()
+    if err := mcpServer.ServeStdio(); err != nil {
+        log.Fatalf("Server failed: %v", err)
+    }
 }
 ```
 
@@ -260,16 +329,94 @@ ship tf checkov             # Security scanning
 ship tf cost                # Cost estimation
 ship tf docs                # Generate documentation
 ship tf diagram . --hcl -o infrastructure.png  # Generate diagrams
+
+# Start MCP servers for AI assistant integration
+ship mcp all                # All Ship tools
+ship mcp lint               # Just TFLint
+ship mcp filesystem         # External filesystem MCP server
+ship mcp brave-search --var BRAVE_API_KEY=your_api_key  # External search with API key
 ```
 
 ## 🛠️ Available Infrastructure Tools
 
+### Built-in Ship Tools
+
 | Tool | Ship Framework | Description | Container Image |
 |------|----------------|-------------|-----------------|
 | **TFLint** | `tools.NewTFLintTool()` | Terraform linter for syntax and best practices | `ghcr.io/terraform-linters/tflint` |
-| **More tools** | *Coming soon* | Additional infrastructure tools in development | *Various* |
+| **Checkov** | `tools.NewCheckovTool()` | Security scanning for Terraform | `bridgecrew/checkov` |
+| **Trivy** | `tools.NewTrivyTool()` | Security scanning for Terraform | `aquasec/trivy` |
+| **OpenInfraQuote** | `tools.NewCostTool()` | Cost analysis for infrastructure | `cloudshipai/openinfraquote` |
+| **terraform-docs** | `tools.NewDocsTool()` | Documentation generation | `quay.io/terraform-docs/terraform-docs` |
+| **InfraMap** | `tools.NewDiagramTool()` | Infrastructure diagrams | `cycloidio/inframap` |
 
-> **Note**: Ship framework currently includes TFLint with more infrastructure tools being added. Check our [roadmap](#-roadmap) for upcoming tools.
+### External MCP Servers
+
+Ship can proxy external MCP servers, discovering their tools dynamically:
+
+| Server | Description | Variables | Example Usage |
+|--------|-------------|-----------|---------------|
+| **filesystem** | File and directory operations | `FILESYSTEM_ROOT` (optional) | `ship mcp filesystem --var FILESYSTEM_ROOT=/custom/path` |
+| **memory** | Persistent knowledge storage | `MEMORY_STORAGE_PATH`, `MEMORY_MAX_SIZE` (optional) | `ship mcp memory --var MEMORY_STORAGE_PATH=/data` |
+| **brave-search** | Web search capabilities | `BRAVE_API_KEY` (required), `BRAVE_SEARCH_COUNT` (optional) | `ship mcp brave-search --var BRAVE_API_KEY=your_key` |
+
+> **Note**: External MCP servers are automatically installed via npm when needed. Tools are discovered dynamically at runtime.
+
+## ⚙️ Environment Variables and Configuration
+
+### --var Flag System
+
+Ship supports passing environment variables to both containerized tools and external MCP servers using the `--var` flag:
+
+```bash
+# Single variable
+ship mcp brave-search --var BRAVE_API_KEY=your_api_key
+
+# Multiple variables
+ship mcp memory --var MEMORY_STORAGE_PATH=/data --var MEMORY_MAX_SIZE=100MB
+
+# Variables for containerized tools
+ship mcp cost --var AWS_REGION=us-east-1 --var DEBUG=true
+```
+
+### Variable Types
+
+**Framework-Defined Variables**: Each tool and external MCP server defines its own variables with:
+- **Required vs Optional**: Some variables are mandatory, others have defaults
+- **Default Values**: Optional variables often have sensible defaults
+- **Secret Handling**: API keys and sensitive data are marked as secrets
+- **Validation**: Variables are validated before starting tools
+
+**Examples by Tool**:
+
+```bash
+# Filesystem operations (all optional)
+ship mcp filesystem --var FILESYSTEM_ROOT=/custom/path
+
+# Memory storage (all optional) 
+ship mcp memory --var MEMORY_STORAGE_PATH=/data --var MEMORY_MAX_SIZE=100MB
+
+# Brave search (API key required)
+ship mcp brave-search --var BRAVE_API_KEY=your_key --var BRAVE_SEARCH_COUNT=20
+
+# Containerized tools (any environment variable)
+ship mcp all --var AWS_PROFILE=production --var AWS_REGION=us-west-2
+```
+
+### Variable Discovery
+
+Use `ship modules info <tool-name>` to see available variables:
+
+```bash
+# See variables for external MCP servers
+ship modules info filesystem
+ship modules info memory
+ship modules info brave-search
+
+# See information about built-in tools
+ship modules info lint
+ship modules info cost
+```
 
 ## 🔧 Ship Framework Integration
 
@@ -357,6 +504,7 @@ We welcome contributions! See our [Contributing Guide](CONTRIBUTING.md) for deta
 ### CLI Documentation
 - [CLI Reference](docs/cli-reference.md) - Complete command reference
 - [MCP Integration Guide](docs/mcp-integration.md) - AI assistant integration setup
+- [External MCP Servers](docs/mcp-external-servers.md) - Proxying external MCP servers with --var flags
 - [Dynamic Module Discovery](docs/dynamic-module-discovery.md) - Extensible module system
 - [Dagger Modules](docs/dagger-modules.md) - How to add new tools
 - [Development Guide](docs/development-tasks.md) - For contributors

@@ -128,6 +128,64 @@ func main() {
 }
 ```
 
+## External MCP Server Integration
+
+Ship can proxy external MCP servers to add their tools to your server:
+
+```go
+package main
+
+import (
+    "context"
+    "log"
+    
+    "github.com/cloudshipai/ship/pkg/ship"
+    "github.com/cloudshipai/ship/pkg/tools"
+)
+
+func main() {
+    ctx := context.Background()
+    
+    // Create server with Ship tools
+    server := ship.NewServer("enhanced-server", "1.0.0").
+        AddTool(tools.NewTFLintTool())
+    
+    // Add external MCP server (filesystem operations)
+    filesystemConfig := ship.MCPServerConfig{
+        Name:      "filesystem",
+        Command:   "npx",
+        Args:      []string{"-y", "@modelcontextprotocol/server-filesystem", "/workspace"},
+        Transport: "stdio",
+        Env: map[string]string{
+            "FILESYSTEM_ROOT": "/workspace",
+        },
+    }
+    
+    // Create proxy and discover tools
+    proxy := ship.NewMCPProxy(filesystemConfig)
+    if err := proxy.Connect(ctx); err != nil {
+        log.Fatalf("Failed to connect to filesystem server: %v", err)
+    }
+    defer proxy.Close()
+    
+    externalTools, err := proxy.DiscoverTools(ctx)
+    if err != nil {
+        log.Fatalf("Failed to discover external tools: %v", err)
+    }
+    
+    // Add external tools to Ship server
+    for _, tool := range externalTools {
+        server.AddTool(tool)
+    }
+    
+    // Build and start server
+    mcpServer := server.Build()
+    if err := mcpServer.ServeStdio(); err != nil {
+        log.Fatalf("Server failed: %v", err)
+    }
+}
+```
+
 ## Integration with AI Assistants
 
 ### Claude Code
@@ -163,6 +221,7 @@ Configure in Cursor's MCP settings:
 
 - Read the [API Reference](ship-sdk-api-reference.md) for detailed documentation
 - Check out [Usage Patterns](ship-sdk-usage-patterns.md) for advanced patterns
+- Learn about [External MCP Server Integration](mcp-external-servers.md) for proxying existing MCP servers
 - Browse [Examples](../examples/) for complete working examples
 - See [Ship Tools](ship-tools-reference.md) for available pre-built tools
 

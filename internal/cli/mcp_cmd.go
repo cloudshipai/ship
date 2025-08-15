@@ -11,10 +11,72 @@ import (
 	"unicode/utf8"
 
 	"github.com/cloudshipai/ship/internal/telemetry"
+	"github.com/cloudshipai/ship/pkg/ship"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
 )
+
+// hardcodedMCPServers contains the built-in external MCP server configurations
+var hardcodedMCPServers = map[string]ship.MCPServerConfig{
+	"filesystem": {
+		Name:      "filesystem",
+		Command:   "npx",
+		Args:      []string{"-y", "@modelcontextprotocol/server-filesystem", "/tmp"},
+		Transport: "stdio",
+		Env:       map[string]string{},
+		Variables: []ship.Variable{
+			{
+				Name:        "FILESYSTEM_ROOT",
+				Description: "Root directory for filesystem operations (overrides /tmp default)",
+				Required:    false,
+				Default:     "/tmp",
+			},
+		},
+	},
+	"memory": {
+		Name:      "memory",
+		Command:   "npx",
+		Args:      []string{"-y", "@modelcontextprotocol/server-memory"},
+		Transport: "stdio",
+		Env:       map[string]string{},
+		Variables: []ship.Variable{
+			{
+				Name:        "MEMORY_STORAGE_PATH",
+				Description: "Path for persistent memory storage",
+				Required:    false,
+				Default:     "/tmp/mcp-memory",
+			},
+			{
+				Name:        "MEMORY_MAX_SIZE",
+				Description: "Maximum memory storage size (e.g., 100MB)",
+				Required:    false,
+				Default:     "50MB",
+			},
+		},
+	},
+	"brave-search": {
+		Name:      "brave-search",
+		Command:   "npx",
+		Args:      []string{"-y", "@modelcontextprotocol/server-brave-search"},
+		Transport: "stdio",
+		Env:       map[string]string{},
+		Variables: []ship.Variable{
+			{
+				Name:        "BRAVE_API_KEY",
+				Description: "Brave Search API key for search functionality",
+				Required:    true,
+				Secret:      true,
+			},
+			{
+				Name:        "BRAVE_SEARCH_COUNT",
+				Description: "Number of search results to return (default: 10)",
+				Required:    false,
+				Default:     "10",
+			},
+		},
+	},
+}
 
 var mcpCmd = &cobra.Command{
 	Use:   "mcp [tool]",
@@ -23,17 +85,26 @@ var mcpCmd = &cobra.Command{
 
 Available tools:
   lint       - TFLint for syntax and best practices
-  checkov    - Checkov security scanning
+  checkov    - Checkov security scanning  
   trivy      - Trivy security scanning
   cost       - OpenInfraQuote cost analysis
   docs       - terraform-docs documentation
   diagram    - InfraMap diagram generation
   all        - All tools (default if no tool specified)
 
+External MCP Servers:
+  filesystem     - Filesystem operations MCP server
+  memory         - Memory/knowledge storage MCP server
+  brave-search   - Brave search MCP server
+
 Examples:
-  ship mcp lint      # MCP server for just TFLint
-  ship mcp checkov   # MCP server for just Checkov
-  ship mcp all       # MCP server for all tools`,
+  ship mcp lint        # MCP server for just TFLint
+  ship mcp checkov     # MCP server for just Checkov
+  ship mcp all         # MCP server for all tools
+  ship mcp filesystem     # Proxy filesystem operations MCP server
+  ship mcp memory         # Proxy memory/knowledge storage MCP server
+  ship mcp brave-search --var BRAVE_API_KEY=your_api_key   # Proxy Brave search with API key
+  ship mcp cost --var AWS_REGION=us-east-1 --var DEBUG=true  # Pass multiple environment variables`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runMCPServer,
 }
@@ -44,12 +115,14 @@ func init() {
 	mcpCmd.Flags().Int("port", 0, "Port to listen on (0 for stdio)")
 	mcpCmd.Flags().String("host", "localhost", "Host to bind to")
 	mcpCmd.Flags().Bool("stdio", true, "Use stdio transport (default)")
+	mcpCmd.Flags().StringToString("var", nil, "Environment variables for MCP servers and containers (e.g., --var API_KEY=value --var DEBUG=true)")
 }
 
 func runMCPServer(cmd *cobra.Command, args []string) error {
 	port, _ := cmd.Flags().GetInt("port")
 	host, _ := cmd.Flags().GetString("host")
 	useStdio, _ := cmd.Flags().GetBool("stdio")
+	envVars, _ := cmd.Flags().GetStringToString("var")
 
 	// Determine which tool to serve
 	toolName := "all"
@@ -64,6 +137,11 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 	serverName := fmt.Sprintf("ship-%s", toolName)
 	s := server.NewMCPServer(serverName, "1.0.0")
 
+	// Set environment variables for containerized tools
+	if len(envVars) > 0 {
+		setContainerEnvironmentVars(envVars)
+	}
+	
 	// Add specific tools based on argument
 	switch toolName {
 	case "lint":
@@ -81,7 +159,11 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 	case "all":
 		addTerraformTools(s)
 	default:
-		return fmt.Errorf("unknown tool: %s. Available: lint, checkov, trivy, cost, docs, diagram, all", toolName)
+		// Check if this is an external MCP server
+		if isExternalMCPServer(toolName) {
+			return runMCPProxy(cmd, toolName)
+		}
+		return fmt.Errorf("unknown tool: %s. Available: lint, checkov, trivy, cost, docs, diagram, all, filesystem, memory, brave-search", toolName)
 	}
 
 	// Add resources for documentation and help
@@ -777,4 +859,150 @@ func truncateText(text string, maxLen int) string {
 	}
 
 	return string(runes[:maxLen]) + "..."
+}
+
+// isExternalMCPServer checks if the tool name matches a hardcoded external MCP server
+func isExternalMCPServer(toolName string) bool {
+	_, exists := hardcodedMCPServers[toolName]
+	return exists
+}
+
+// runMCPProxy starts an MCP proxy server for external MCP servers
+func runMCPProxy(cmd *cobra.Command, serverName string) error {
+	useStdio, _ := cmd.Flags().GetBool("stdio")
+	port, _ := cmd.Flags().GetInt("port")
+	envVars, _ := cmd.Flags().GetStringToString("var")
+	
+	// Get hardcoded server configuration
+	mcpConfig, exists := hardcodedMCPServers[serverName]
+	if !exists {
+		return fmt.Errorf("external MCP server '%s' not found in hardcoded configurations", serverName)
+	}
+	
+	// Validate and merge environment variables
+	if err := validateAndMergeVariables(&mcpConfig, envVars); err != nil {
+		return fmt.Errorf("variable validation failed: %w", err)
+	}
+	
+	ctx := context.Background()
+	
+	// Create and connect proxy
+	proxy := ship.NewMCPProxy(mcpConfig)
+	if err := proxy.Connect(ctx); err != nil {
+		return fmt.Errorf("failed to connect to external MCP server: %w", err)
+	}
+	defer proxy.Close()
+	
+	// Discover tools from the external server
+	tools, err := proxy.DiscoverTools(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to discover tools from external server: %w", err)
+	}
+	
+	fmt.Fprintf(os.Stderr, "Discovered %d tools from external MCP server\n", len(tools))
+	
+	// Create a Ship MCP server with the discovered tools
+	shipServer := ship.NewServer(fmt.Sprintf("ship-proxy-%s", serverName), "1.0.0")
+	for _, tool := range tools {
+		shipServer.AddTool(tool)
+	}
+	mcpServer := shipServer.Build()
+	defer mcpServer.Close()
+	
+	// Start the server
+	if err := mcpServer.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start MCP server: %w", err)
+	}
+	
+	// Get the mcp-go server instance
+	serverInstance := mcpServer.GetMCPGoServer()
+	if serverInstance == nil {
+		return fmt.Errorf("failed to get MCP server instance")
+	}
+	
+	// Start the proxy server
+	if useStdio || port == 0 {
+		fmt.Fprintf(os.Stderr, "Starting Ship proxy for %s on stdio...\n", serverName)
+		fmt.Fprintf(os.Stderr, "Available tools: %v\n", mcpServer.GetRegistry().ListTools())
+		return server.ServeStdio(serverInstance)
+	} else {
+		return fmt.Errorf("HTTP server not implemented in this version, use --stdio")
+	}
+}
+
+// validateAndMergeVariables validates required variables and merges user-provided vars with config
+func validateAndMergeVariables(config *ship.MCPServerConfig, userVars map[string]string) error {
+	if config.Variables == nil {
+		return nil
+	}
+	
+	// Check for required variables
+	for _, variable := range config.Variables {
+		if variable.Required {
+			// Check if provided by user
+			if _, exists := userVars[variable.Name]; !exists {
+				// Check if has default value
+				if variable.Default == "" {
+					return fmt.Errorf("required variable %s is missing (use --var %s=value)", 
+						variable.Name, variable.Name)
+				}
+			}
+		}
+	}
+	
+	// Merge variables into config.Env
+	if config.Env == nil {
+		config.Env = make(map[string]string)
+	}
+	
+	// First, set defaults for variables that aren't provided
+	for _, variable := range config.Variables {
+		if _, exists := userVars[variable.Name]; !exists && variable.Default != "" {
+			config.Env[variable.Name] = variable.Default
+		}
+	}
+	
+	// Then, override with user-provided values
+	for key, value := range userVars {
+		config.Env[key] = value
+	}
+	
+	return nil
+}
+
+// setContainerEnvironmentVars sets environment variables for containerized tools
+func setContainerEnvironmentVars(envVars map[string]string) {
+	for key, value := range envVars {
+		os.Setenv(key, value)
+	}
+}
+
+// showVariableHelp displays information about available variables for a tool
+func showVariableHelp(serverName string) {
+	config, exists := hardcodedMCPServers[serverName]
+	if !exists || len(config.Variables) == 0 {
+		return
+	}
+	
+	fmt.Fprintf(os.Stderr, "\nAvailable variables for %s:\n", serverName)
+	for _, variable := range config.Variables {
+		required := ""
+		if variable.Required {
+			required = " (required)"
+		}
+		
+		secret := ""
+		if variable.Secret {
+			secret = " (secret)"
+		}
+		
+		defaultInfo := ""
+		if variable.Default != "" {
+			defaultInfo = fmt.Sprintf(" [default: %s]", variable.Default)
+		}
+		
+		fmt.Fprintf(os.Stderr, "  --var %s=value%s%s%s\n    %s\n", 
+			variable.Name, defaultInfo, required, secret, variable.Description)
+	}
+	fmt.Fprintf(os.Stderr, "\n")
 }

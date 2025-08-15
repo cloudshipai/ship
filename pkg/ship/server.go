@@ -18,6 +18,7 @@ type MCPServer struct {
 	registry *Registry
 	engine   *dagger.Engine
 	server   *server.MCPServer
+	proxies  map[string]*MCPProxy // For managing external MCP server connections
 }
 
 // ServerBuilder provides a fluent API for building MCP servers
@@ -151,10 +152,25 @@ func (s *MCPServer) ServeHTTP(host string, port int) error {
 
 // Close shuts down the server and cleans up resources
 func (s *MCPServer) Close() error {
-	if s.engine != nil {
-		return s.engine.Close()
+	var lastErr error
+	
+	// Close all proxy connections
+	if s.proxies != nil {
+		for name, proxy := range s.proxies {
+			if err := proxy.Close(); err != nil {
+				lastErr = fmt.Errorf("failed to close proxy %s: %w", name, err)
+			}
+		}
 	}
-	return nil
+	
+	// Close Dagger engine
+	if s.engine != nil {
+		if err := s.engine.Close(); err != nil {
+			lastErr = err
+		}
+	}
+	
+	return lastErr
 }
 
 // GetRegistry returns the server's registry
@@ -165,6 +181,11 @@ func (s *MCPServer) GetRegistry() *Registry {
 // GetEngine returns the server's Dagger engine (may be nil if not started)
 func (s *MCPServer) GetEngine() *dagger.Engine {
 	return s.engine
+}
+
+// GetMCPGoServer returns the underlying mcp-go server instance
+func (s *MCPServer) GetMCPGoServer() *server.MCPServer {
+	return s.server
 }
 
 // registerMCPTool registers a framework tool as an MCP tool

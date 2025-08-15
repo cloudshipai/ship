@@ -74,8 +74,10 @@ docker-compose.override.yml
 .DS_Store
 Thumbs.db
 
-# Shell scripts in root (should be in scripts/)
+# Shell scripts in root (should be in scripts/) - except install scripts
 /*.sh
+!install.sh
+!setup.sh
 
 # Logs
 *.log

@@ -34,8 +34,8 @@ go.work.sum
 # .idea/
 # .vscode/
 
-# Ship CLI binary
-ship
+# Ship CLI binary (in root only)
+/ship
 
 # Build artifacts  
 dist/

@@ -36,7 +36,6 @@ go.work.sum
 
 # Ship CLI binary
 ship
-ship-*
 
 # Build artifacts  
 dist/

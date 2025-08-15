@@ -146,6 +146,54 @@ ship mcp checkov lint
 ship mcp all
 ```
 
+#### Advanced Integration Patterns
+
+**Bring Your Own MCP Server:**
+Perfect for existing applications that already use mcp-go - just add Ship's containerized tools:
+
+```go
+import (
+    "github.com/cloudshipai/ship/pkg/ship"
+    "github.com/cloudshipai/ship/internal/tools" 
+    "github.com/mark3labs/mcp-go/server"
+)
+
+func main() {
+    // Your existing mcp-go server
+    mcpServer := server.NewMCPServer("my-app", "1.0.0")
+    
+    // Add your existing tools
+    mcpServer.AddTool(myCustomTool, myHandler)
+    
+    // Add Ship's containerized infrastructure tools
+    shipAdapter := ship.NewMCPAdapter().
+        AddTool(tools.NewTFLintTool()).
+        AddTool(tools.NewCheckovTool())
+    
+    // Attach Ship tools to your existing server
+    shipAdapter.AttachToServer(ctx, mcpServer)
+    defer shipAdapter.Close()
+    
+    // Now you have both your tools AND Ship's containerized tools
+    server.ServeStdio(mcpServer)
+}
+```
+
+**Selective Integration:**
+Only use the Ship capabilities you need:
+
+```go
+// Just use Ship's Dagger engine and container framework
+engine, _ := dagger.NewEngine(ctx)
+customTool := ship.NewContainerTool("my-scanner", ship.ContainerToolConfig{
+    Image: "my-org/scanner:latest",
+    // ... your configuration
+})
+
+adapter := ship.NewMCPAdapter().WithEngine(engine).AddTool(customTool)
+adapter.AttachToServer(ctx, yourExistingMCPServer)
+```
+
 #### Integration with AI Assistants
 
 Configure your custom MCP server in Claude Code:

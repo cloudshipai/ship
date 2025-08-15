@@ -79,7 +79,7 @@ Build your own MCP servers using the Ship SDK:
 # Create a new Go project
 mkdir my-mcp-server && cd my-mcp-server
 go mod init my-mcp-server
-go get github.com/cloudshipai/ship/pkg/ship
+go get github.com/cloudshipai/ship
 ```
 
 Create `main.go`:

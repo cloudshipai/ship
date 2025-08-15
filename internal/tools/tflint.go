@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cloudshipai/ship/internal/ship"
+	"github.com/cloudshipai/ship/pkg/ship"
 	"github.com/cloudshipai/ship/pkg/dagger"
 )
 

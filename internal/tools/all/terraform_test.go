@@ -3,7 +3,7 @@ package all
 import (
 	"testing"
 
-	"github.com/cloudshipai/ship/internal/ship"
+	"github.com/cloudshipai/ship/pkg/ship"
 	"github.com/stretchr/testify/assert"
 )
 

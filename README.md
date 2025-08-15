@@ -59,7 +59,7 @@ Ship is designed for the **AI-first infrastructure era** where AI assistants nee
 # Add Ship SDK to your Go project
 go mod init my-mcp-server
 go get github.com/cloudshipai/ship/pkg/ship
-go get github.com/cloudshipai/ship/pkg/tools  # Optional: for Ship tools
+go get github.com/cloudshipai/ship/pkg/ship  # Ship framework
 ```
 
 ### Quick Install (CLI + Framework)
@@ -146,7 +146,7 @@ server := ship.NewServer("custom-server", "1.0.0").
 
 **2. Cherry-Pick Ship Tools:**
 ```go
-import "github.com/cloudshipai/ship/pkg/tools"
+import "github.com/cloudshipai/ship/pkg/ship"
 
 server := ship.NewServer("hybrid-server", "1.0.0").
     AddTool(tools.NewTFLintTool()).
@@ -156,7 +156,7 @@ server := ship.NewServer("hybrid-server", "1.0.0").
 
 **3. Everything Plus Custom Extensions:**
 ```go
-import "github.com/cloudshipai/ship/pkg/tools/all"
+import "github.com/cloudshipai/ship/pkg/ship"
 
 server := all.AddAllTools(
     ship.NewServer("full-server", "1.0.0").

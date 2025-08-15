@@ -17,8 +17,8 @@ import (
 	"log"
 
 	"github.com/cloudshipai/ship/pkg/dagger"
-	"github.com/cloudshipai/ship/internal/ship"
-	"github.com/cloudshipai/ship/pkg/tools"
+	"github.com/cloudshipai/ship/pkg/ship"
+	"github.com/cloudshipai/ship/internal/tools"
 )
 
 func main() {

@@ -314,6 +314,12 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 		addTrivyGoldenTool(s)
 	case "iac-plan":
 		addIacPlanTool(s)
+	case "dependency-track":
+		addDependencyTrackTool(s)
+	case "guac":
+		addGuacTool(s)
+	case "sigstore-policy-controller":
+		addSigstorePolicyControllerTool(s)
 
 	// Cloud & Infrastructure Tools (with MCP functions)
 	case "cloudquery":
@@ -967,7 +973,7 @@ func addSecurityTools(s *server.MCPServer) {
 	addProwlerTool(s)
 	addTruffleHogTool(s)
 	addCosignTool(s)
-	
+
 	// New high-priority security tools with full MCP integration
 	addSLSAVerifierTool(s)
 	addInTotoTool(s)
@@ -975,7 +981,7 @@ func addSecurityTools(s *server.MCPServer) {
 	addKubescapeTool(s)
 	addDockleTool(s)
 	addSOPSTool(s)
-	
+
 	// Additional security tools with MCP integration
 	addActionlintTool(s)
 	addSemgrepTool(s)
@@ -1004,6 +1010,11 @@ func addSecurityTools(s *server.MCPServer) {
 	addHistoryScrubTool(s)
 	addTrivyGoldenTool(s)
 	addIacPlanTool(s)
+	
+	// Supply chain security tools
+	addDependencyTrackTool(s)
+	addGuacTool(s)
+	addSigstorePolicyControllerTool(s)
 }
 
 func addGitleaksTool(s *server.MCPServer) {
@@ -2462,5 +2473,124 @@ func addOpenInfraQuoteTool(s *server.MCPServer) {
 	tool := mcp.NewTool("openinfraquote", mcp.WithDescription("Infrastructure cost estimation"))
 	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return executeShipCommand([]string{"tf", "cost"})
+	})
+}
+
+// Supply Chain Security Tools MCP Functions
+func addDependencyTrackTool(s *server.MCPServer) {
+	tool := mcp.NewTool("dependency-track",
+		mcp.WithDescription("OWASP Dependency-Track SBOM analysis and vulnerability tracking"),
+		mcp.WithString("command", mcp.Description("Command to run"), mcp.Enum("analyze", "report", "validate", "track")),
+		mcp.WithString("directory", mcp.Description("Directory to scan (default: current directory)")),
+		mcp.WithString("sbom", mcp.Description("Path to SBOM file")),
+		mcp.WithString("format", mcp.Description("Report format (json, xml, html)")),
+		mcp.WithString("output", mcp.Description("Output file to save results")),
+	)
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"security", "dependency-track"}
+		if command := request.GetString("command", ""); command != "" {
+			args = append(args, command)
+		}
+		if dir := request.GetString("directory", ""); dir != "" {
+			args = append(args, "--directory", dir)
+		}
+		if sbom := request.GetString("sbom", ""); sbom != "" {
+			args = append(args, "--sbom", sbom)
+		}
+		if format := request.GetString("format", ""); format != "" {
+			args = append(args, "--format", format)
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		return executeShipCommand(args)
+	})
+}
+
+func addGuacTool(s *server.MCPServer) {
+	tool := mcp.NewTool("guac",
+		mcp.WithDescription("GUAC supply chain security analysis - Graph for Understanding Artifact Composition"),
+		mcp.WithString("command", mcp.Description("Command to run"), mcp.Enum("collect", "query", "impact", "graph")),
+		mcp.WithString("directory", mcp.Description("Directory to analyze (default: current directory)")),
+		mcp.WithString("sbom", mcp.Description("Path to SBOM file")),
+		mcp.WithString("artifact", mcp.Description("Path to artifact file")),
+		mcp.WithString("package", mcp.Description("Package name to query")),
+		mcp.WithString("vuln-id", mcp.Description("Vulnerability ID for impact analysis")),
+		mcp.WithString("attestation", mcp.Description("Path to attestation file")),
+		mcp.WithString("output", mcp.Description("Output file to save results")),
+	)
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"security", "guac"}
+		if command := request.GetString("command", ""); command != "" {
+			args = append(args, command)
+		}
+		if dir := request.GetString("directory", ""); dir != "" {
+			args = append(args, "--directory", dir)
+		}
+		if sbom := request.GetString("sbom", ""); sbom != "" {
+			args = append(args, "--sbom", sbom)
+		}
+		if artifact := request.GetString("artifact", ""); artifact != "" {
+			args = append(args, "--artifact", artifact)
+		}
+		if pkg := request.GetString("package", ""); pkg != "" {
+			args = append(args, "--package", pkg)
+		}
+		if vulnID := request.GetString("vuln-id", ""); vulnID != "" {
+			args = append(args, "--vuln-id", vulnID)
+		}
+		if attestation := request.GetString("attestation", ""); attestation != "" {
+			args = append(args, "--attestation", attestation)
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		return executeShipCommand(args)
+	})
+}
+
+func addSigstorePolicyControllerTool(s *server.MCPServer) {
+	tool := mcp.NewTool("sigstore-policy-controller",
+		mcp.WithDescription("Sigstore Policy Controller for Kubernetes admission control and image verification"),
+		mcp.WithString("command", mcp.Description("Command to run"), mcp.Enum("validate", "test", "verify", "generate", "validate-manifest", "check-compliance", "audit")),
+		mcp.WithString("policy", mcp.Description("Path to policy file")),
+		mcp.WithString("image", mcp.Description("Container image name")),
+		mcp.WithString("public-key", mcp.Description("Path to public key file")),
+		mcp.WithString("manifest", mcp.Description("Path to manifest file")),
+		mcp.WithString("manifests", mcp.Description("Path to manifests directory")),
+		mcp.WithString("namespace", mcp.Description("Kubernetes namespace")),
+		mcp.WithString("key-ref", mcp.Description("Key reference for policy generation")),
+		mcp.WithString("output", mcp.Description("Output file to save results")),
+	)
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"security", "sigstore-policy-controller"}
+		if command := request.GetString("command", ""); command != "" {
+			args = append(args, command)
+		}
+		if policy := request.GetString("policy", ""); policy != "" {
+			args = append(args, "--policy", policy)
+		}
+		if image := request.GetString("image", ""); image != "" {
+			args = append(args, "--image", image)
+		}
+		if publicKey := request.GetString("public-key", ""); publicKey != "" {
+			args = append(args, "--public-key", publicKey)
+		}
+		if manifest := request.GetString("manifest", ""); manifest != "" {
+			args = append(args, "--manifest", manifest)
+		}
+		if manifests := request.GetString("manifests", ""); manifests != "" {
+			args = append(args, "--manifests", manifests)
+		}
+		if namespace := request.GetString("namespace", ""); namespace != "" {
+			args = append(args, "--namespace", namespace)
+		}
+		if keyRef := request.GetString("key-ref", ""); keyRef != "" {
+			args = append(args, "--key-ref", keyRef)
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		return executeShipCommand(args)
 	})
 }

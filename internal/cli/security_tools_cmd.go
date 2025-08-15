@@ -235,6 +235,9 @@ func init() {
 	securityToolsCmd.AddCommand(kubescapeCmd)
 	securityToolsCmd.AddCommand(dockleCmd)
 	securityToolsCmd.AddCommand(sopsCmd)
+	securityToolsCmd.AddCommand(dependencyTrackCmd)
+	securityToolsCmd.AddCommand(guacCmd)
+	securityToolsCmd.AddCommand(sigstorePolicyControllerCmd)
 
 	// Gitleaks flags
 	gitleaksCmd.Flags().StringP("output", "o", "", "Output file to save results (default: print to stdout)")
@@ -1687,6 +1690,262 @@ func runSOPS(cmd *cobra.Command, args []string) error {
 }
 
 func handleOutput(result string, outputFile string) error {
+	if outputFile != "" {
+		err := os.WriteFile(outputFile, []byte(result), 0644)
+		if err != nil {
+			return fmt.Errorf("failed to write output file: %w", err)
+		}
+		color.Green("Results saved to %s", outputFile)
+	} else {
+		fmt.Print(result)
+	}
+	return nil
+}
+
+var dependencyTrackCmd = &cobra.Command{
+	Use:   "dependency-track [command]",
+	Short: "OWASP Dependency-Track SBOM analysis",
+	Long:  `Analyze Software Bills of Materials (SBOMs) and track dependencies using OWASP Dependency-Track`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runDependencyTrack(cmd, args)
+	},
+}
+
+var guacCmd = &cobra.Command{
+	Use:   "guac [command]",
+	Short: "GUAC supply chain analysis",
+	Long:  `Graph for Understanding Artifact Composition - analyze software supply chain dependencies and vulnerabilities`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runGuac(cmd, args)
+	},
+}
+
+var sigstorePolicyControllerCmd = &cobra.Command{
+	Use:   "sigstore-policy-controller [command]", 
+	Short: "Sigstore Policy Controller for admission control",
+	Long:  `Kubernetes admission controller for enforcing image signing and attestation policies using Sigstore`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runSigstorePolicyController(cmd, args)
+	},
+}
+
+func runDependencyTrack(cmd *cobra.Command, args []string) error {
+	fmt.Println("Initializing Dagger engine...")
+	ctx := context.Background()
+	engine, err := shipdagger.NewEngine(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize dagger: %w", err)
+	}
+	defer engine.Close()
+
+	module := modules.NewDependencyTrackModule(engine.GetClient())
+
+	command := "analyze"
+	if len(args) > 0 {
+		command = args[0]
+	}
+
+	projectPath, _ := cmd.Flags().GetString("directory")
+	if projectPath == "" {
+		projectPath = "."
+	}
+
+	sbomPath, _ := cmd.Flags().GetString("sbom")
+	format, _ := cmd.Flags().GetString("format")
+	outputFile, _ := cmd.Flags().GetString("output")
+
+	var result string
+
+	switch command {
+	case "analyze":
+		if sbomPath != "" {
+			result, err = module.ScanSBOM(ctx, sbomPath)
+		} else {
+			result, err = module.AnalyzeProject(ctx, projectPath)
+		}
+	case "report":
+		result, err = module.GenerateReport(ctx, projectPath, format)
+	case "validate":
+		result, err = module.ValidateComponents(ctx, projectPath)
+	case "track":
+		result, err = module.TrackDependencies(ctx, projectPath)
+	default:
+		return fmt.Errorf("unknown command: %s. Available: analyze, report, validate, track", command)
+	}
+
+	if err != nil {
+		return fmt.Errorf("dependency-track %s failed: %w", command, err)
+	}
+
+	if outputFile != "" {
+		err := os.WriteFile(outputFile, []byte(result), 0644)
+		if err != nil {
+			return fmt.Errorf("failed to write output file: %w", err)
+		}
+		color.Green("Results saved to %s", outputFile)
+	} else {
+		fmt.Print(result)
+	}
+	return nil
+}
+
+func runGuac(cmd *cobra.Command, args []string) error {
+	fmt.Println("Initializing Dagger engine...")
+	ctx := context.Background()
+	engine, err := shipdagger.NewEngine(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize dagger: %w", err)
+	}
+	defer engine.Close()
+
+	module := modules.NewGuacModule(engine.GetClient())
+
+	command := "collect"
+	if len(args) > 0 {
+		command = args[0]
+	}
+
+	projectPath, _ := cmd.Flags().GetString("directory")
+	if projectPath == "" {
+		projectPath = "."
+	}
+
+	sbomPath, _ := cmd.Flags().GetString("sbom")
+	artifactPath, _ := cmd.Flags().GetString("artifact")
+	packageName, _ := cmd.Flags().GetString("package")
+	vulnID, _ := cmd.Flags().GetString("vuln-id")
+	attestationPath, _ := cmd.Flags().GetString("attestation")
+	outputFile, _ := cmd.Flags().GetString("output")
+
+	var result string
+
+	switch command {
+	case "collect":
+		if sbomPath != "" {
+			result, err = module.IngestSBOM(ctx, sbomPath)
+		} else if artifactPath != "" {
+			result, err = module.AnalyzeArtifact(ctx, artifactPath)
+		} else if attestationPath != "" {
+			result, err = module.ValidateAttestation(ctx, attestationPath)
+		} else {
+			result, err = module.CollectFiles(ctx, projectPath)
+		}
+	case "query":
+		if packageName != "" {
+			if vulnID != "" {
+				result, err = module.QueryVulnerabilities(ctx, packageName)
+			} else {
+				result, err = module.QueryDependencies(ctx, packageName)
+			}
+		} else {
+			return fmt.Errorf("package name required for query command")
+		}
+	case "impact":
+		if vulnID != "" {
+			result, err = module.AnalyzeImpact(ctx, vulnID)
+		} else {
+			return fmt.Errorf("vulnerability ID required for impact analysis")
+		}
+	case "graph":
+		result, err = module.GenerateGraph(ctx, projectPath)
+	default:
+		return fmt.Errorf("unknown command: %s. Available: collect, query, impact, graph", command)
+	}
+
+	if err != nil {
+		return fmt.Errorf("guac %s failed: %w", command, err)
+	}
+
+	if outputFile != "" {
+		err := os.WriteFile(outputFile, []byte(result), 0644)
+		if err != nil {
+			return fmt.Errorf("failed to write output file: %w", err)
+		}
+		color.Green("Results saved to %s", outputFile)
+	} else {
+		fmt.Print(result)
+	}
+	return nil
+}
+
+func runSigstorePolicyController(cmd *cobra.Command, args []string) error {
+	fmt.Println("Initializing Dagger engine...")
+	ctx := context.Background()
+	engine, err := shipdagger.NewEngine(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize dagger: %w", err)
+	}
+	defer engine.Close()
+
+	module := modules.NewSigstorePolicyControllerModule(engine.GetClient())
+
+	command := "validate"
+	if len(args) > 0 {
+		command = args[0]
+	}
+
+	policyPath, _ := cmd.Flags().GetString("policy")
+	imageName, _ := cmd.Flags().GetString("image")
+	publicKeyPath, _ := cmd.Flags().GetString("public-key")
+	manifestPath, _ := cmd.Flags().GetString("manifest")
+	manifestsPath, _ := cmd.Flags().GetString("manifests")
+	namespace, _ := cmd.Flags().GetString("namespace")
+	keyRef, _ := cmd.Flags().GetString("key-ref")
+	outputFile, _ := cmd.Flags().GetString("output")
+
+	var result string
+
+	switch command {
+	case "validate":
+		if policyPath != "" {
+			result, err = module.ValidatePolicy(ctx, policyPath)
+		} else {
+			return fmt.Errorf("policy file required for validation")
+		}
+	case "test":
+		if policyPath != "" && imageName != "" {
+			result, err = module.TestPolicy(ctx, policyPath, imageName)
+		} else {
+			return fmt.Errorf("policy file and image name required for testing")
+		}
+	case "verify":
+		if imageName != "" {
+			result, err = module.VerifySignature(ctx, imageName, publicKeyPath)
+		} else {
+			return fmt.Errorf("image name required for verification")
+		}
+	case "generate":
+		if namespace != "" && keyRef != "" {
+			result, err = module.GeneratePolicyTemplate(ctx, namespace, keyRef)
+		} else {
+			return fmt.Errorf("namespace and key-ref required for policy generation")
+		}
+	case "validate-manifest":
+		if manifestPath != "" && policyPath != "" {
+			result, err = module.ValidateManifest(ctx, manifestPath, policyPath)
+		} else {
+			return fmt.Errorf("manifest and policy files required")
+		}
+	case "check-compliance":
+		if manifestsPath != "" && policyPath != "" {
+			result, err = module.CheckCompliance(ctx, manifestsPath, policyPath)
+		} else {
+			return fmt.Errorf("manifests directory and policy file required")
+		}
+	case "audit":
+		if namespace != "" && policyPath != "" {
+			result, err = module.AuditImages(ctx, namespace, policyPath)
+		} else {
+			return fmt.Errorf("namespace and policy file required for audit")
+		}
+	default:
+		return fmt.Errorf("unknown command: %s. Available: validate, test, verify, generate, validate-manifest, check-compliance, audit", command)
+	}
+
+	if err != nil {
+		return fmt.Errorf("sigstore-policy-controller %s failed: %w", command, err)
+	}
+
 	if outputFile != "" {
 		err := os.WriteFile(outputFile, []byte(result), 0644)
 		if err != nil {

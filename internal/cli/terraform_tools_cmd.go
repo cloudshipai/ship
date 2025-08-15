@@ -13,8 +13,9 @@ import (
 
 var terraformToolsCmd = &cobra.Command{
 	Use:   "tf",
-	Short: "Run Terraform analysis tools",
+	Short: "Run Terraform analysis tools", 
 	Long:  `Run various Terraform analysis tools including cost estimation, security scanning, and documentation generation`,
+	Aliases: []string{"terraform"},
 }
 
 var costAnalysisCmd = &cobra.Command{

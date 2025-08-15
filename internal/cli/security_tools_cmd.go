@@ -1721,7 +1721,7 @@ var guacCmd = &cobra.Command{
 }
 
 var sigstorePolicyControllerCmd = &cobra.Command{
-	Use:   "sigstore-policy-controller [command]", 
+	Use:   "sigstore-policy-controller [command]",
 	Short: "Sigstore Policy Controller for admission control",
 	Long:  `Kubernetes admission controller for enforcing image signing and attestation policies using Sigstore`,
 	RunE: func(cmd *cobra.Command, args []string) error {

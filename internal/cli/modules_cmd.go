@@ -77,7 +77,7 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 		{"tflint", "Terraform linting", "terraform"},
 		{"terrascan", "Infrastructure as Code security scanning", "terraform"},
 		{"openinfraquote", "Infrastructure cost estimation", "terraform"},
-		
+
 		// Security Tools (Core)
 		{"gitleaks", "Secret detection with Gitleaks", "security"},
 		{"grype", "Vulnerability scanning with Grype", "security"},
@@ -85,7 +85,7 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 		{"prowler", "Multi-cloud security assessment", "security"},
 		{"trufflehog", "Verified secret detection", "security"},
 		{"cosign", "Container signing and verification", "security"},
-		
+
 		// Security Tools (High-Priority Supply Chain)
 		{"slsa-verifier", "SLSA provenance verification", "security"},
 		{"in-toto", "Supply chain attestation", "security"},
@@ -93,12 +93,12 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 		{"kubescape", "Kubernetes security scanning", "security"},
 		{"dockle", "Container image linting", "security"},
 		{"sops", "Secrets management with Mozilla SOPS", "security"},
-		
+
 		// Security Tools (Supply Chain)
 		{"dependency-track", "OWASP Dependency-Track SBOM analysis", "security"},
 		{"guac", "GUAC supply chain analysis", "security"},
 		{"sigstore-policy-controller", "Sigstore Policy Controller", "security"},
-		
+
 		// Security Tools (Additional)
 		{"actionlint", "GitHub Actions workflow linting", "security"},
 		{"semgrep", "Static analysis security scanning", "security"},
@@ -127,7 +127,7 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 		{"history-scrub", "Git history cleaning and secret removal", "security"},
 		{"trivy-golden", "Enhanced Trivy for golden images", "security"},
 		{"iac-plan", "Infrastructure as Code planning", "security"},
-		
+
 		// Cloud & Infrastructure Tools
 		{"cloudquery", "Cloud asset inventory", "cloud"},
 		{"custodian", "Cloud governance engine", "cloud"},
@@ -149,13 +149,13 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 		{"kyverno-multitenant", "Multi-tenant Kyverno policies", "cloud"},
 		{"github-admin", "GitHub administration tools", "cloud"},
 		{"github-packages", "GitHub Packages security", "cloud"},
-		
+
 		// AWS IAM Tools
 		{"cloudsplaining", "AWS IAM security assessment", "aws-iam"},
 		{"parliament", "AWS IAM policy linting", "aws-iam"},
 		{"pmapper", "AWS IAM privilege mapping", "aws-iam"},
 		{"policy-sentry", "AWS IAM policy generation", "aws-iam"},
-		
+
 		// Collections
 		{"terraform", "All Terraform tools", "meta"},
 		{"security", "All security tools", "meta"},
@@ -163,7 +163,7 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 		{"cloud", "All cloud infrastructure tools", "meta"},
 		{"kubernetes", "All Kubernetes tools", "meta"},
 		{"all", "All tools combined", "meta"},
-		
+
 		// External MCP servers
 		{"filesystem", "Filesystem operations MCP server", "mcp-external"},
 		{"memory", "Memory/knowledge storage MCP server", "mcp-external"},
@@ -188,7 +188,7 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 	awsIamTools := 0
 	metaTools := 0
 	externalServers := 0
-	
+
 	for _, tool := range mcpTools {
 		switch tool.Type {
 		case "terraform":
@@ -205,11 +205,11 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 			externalServers++
 		}
 	}
-	
+
 	totalBuiltinTools := terraformTools + securityTools + cloudTools + awsIamTools
-	
+
 	fmt.Printf("\nTotal: %d tools available\n", len(mcpTools))
-	fmt.Printf("  - Built-in tools: %d (%d terraform, %d security, %d cloud, %d aws-iam)\n", 
+	fmt.Printf("  - Built-in tools: %d (%d terraform, %d security, %d cloud, %d aws-iam)\n",
 		totalBuiltinTools, terraformTools, securityTools, cloudTools, awsIamTools)
 	fmt.Printf("  - Collections: %d\n", metaTools)
 	fmt.Printf("  - External MCP servers: %d\n", externalServers)
@@ -564,7 +564,7 @@ func showMCPServerInfo(serverName string) error {
 	// Get the actual hardcoded server configuration from the mcp_cmd.go file
 	// We need to access the hardcodedMCPServers map from mcp_cmd.go
 	serverConfigs := getHardcodedMCPServerConfigs()
-	
+
 	config, exists := serverConfigs[serverName]
 	if !exists {
 		return fmt.Errorf("external MCP server '%s' not found", serverName)
@@ -586,12 +586,12 @@ func showMCPServerInfo(serverName string) error {
 			if variable.Required {
 				required = " (required)"
 			}
-			
+
 			secret := ""
 			if variable.Secret {
 				secret = " (secret)"
 			}
-			
+
 			defaultInfo := ""
 			if variable.Default != "" {
 				if variable.Secret {
@@ -600,7 +600,7 @@ func showMCPServerInfo(serverName string) error {
 					defaultInfo = fmt.Sprintf(" [default: %s]", variable.Default)
 				}
 			}
-			
+
 			fmt.Printf("  %s%s%s%s\n", variable.Name, defaultInfo, required, secret)
 			fmt.Printf("    %s\n", variable.Description)
 		}
@@ -608,11 +608,11 @@ func showMCPServerInfo(serverName string) error {
 
 	fmt.Printf("\nUsage:\n")
 	fmt.Printf("  ship mcp %s    # Start MCP server proxy\n", serverName)
-	
+
 	// Show usage examples with variables
 	if len(config.Variables) > 0 {
 		fmt.Printf("\nExamples with variables:\n")
-		
+
 		// Generate example command with required variables
 		requiredVars := []string{}
 		for _, variable := range config.Variables {
@@ -624,11 +624,11 @@ func showMCPServerInfo(serverName string) error {
 				}
 			}
 		}
-		
+
 		if len(requiredVars) > 0 {
 			fmt.Printf("  ship mcp %s %s\n", serverName, strings.Join(requiredVars, " "))
 		}
-		
+
 		// Show example with optional variables
 		if hasOptionalVariables(config.Variables) {
 			optionalExample := getOptionalVariableExample(serverName, config.Variables)

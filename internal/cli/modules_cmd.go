@@ -168,6 +168,14 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 		{"filesystem", "Filesystem operations MCP server", "mcp-external"},
 		{"memory", "Memory/knowledge storage MCP server", "mcp-external"},
 		{"brave-search", "Brave search MCP server", "mcp-external"},
+		
+		// AWS Labs Official MCP Servers
+		{"aws-core", "AWS core operations and general services", "aws-mcp"},
+		{"aws-iam", "AWS IAM operations and identity management", "aws-mcp"},
+		{"aws-pricing", "AWS pricing and cost estimation", "aws-mcp"},
+		{"aws-eks", "AWS EKS and Kubernetes operations", "aws-mcp"},
+		{"aws-ec2", "AWS EC2 compute operations", "aws-mcp"},
+		{"aws-s3", "AWS S3 storage operations", "aws-mcp"},
 	}
 
 	// Create table writer
@@ -188,6 +196,7 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 	awsIamTools := 0
 	metaTools := 0
 	externalServers := 0
+	awsMcpServers := 0
 
 	for _, tool := range mcpTools {
 		switch tool.Type {
@@ -203,6 +212,8 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 			metaTools++
 		case "mcp-external":
 			externalServers++
+		case "aws-mcp":
+			awsMcpServers++
 		}
 	}
 
@@ -213,6 +224,7 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 		totalBuiltinTools, terraformTools, securityTools, cloudTools, awsIamTools)
 	fmt.Printf("  - Collections: %d\n", metaTools)
 	fmt.Printf("  - External MCP servers: %d\n", externalServers)
+	fmt.Printf("  - AWS Labs MCP servers: %d\n", awsMcpServers)
 
 	return nil
 }
@@ -539,7 +551,10 @@ echo "%s completed successfully"
 
 // isExternalMCPServerModule checks if the given name is an external MCP server
 func isExternalMCPServerModule(serverName string) bool {
-	externalServers := []string{"filesystem", "memory", "brave-search"}
+	externalServers := []string{
+		"filesystem", "memory", "brave-search",
+		"aws-core", "aws-iam", "aws-pricing", "aws-eks", "aws-ec2", "aws-s3",
+	}
 	for _, server := range externalServers {
 		if server == serverName {
 			return true
@@ -871,6 +886,12 @@ func getOptionalVariableExample(serverName string, variables []struct {
 		"filesystem":   "--var FILESYSTEM_ROOT=/custom/path",
 		"memory":       "--var MEMORY_STORAGE_PATH=/data --var MEMORY_MAX_SIZE=100MB",
 		"brave-search": "--var BRAVE_SEARCH_COUNT=20",
+		"aws-core":     "--var AWS_PROFILE=production --var AWS_REGION=us-west-2",
+		"aws-iam":      "--var AWS_PROFILE=default --var AWS_REGION=eu-west-1",
+		"aws-pricing":  "--var AWS_REGION=us-east-1",
+		"aws-eks":      "--var AWS_PROFILE=k8s-admin --var AWS_REGION=us-west-2",
+		"aws-ec2":      "--var AWS_PROFILE=compute --var AWS_REGION=eu-central-1",
+		"aws-s3":       "--var AWS_PROFILE=storage --var AWS_REGION=ap-southeast-1",
 	}
 	if example, exists := examples[serverName]; exists {
 		return example

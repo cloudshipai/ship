@@ -76,6 +76,162 @@ var hardcodedMCPServers = map[string]ship.MCPServerConfig{
 			},
 		},
 	},
+	"aws-core": {
+		Name:      "aws-core",
+		Command:   "uvx",
+		Args:      []string{"awslabs.core-mcp-server@latest"},
+		Transport: "stdio",
+		Env:       map[string]string{},
+		Variables: []ship.Variable{
+			{
+				Name:        "AWS_PROFILE",
+				Description: "AWS profile to use for authentication",
+				Required:    false,
+			},
+			{
+				Name:        "AWS_REGION",
+				Description: "AWS region for operations",
+				Required:    false,
+				Default:     "us-east-1",
+			},
+			{
+				Name:        "FASTMCP_LOG_LEVEL",
+				Description: "Log level for the MCP server",
+				Required:    false,
+				Default:     "ERROR",
+			},
+		},
+	},
+	"aws-iam": {
+		Name:      "aws-iam",
+		Command:   "uvx",
+		Args:      []string{"awslabs.iam-mcp-server@latest"},
+		Transport: "stdio",
+		Env:       map[string]string{},
+		Variables: []ship.Variable{
+			{
+				Name:        "AWS_PROFILE",
+				Description: "AWS profile to use for authentication",
+				Required:    false,
+			},
+			{
+				Name:        "AWS_REGION",
+				Description: "AWS region for operations",
+				Required:    false,
+				Default:     "us-east-1",
+			},
+			{
+				Name:        "FASTMCP_LOG_LEVEL",
+				Description: "Log level for the MCP server",
+				Required:    false,
+				Default:     "ERROR",
+			},
+		},
+	},
+	"aws-pricing": {
+		Name:      "aws-pricing",
+		Command:   "uvx",
+		Args:      []string{"awslabs.pricing-mcp-server@latest"},
+		Transport: "stdio",
+		Env:       map[string]string{},
+		Variables: []ship.Variable{
+			{
+				Name:        "AWS_PROFILE",
+				Description: "AWS profile to use for authentication",
+				Required:    false,
+			},
+			{
+				Name:        "AWS_REGION",
+				Description: "AWS region for operations",
+				Required:    false,
+				Default:     "us-east-1",
+			},
+			{
+				Name:        "FASTMCP_LOG_LEVEL",
+				Description: "Log level for the MCP server",
+				Required:    false,
+				Default:     "ERROR",
+			},
+		},
+	},
+	"aws-eks": {
+		Name:      "aws-eks",
+		Command:   "uvx",
+		Args:      []string{"awslabs.eks-mcp-server@latest"},
+		Transport: "stdio",
+		Env:       map[string]string{},
+		Variables: []ship.Variable{
+			{
+				Name:        "AWS_PROFILE",
+				Description: "AWS profile to use for authentication",
+				Required:    false,
+			},
+			{
+				Name:        "AWS_REGION",
+				Description: "AWS region for operations",
+				Required:    false,
+				Default:     "us-east-1",
+			},
+			{
+				Name:        "FASTMCP_LOG_LEVEL",
+				Description: "Log level for the MCP server",
+				Required:    false,
+				Default:     "ERROR",
+			},
+		},
+	},
+	"aws-ec2": {
+		Name:      "aws-ec2",
+		Command:   "uvx",
+		Args:      []string{"awslabs.ec2-mcp-server@latest"},
+		Transport: "stdio",
+		Env:       map[string]string{},
+		Variables: []ship.Variable{
+			{
+				Name:        "AWS_PROFILE",
+				Description: "AWS profile to use for authentication",
+				Required:    false,
+			},
+			{
+				Name:        "AWS_REGION",
+				Description: "AWS region for operations",
+				Required:    false,
+				Default:     "us-east-1",
+			},
+			{
+				Name:        "FASTMCP_LOG_LEVEL",
+				Description: "Log level for the MCP server",
+				Required:    false,
+				Default:     "ERROR",
+			},
+		},
+	},
+	"aws-s3": {
+		Name:      "aws-s3",
+		Command:   "uvx",
+		Args:      []string{"awslabs.s3-mcp-server@latest"},
+		Transport: "stdio",
+		Env:       map[string]string{},
+		Variables: []ship.Variable{
+			{
+				Name:        "AWS_PROFILE",
+				Description: "AWS profile to use for authentication",
+				Required:    false,
+			},
+			{
+				Name:        "AWS_REGION",
+				Description: "AWS region for operations",
+				Required:    false,
+				Default:     "us-east-1",
+			},
+			{
+				Name:        "FASTMCP_LOG_LEVEL",
+				Description: "Log level for the MCP server",
+				Required:    false,
+				Default:     "ERROR",
+			},
+		},
+	},
 }
 
 var mcpCmd = &cobra.Command{
@@ -180,14 +336,34 @@ External MCP Servers:
   filesystem     - Filesystem operations MCP server
   memory         - Memory/knowledge storage MCP server
   brave-search   - Brave search MCP server
+  
+  # AWS Labs Official MCP Servers
+  aws-core       - AWS core operations and general services
+  aws-iam        - AWS IAM operations and identity management  
+  aws-pricing    - AWS pricing and cost estimation
+  aws-eks        - AWS EKS and Kubernetes operations
+  aws-ec2        - AWS EC2 compute operations
+  aws-s3         - AWS S3 storage operations
 
 Examples:
+  # Our Security & Infrastructure Tools
   ship mcp lint        # MCP server for just TFLint
   ship mcp checkov     # MCP server for just Checkov
   ship mcp all         # MCP server for all tools
+  
+  # External MCP Servers
   ship mcp filesystem     # Proxy filesystem operations MCP server
   ship mcp memory         # Proxy memory/knowledge storage MCP server
   ship mcp brave-search --var BRAVE_API_KEY=your_api_key   # Proxy Brave search with API key
+  
+  # AWS Labs Official MCP Servers (requires 'uv' and AWS credentials)
+  ship mcp aws-core --var AWS_PROFILE=default             # AWS core operations
+  ship mcp aws-iam --var AWS_REGION=us-west-2             # AWS IAM management
+  ship mcp aws-pricing                                     # AWS pricing queries
+  ship mcp aws-eks --var AWS_PROFILE=production           # EKS operations
+  ship mcp aws-ec2 --var AWS_REGION=eu-west-1             # EC2 operations
+  ship mcp aws-s3                                          # S3 operations
+  
   ship mcp cost --var AWS_REGION=us-east-1 --var DEBUG=true  # Pass multiple environment variables`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runMCPServer,

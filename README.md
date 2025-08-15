@@ -69,16 +69,16 @@ go install github.com/cloudshipai/ship/cmd/ship@latest
 
 ## 🏃 Quick Start
 
-### 1. Ship SDK Framework
+### 1. Ship Framework
 
-Build your own MCP servers using the Ship SDK:
+Build your own MCP servers using the Ship framework:
 
-#### Quick Example: Echo Server
+#### Quick Example: Infrastructure MCP Server
 
 ```bash
 # Create a new Go project
-mkdir my-mcp-server && cd my-mcp-server
-go mod init my-mcp-server
+mkdir my-infrastructure-server && cd my-infrastructure-server
+go mod init my-infrastructure-server
 go get github.com/cloudshipai/ship
 ```
 
@@ -88,32 +88,18 @@ Create `main.go`:
 package main
 
 import (
-    "context"
     "log"
     "github.com/cloudshipai/ship/pkg/ship"
-    "github.com/cloudshipai/ship/pkg/dagger"
+    "github.com/cloudshipai/ship/internal/tools"
 )
 
 func main() {
-    // Create a simple echo tool
-    echoTool := ship.NewContainerTool("echo", ship.ContainerToolConfig{
-        Description: "Echo a message",
-        Image:       "alpine:latest",
-        Parameters: []ship.Parameter{
-            {Name: "message", Type: "string", Description: "Message to echo", Required: true},
-        },
-        Execute: func(ctx context.Context, params map[string]interface{}, engine *dagger.Engine) (*ship.ToolResult, error) {
-            message := params["message"].(string)
-            result, err := engine.Container().From("alpine:latest").WithExec([]string{"echo", message}).Stdout(ctx)
-            if err != nil {
-                return &ship.ToolResult{Error: err}, err
-            }
-            return &ship.ToolResult{Content: result}, nil
-        },
-    })
+    // Build MCP server with Ship's pre-built infrastructure tools
+    server := ship.NewServer("infrastructure-server", "1.0.0").
+        AddTool(tools.NewTFLintTool()).     // Terraform linting
+        Build()
 
-    // Build and start the MCP server
-    server := ship.NewServer("echo-server", "1.0.0").AddTool(echoTool).Build()
+    // Start the MCP server
     if err := server.ServeStdio(); err != nil {
         log.Fatalf("Server failed: %v", err)
     }
@@ -122,28 +108,41 @@ func main() {
 
 ```bash
 # Build and run your MCP server
-go build -o echo-server .
-./echo-server
+go build -o infrastructure-server .
+./infrastructure-server
 ```
 
-#### Three Usage Patterns
+#### Four Integration Patterns
 
-**1. Single Tool MCP Server:**
-```bash
-# Start MCP server with just TFLint
-ship mcp lint
+**1. Ship-First (Recommended):**
+```go
+// Ship manages the entire MCP server
+server := ship.NewServer("my-server", "1.0.0").
+    AddTool(tools.NewTFLintTool()).
+    Build()
+server.ServeStdio()
 ```
 
-**2. Multiple Tools MCP Server:**
-```bash
-# Start MCP server with Checkov and TFLint
-ship mcp checkov lint
+**2. Bring Your Own MCP Server:**
+```go
+// Add Ship tools to existing mcp-go server  
+shipAdapter := ship.NewMCPAdapter().
+    AddTool(tools.NewTFLintTool())
+shipAdapter.AttachToServer(ctx, existingMCPServer)
 ```
 
-**3. All Tools MCP Server:**
+**3. Tool Router (Advanced):**
+```go
+// Route different tools to different servers
+router := ship.NewToolRouter().
+    AddRoute("terraform", terraformAdapter).
+    AddRoute("security", securityAdapter)
+```
+
+**4. CLI Usage (Optional):**
 ```bash
-# Start MCP server with all Ship tools
-ship mcp all
+# Direct CLI access to tools
+ship mcp all  # Start MCP server with all tools
 ```
 
 #### Advanced Integration Patterns
@@ -153,12 +152,16 @@ Perfect for existing applications that already use mcp-go - just add Ship's cont
 
 ```go
 import (
+    "context"
+    "log"
     "github.com/cloudshipai/ship/pkg/ship"
     "github.com/cloudshipai/ship/internal/tools" 
     "github.com/mark3labs/mcp-go/server"
 )
 
 func main() {
+    ctx := context.Background()
+    
     // Your existing mcp-go server
     mcpServer := server.NewMCPServer("my-app", "1.0.0")
     
@@ -167,11 +170,12 @@ func main() {
     
     // Add Ship's containerized infrastructure tools
     shipAdapter := ship.NewMCPAdapter().
-        AddTool(tools.NewTFLintTool()).
-        AddTool(tools.NewCheckovTool())
+        AddTool(tools.NewTFLintTool())
     
     // Attach Ship tools to your existing server
-    shipAdapter.AttachToServer(ctx, mcpServer)
+    if err := shipAdapter.AttachToServer(ctx, mcpServer); err != nil {
+        log.Fatalf("Failed to attach Ship tools: %v", err)
+    }
     defer shipAdapter.Close()
     
     // Now you have both your tools AND Ship's containerized tools
@@ -183,16 +187,24 @@ func main() {
 Only use the Ship capabilities you need:
 
 ```go
-// Just use Ship's Dagger engine and container framework
-engine, _ := dagger.NewEngine(ctx)
+// Just use Ship's container framework with custom tools
 customTool := ship.NewContainerTool("my-scanner", ship.ContainerToolConfig{
+    Description: "Custom security scanner",
     Image: "my-org/scanner:latest",
-    // ... your configuration
+    Parameters: []ship.Parameter{
+        {Name: "directory", Type: "string", Description: "Directory to scan", Required: true},
+    },
+    Execute: func(ctx context.Context, params map[string]interface{}, engine *dagger.Engine) (*ship.ToolResult, error) {
+        // Your custom tool logic here
+        return &ship.ToolResult{Content: "Scan completed"}, nil
+    },
 })
 
-adapter := ship.NewMCPAdapter().WithEngine(engine).AddTool(customTool)
+adapter := ship.NewMCPAdapter().AddTool(customTool)
 adapter.AttachToServer(ctx, yourExistingMCPServer)
 ```
+
+📚 **Complete Integration Guide**: See [examples/integration-patterns.md](examples/integration-patterns.md) for detailed integration patterns with code examples for all four usage patterns.
 
 #### Integration with AI Assistants
 
@@ -252,14 +264,12 @@ ship tf diagram . --hcl -o infrastructure.png  # Generate diagrams
 
 ## 🛠️ Available Infrastructure Tools
 
-| Tool | Ship SDK | Description | Container Image |
-|------|----------|-------------|-----------------|
+| Tool | Ship Framework | Description | Container Image |
+|------|----------------|-------------|-----------------|
 | **TFLint** | `tools.NewTFLintTool()` | Terraform linter for syntax and best practices | `ghcr.io/terraform-linters/tflint` |
-| **Checkov** | `tools.NewCheckovTool()` | Security and compliance scanner | `bridgecrew/checkov` |
-| **Trivy** | `tools.NewTrivyTool()` | Vulnerability scanner for IaC | `aquasec/trivy` |
-| **OpenInfraQuote** | `tools.NewCostTool()` | Infrastructure cost analysis | `gruebel/openinfraquote` |
-| **terraform-docs** | `tools.NewDocsTool()` | Auto-generate module documentation | `quay.io/terraform-docs/terraform-docs` |
-| **InfraMap** | `tools.NewDiagramTool()` | Infrastructure diagram generation | `cycloid/inframap:latest` |
+| **More tools** | *Coming soon* | Additional infrastructure tools in development | *Various* |
+
+> **Note**: Ship framework currently includes TFLint with more infrastructure tools being added. Check our [roadmap](#-roadmap) for upcoming tools.
 
 ## 🔧 Ship Framework Integration
 
@@ -278,22 +288,21 @@ Ship Framework wraps the official [mcp-go](https://github.com/modelcontextprotoc
 package main
 
 import (
-    "context"
+    "log"
     "github.com/cloudshipai/ship/pkg/ship"
-    "github.com/cloudshipai/ship/pkg/tools"
-    "github.com/modelcontextprotocol/mcp-go/mcp"
+    "github.com/cloudshipai/ship/internal/tools"
 )
 
 func main() {
     // Ship builds on mcp-go's foundation
     server := ship.NewServer("infrastructure-server", "1.0.0").
         AddTool(tools.NewTFLintTool()).         // Pre-built Ship tool
-        AddTool(tools.NewCheckovTool()).        // Security scanning
-        AddContainerTool("custom", config).     // Your custom tools
         Build()
     
     // Leverages mcp-go's stdio transport
-    server.ServeStdio()
+    if err := server.ServeStdio(); err != nil {
+        log.Fatalf("Server failed: %v", err)
+    }
 }
 ```
 
@@ -310,16 +319,12 @@ Ship Framework provides security through containerization:
 
 ```go
 // AWS credentials passed automatically from environment
-server.AddTool(tools.NewTFLintTool().WithEnv(map[string]string{
-    "AWS_PROFILE": "production",
-    "AWS_REGION": "us-west-2",
-}))
+server := ship.NewServer("aws-server", "1.0.0").
+    AddTool(tools.NewTFLintTool()).
+    Build()
 
-// Azure credentials
-server.AddTool(tools.NewCheckovTool().WithEnv(map[string]string{
-    "ARM_CLIENT_ID": "your-client-id",
-    "ARM_CLIENT_SECRET": "your-client-secret",
-}))
+// Environment variables are automatically passed to containers
+// Set AWS_PROFILE, AWS_REGION etc. in your environment
 ```
 
 ## 🏗️ Framework Architecture

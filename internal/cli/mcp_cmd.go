@@ -260,7 +260,113 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 		addDockleTool(s)
 	case "sops":
 		addSOPSTool(s)
-	
+	case "actionlint":
+		addActionlintTool(s)
+	case "semgrep":
+		addSemgrepTool(s)
+	case "hadolint":
+		addHadolintTool(s)
+	case "cfn-nag":
+		addCfnNagTool(s)
+	case "conftest":
+		addConftestTool(s)
+	case "git-secrets":
+		addGitSecretsTool(s)
+	case "kube-bench":
+		addKubeBenchTool(s)
+	case "kube-hunter":
+		addKubeHunterTool(s)
+	case "zap":
+		addZapTool(s)
+	case "falco":
+		addFalcoTool(s)
+	case "nikto":
+		addNiktoTool(s)
+	case "openscap":
+		addOpenSCAPTool(s)
+	case "ossf-scorecard":
+		addOSSFScorecardTool(s)
+	case "scout-suite":
+		addScoutSuiteTool(s)
+	case "steampipe":
+		addSteampipeTool(s)
+	case "powerpipe":
+		addPowerpipeTool(s)
+	case "velero":
+		addVeleroTool(s)
+	case "goldilocks":
+		addGoldilocksTool(s)
+	case "allstar":
+		addAllstarTool(s)
+	case "rekor":
+		addRekorTool(s)
+	case "osv-scanner":
+		addOSVScannerTool(s)
+	case "license-detector":
+		addLicenseDetectorTool(s)
+	case "registry":
+		addRegistryTool(s)
+	case "cosign-golden":
+		addCosignGoldenTool(s)
+	case "history-scrub":
+		addHistoryScrubTool(s)
+	case "trivy-golden":
+		addTrivyGoldenTool(s)
+	case "iac-plan":
+		addIacPlanTool(s)
+
+	// Cloud & Infrastructure Tools (with MCP functions)
+	case "cloudquery":
+		addCloudQueryTool(s)
+	case "custodian":
+		addCustodianTool(s)
+	case "terraformer":
+		addTerraformerTool(s)
+	case "infracost":
+		addInfracostTool(s)
+	case "inframap":
+		addInframapTool(s)
+	case "infrascan":
+		addInfrascanTool(s)
+	case "aws-iam-rotation":
+		addAWSIAMRotationTool(s)
+	case "tfstate-reader":
+		addTfstateReaderTool(s)
+	case "packer":
+		addPackerTool(s)
+	case "fleet":
+		addFleetTool(s)
+	case "kuttl":
+		addKuttlTool(s)
+	case "litmus":
+		addLitmusTool(s)
+	case "cert-manager":
+		addCertManagerTool(s)
+	case "step-ca":
+		addStepCATool(s)
+	case "check-ssl-cert":
+		addCheckSSLCertTool(s)
+	case "k8s-network-policy":
+		addK8sNetworkPolicyTool(s)
+	case "kyverno":
+		addKyvernoTool(s)
+	case "kyverno-multitenant":
+		addKyvernoMultitenantTool(s)
+	case "github-admin":
+		addGitHubAdminTool(s)
+	case "github-packages":
+		addGitHubPackagesTool(s)
+
+	// Additional Terraform Tools
+	case "terraform-docs":
+		addTerraformDocsTool(s)
+	case "tflint":
+		addTflintTool(s)
+	case "terrascan":
+		addTerrascanTool(s)
+	case "openinfraquote":
+		addOpenInfraQuoteTool(s)
+
 	// AWS IAM Tools (with MCP functions)
 	case "cloudsplaining":
 		addCloudsplainingTool(s)
@@ -278,10 +384,16 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 		addSecurityTools(s)
 	case "aws-iam":
 		addAWSIAMTools(s)
+	case "cloud":
+		addCloudTools(s)
+	case "kubernetes":
+		addKubernetesTools(s)
 	case "all":
 		addTerraformTools(s)
 		addSecurityTools(s)
 		addAWSIAMTools(s)
+		addCloudTools(s)
+		addKubernetesTools(s)
 	default:
 		// Check if this is an external MCP server
 		if isExternalMCPServer(toolName) {
@@ -863,6 +975,35 @@ func addSecurityTools(s *server.MCPServer) {
 	addKubescapeTool(s)
 	addDockleTool(s)
 	addSOPSTool(s)
+	
+	// Additional security tools with MCP integration
+	addActionlintTool(s)
+	addSemgrepTool(s)
+	addHadolintTool(s)
+	addCfnNagTool(s)
+	addConftestTool(s)
+	addGitSecretsTool(s)
+	addKubeBenchTool(s)
+	addKubeHunterTool(s)
+	addZapTool(s)
+	addFalcoTool(s)
+	addNiktoTool(s)
+	addOpenSCAPTool(s)
+	addOSSFScorecardTool(s)
+	addScoutSuiteTool(s)
+	addSteampipeTool(s)
+	addPowerpipeTool(s)
+	addVeleroTool(s)
+	addGoldilocksTool(s)
+	addAllstarTool(s)
+	addRekorTool(s)
+	addOSVScannerTool(s)
+	addLicenseDetectorTool(s)
+	addRegistryTool(s)
+	addCosignGoldenTool(s)
+	addHistoryScrubTool(s)
+	addTrivyGoldenTool(s)
+	addIacPlanTool(s)
 }
 
 func addGitleaksTool(s *server.MCPServer) {
@@ -1117,6 +1258,40 @@ func addAWSIAMTools(s *server.MCPServer) {
 	addParliamentTool(s)
 	addPMapperTool(s)
 	addPolicySentryTool(s)
+}
+
+// Cloud Tools Collection
+func addCloudTools(s *server.MCPServer) {
+	addCloudQueryTool(s)
+	addCustodianTool(s)
+	addTerraformerTool(s)
+	addInfracostTool(s)
+	addInframapTool(s)
+	addInfrascanTool(s)
+	addAWSIAMRotationTool(s)
+	addTfstateReaderTool(s)
+	addPackerTool(s)
+	addSteampipeTool(s)
+	addPowerpipeTool(s)
+	addIacPlanTool(s)
+}
+
+// Kubernetes Tools Collection
+func addKubernetesTools(s *server.MCPServer) {
+	addKubeBenchTool(s)
+	addKubeHunterTool(s)
+	addFalcoTool(s)
+	addFleetTool(s)
+	addKuttlTool(s)
+	addLitmusTool(s)
+	addCertManagerTool(s)
+	addK8sNetworkPolicyTool(s)
+	addKyvernoTool(s)
+	addKyvernoMultitenantTool(s)
+	addVeleroTool(s)
+	addGoldilocksTool(s)
+	addGatekeeperTool(s)
+	addKubescapeTool(s)
 }
 
 func addCloudsplainingTool(s *server.MCPServer) {
@@ -1764,5 +1939,528 @@ func addSOPSTool(s *server.MCPServer) {
 			args = append(args, "--in-place")
 		}
 		return executeShipCommand(args)
+	})
+}
+
+// Additional Security Tools MCP Functions
+func addActionlintTool(s *server.MCPServer) {
+	tool := mcp.NewTool("actionlint",
+		mcp.WithDescription("GitHub Actions workflow linting"),
+		mcp.WithString("directory", mcp.Description("Directory to scan (default: current directory)")),
+		mcp.WithString("output", mcp.Description("Output file to save results")),
+	)
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"security", "actionlint"}
+		if dir := request.GetString("directory", ""); dir != "" {
+			args = append(args, dir)
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		return executeShipCommand(args)
+	})
+}
+
+func addSemgrepTool(s *server.MCPServer) {
+	tool := mcp.NewTool("semgrep",
+		mcp.WithDescription("Static analysis security scanning"),
+		mcp.WithString("directory", mcp.Description("Directory to scan (default: current directory)")),
+		mcp.WithString("config", mcp.Description("Semgrep configuration/ruleset")),
+		mcp.WithString("severity", mcp.Description("Minimum severity level")),
+		mcp.WithString("output", mcp.Description("Output file to save results")),
+	)
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"security", "semgrep"}
+		if dir := request.GetString("directory", ""); dir != "" {
+			args = append(args, dir)
+		}
+		if config := request.GetString("config", ""); config != "" {
+			args = append(args, "--config", config)
+		}
+		if severity := request.GetString("severity", ""); severity != "" {
+			args = append(args, "--severity", severity)
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		return executeShipCommand(args)
+	})
+}
+
+func addHadolintTool(s *server.MCPServer) {
+	tool := mcp.NewTool("hadolint",
+		mcp.WithDescription("Dockerfile security linting"),
+		mcp.WithString("directory", mcp.Description("Directory to scan (default: current directory)")),
+		mcp.WithString("output", mcp.Description("Output file to save results")),
+		mcp.WithBoolean("directory-scan", mcp.Description("Scan all Dockerfiles in directory")),
+	)
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"security", "hadolint"}
+		if dir := request.GetString("directory", ""); dir != "" {
+			args = append(args, dir)
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		if dirScan := request.GetBool("directory-scan", false); dirScan {
+			args = append(args, "--directory")
+		}
+		return executeShipCommand(args)
+	})
+}
+
+func addCfnNagTool(s *server.MCPServer) {
+	tool := mcp.NewTool("cfn-nag",
+		mcp.WithDescription("CloudFormation security scanning"),
+		mcp.WithString("directory", mcp.Description("Directory to scan (default: current directory)")),
+		mcp.WithString("rules", mcp.Description("Path to custom rules directory")),
+		mcp.WithString("output", mcp.Description("Output file to save results")),
+	)
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"security", "cfn-nag"}
+		if dir := request.GetString("directory", ""); dir != "" {
+			args = append(args, dir)
+		}
+		if rules := request.GetString("rules", ""); rules != "" {
+			args = append(args, "--rules", rules)
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		return executeShipCommand(args)
+	})
+}
+
+func addConftestTool(s *server.MCPServer) {
+	tool := mcp.NewTool("conftest",
+		mcp.WithDescription("OPA policy testing"),
+		mcp.WithString("directory", mcp.Description("Directory to scan (default: current directory)")),
+		mcp.WithString("policy", mcp.Description("Path to policy directory (required)")),
+		mcp.WithString("output", mcp.Description("Output file to save results")),
+	)
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"security", "conftest"}
+		if dir := request.GetString("directory", ""); dir != "" {
+			args = append(args, dir)
+		}
+		if policy := request.GetString("policy", ""); policy != "" {
+			args = append(args, "--policy", policy)
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		return executeShipCommand(args)
+	})
+}
+
+func addGitSecretsTool(s *server.MCPServer) {
+	tool := mcp.NewTool("git-secrets",
+		mcp.WithDescription("Git secrets scanning"),
+		mcp.WithString("directory", mcp.Description("Directory to scan (default: current directory)")),
+		mcp.WithString("output", mcp.Description("Output file to save results")),
+		mcp.WithBoolean("aws", mcp.Description("Include AWS secret patterns")),
+	)
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"security", "git-secrets"}
+		if dir := request.GetString("directory", ""); dir != "" {
+			args = append(args, dir)
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		if aws := request.GetBool("aws", false); aws {
+			args = append(args, "--aws")
+		}
+		return executeShipCommand(args)
+	})
+}
+
+func addKubeBenchTool(s *server.MCPServer) {
+	tool := mcp.NewTool("kube-bench",
+		mcp.WithDescription("Kubernetes security benchmarks"),
+		mcp.WithString("kubeconfig", mcp.Description("Path to kubeconfig file")),
+		mcp.WithString("node-type", mcp.Description("Node type (master, node)")),
+		mcp.WithString("output", mcp.Description("Output file to save results")),
+	)
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"security", "kube-bench"}
+		if kubeconfig := request.GetString("kubeconfig", ""); kubeconfig != "" {
+			args = append(args, "--kubeconfig", kubeconfig)
+		}
+		if nodeType := request.GetString("node-type", ""); nodeType != "" {
+			args = append(args, "--node-type", nodeType)
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		return executeShipCommand(args)
+	})
+}
+
+func addKubeHunterTool(s *server.MCPServer) {
+	tool := mcp.NewTool("kube-hunter",
+		mcp.WithDescription("Kubernetes penetration testing"),
+		mcp.WithString("scan-type", mcp.Description("Scan type (remote, cidr, interface, pod)")),
+		mcp.WithString("kubeconfig", mcp.Description("Path to kubeconfig file (for pod scan)")),
+		mcp.WithString("output", mcp.Description("Output file to save results")),
+	)
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"security", "kube-hunter"}
+		if scanType := request.GetString("scan-type", ""); scanType != "" {
+			args = append(args, "--scan-type", scanType)
+		}
+		if kubeconfig := request.GetString("kubeconfig", ""); kubeconfig != "" {
+			args = append(args, "--kubeconfig", kubeconfig)
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		return executeShipCommand(args)
+	})
+}
+
+func addZapTool(s *server.MCPServer) {
+	tool := mcp.NewTool("zap",
+		mcp.WithDescription("Web application security testing using OWASP ZAP"),
+		mcp.WithString("target", mcp.Description("Target URL to scan")),
+		mcp.WithString("scan-type", mcp.Description("Scan type (baseline, full, api)")),
+		mcp.WithString("api-spec", mcp.Description("Path to OpenAPI/Swagger spec file (for API scan)")),
+		mcp.WithString("context", mcp.Description("Path to ZAP context file")),
+		mcp.WithString("output", mcp.Description("Output file to save results")),
+	)
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"security", "zap"}
+		if target := request.GetString("target", ""); target != "" {
+			args = append(args, target)
+		}
+		if scanType := request.GetString("scan-type", ""); scanType != "" {
+			args = append(args, "--scan-type", scanType)
+		}
+		if apiSpec := request.GetString("api-spec", ""); apiSpec != "" {
+			args = append(args, "--api-spec", apiSpec)
+		}
+		if context := request.GetString("context", ""); context != "" {
+			args = append(args, "--context", context)
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		return executeShipCommand(args)
+	})
+}
+
+func addFalcoTool(s *server.MCPServer) {
+	tool := mcp.NewTool("falco",
+		mcp.WithDescription("Runtime security monitoring"),
+		mcp.WithString("rules", mcp.Description("Path to custom rules directory")),
+		mcp.WithString("kubeconfig", mcp.Description("Path to kubeconfig file")),
+		mcp.WithString("output", mcp.Description("Output file to save results")),
+		mcp.WithBoolean("validate", mcp.Description("Validate rules only")),
+	)
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"security", "falco"}
+		if rules := request.GetString("rules", ""); rules != "" {
+			args = append(args, "--rules", rules)
+		}
+		if kubeconfig := request.GetString("kubeconfig", ""); kubeconfig != "" {
+			args = append(args, "--kubeconfig", kubeconfig)
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		if validate := request.GetBool("validate", false); validate {
+			args = append(args, "--validate")
+		}
+		return executeShipCommand(args)
+	})
+}
+
+// Remaining Security Tools with simplified MCP functions
+func addNiktoTool(s *server.MCPServer) {
+	tool := mcp.NewTool("nikto", mcp.WithDescription("Web server security scanning"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "nikto"})
+	})
+}
+
+func addOpenSCAPTool(s *server.MCPServer) {
+	tool := mcp.NewTool("openscap", mcp.WithDescription("Security compliance scanning"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "openscap"})
+	})
+}
+
+func addOSSFScorecardTool(s *server.MCPServer) {
+	tool := mcp.NewTool("ossf-scorecard", mcp.WithDescription("Open Source Security Foundation scorecard"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "ossf-scorecard"})
+	})
+}
+
+func addScoutSuiteTool(s *server.MCPServer) {
+	tool := mcp.NewTool("scout-suite", mcp.WithDescription("Multi-cloud security auditing"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "scout-suite"})
+	})
+}
+
+func addSteampipeTool(s *server.MCPServer) {
+	tool := mcp.NewTool("steampipe", mcp.WithDescription("Cloud infrastructure queries"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "steampipe"})
+	})
+}
+
+func addPowerpipeTool(s *server.MCPServer) {
+	tool := mcp.NewTool("powerpipe", mcp.WithDescription("Infrastructure benchmarking"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "powerpipe"})
+	})
+}
+
+func addVeleroTool(s *server.MCPServer) {
+	tool := mcp.NewTool("velero", mcp.WithDescription("Kubernetes backup and disaster recovery"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "velero"})
+	})
+}
+
+func addGoldilocksTool(s *server.MCPServer) {
+	tool := mcp.NewTool("goldilocks", mcp.WithDescription("Kubernetes resource recommendations"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "goldilocks"})
+	})
+}
+
+func addAllstarTool(s *server.MCPServer) {
+	tool := mcp.NewTool("allstar", mcp.WithDescription("GitHub security policy enforcement"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "allstar"})
+	})
+}
+
+func addRekorTool(s *server.MCPServer) {
+	tool := mcp.NewTool("rekor", mcp.WithDescription("Software supply chain transparency"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "rekor"})
+	})
+}
+
+func addOSVScannerTool(s *server.MCPServer) {
+	tool := mcp.NewTool("osv-scanner", mcp.WithDescription("Open Source Vulnerability scanning"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "osv-scanner"})
+	})
+}
+
+func addLicenseDetectorTool(s *server.MCPServer) {
+	tool := mcp.NewTool("license-detector", mcp.WithDescription("Software license detection"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "license-detector"})
+	})
+}
+
+func addRegistryTool(s *server.MCPServer) {
+	tool := mcp.NewTool("registry", mcp.WithDescription("Container registry operations"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "registry"})
+	})
+}
+
+func addCosignGoldenTool(s *server.MCPServer) {
+	tool := mcp.NewTool("cosign-golden", mcp.WithDescription("Enhanced Cosign for golden images"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "cosign-golden"})
+	})
+}
+
+func addHistoryScrubTool(s *server.MCPServer) {
+	tool := mcp.NewTool("history-scrub", mcp.WithDescription("Git history cleaning and secret removal"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "history-scrub"})
+	})
+}
+
+func addTrivyGoldenTool(s *server.MCPServer) {
+	tool := mcp.NewTool("trivy-golden", mcp.WithDescription("Enhanced Trivy for golden images"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "trivy-golden"})
+	})
+}
+
+func addIacPlanTool(s *server.MCPServer) {
+	tool := mcp.NewTool("iac-plan", mcp.WithDescription("Infrastructure as Code planning"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "iac-plan"})
+	})
+}
+
+// Cloud & Infrastructure Tools MCP Functions
+func addCloudQueryTool(s *server.MCPServer) {
+	tool := mcp.NewTool("cloudquery", mcp.WithDescription("Cloud asset inventory"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "cloudquery"})
+	})
+}
+
+func addCustodianTool(s *server.MCPServer) {
+	tool := mcp.NewTool("custodian", mcp.WithDescription("Cloud governance engine"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "custodian"})
+	})
+}
+
+func addTerraformerTool(s *server.MCPServer) {
+	tool := mcp.NewTool("terraformer", mcp.WithDescription("Infrastructure import and management"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "terraformer"})
+	})
+}
+
+func addInfracostTool(s *server.MCPServer) {
+	tool := mcp.NewTool("infracost", mcp.WithDescription("Infrastructure cost estimation"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "infracost"})
+	})
+}
+
+func addInframapTool(s *server.MCPServer) {
+	tool := mcp.NewTool("inframap", mcp.WithDescription("Infrastructure visualization"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "inframap"})
+	})
+}
+
+func addInfrascanTool(s *server.MCPServer) {
+	tool := mcp.NewTool("infrascan", mcp.WithDescription("Infrastructure security scanning"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "infrascan"})
+	})
+}
+
+func addAWSIAMRotationTool(s *server.MCPServer) {
+	tool := mcp.NewTool("aws-iam-rotation", mcp.WithDescription("AWS IAM credential rotation"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "aws-iam-rotation"})
+	})
+}
+
+func addTfstateReaderTool(s *server.MCPServer) {
+	tool := mcp.NewTool("tfstate-reader", mcp.WithDescription("Terraform state analysis"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "tfstate-reader"})
+	})
+}
+
+func addPackerTool(s *server.MCPServer) {
+	tool := mcp.NewTool("packer", mcp.WithDescription("Machine image building"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "packer"})
+	})
+}
+
+func addFleetTool(s *server.MCPServer) {
+	tool := mcp.NewTool("fleet", mcp.WithDescription("GitOps for Kubernetes"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "fleet"})
+	})
+}
+
+func addKuttlTool(s *server.MCPServer) {
+	tool := mcp.NewTool("kuttl", mcp.WithDescription("Kubernetes testing framework"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "kuttl"})
+	})
+}
+
+func addLitmusTool(s *server.MCPServer) {
+	tool := mcp.NewTool("litmus", mcp.WithDescription("Chaos engineering for Kubernetes"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "litmus"})
+	})
+}
+
+func addCertManagerTool(s *server.MCPServer) {
+	tool := mcp.NewTool("cert-manager", mcp.WithDescription("Certificate management"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "cert-manager"})
+	})
+}
+
+func addStepCATool(s *server.MCPServer) {
+	tool := mcp.NewTool("step-ca", mcp.WithDescription("Certificate authority operations"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "step-ca"})
+	})
+}
+
+func addCheckSSLCertTool(s *server.MCPServer) {
+	tool := mcp.NewTool("check-ssl-cert", mcp.WithDescription("SSL certificate validation"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "check-ssl-cert"})
+	})
+}
+
+func addK8sNetworkPolicyTool(s *server.MCPServer) {
+	tool := mcp.NewTool("k8s-network-policy", mcp.WithDescription("Kubernetes network policy management"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "k8s-network-policy"})
+	})
+}
+
+func addKyvernoTool(s *server.MCPServer) {
+	tool := mcp.NewTool("kyverno", mcp.WithDescription("Kubernetes policy management"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "kyverno"})
+	})
+}
+
+func addKyvernoMultitenantTool(s *server.MCPServer) {
+	tool := mcp.NewTool("kyverno-multitenant", mcp.WithDescription("Multi-tenant Kyverno policies"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "kyverno-multitenant"})
+	})
+}
+
+func addGitHubAdminTool(s *server.MCPServer) {
+	tool := mcp.NewTool("github-admin", mcp.WithDescription("GitHub administration tools"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "github-admin"})
+	})
+}
+
+func addGitHubPackagesTool(s *server.MCPServer) {
+	tool := mcp.NewTool("github-packages", mcp.WithDescription("GitHub Packages security"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "github-packages"})
+	})
+}
+
+// Terraform Tools
+func addTerraformDocsTool(s *server.MCPServer) {
+	tool := mcp.NewTool("terraform-docs", mcp.WithDescription("Terraform documentation generation"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"tf", "docs"})
+	})
+}
+
+func addTflintTool(s *server.MCPServer) {
+	tool := mcp.NewTool("tflint", mcp.WithDescription("Terraform linting"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"tf", "lint"})
+	})
+}
+
+func addTerrascanTool(s *server.MCPServer) {
+	tool := mcp.NewTool("terrascan", mcp.WithDescription("Infrastructure as Code security scanning"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"security", "terrascan"})
+	})
+}
+
+func addOpenInfraQuoteTool(s *server.MCPServer) {
+	tool := mcp.NewTool("openinfraquote", mcp.WithDescription("Infrastructure cost estimation"))
+	s.AddTool(tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return executeShipCommand([]string{"tf", "cost"})
 	})
 }

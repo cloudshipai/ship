@@ -53,19 +53,10 @@ Ship is designed for the **AI-first infrastructure era** where AI assistants nee
 
 ## 📦 Installation
 
-### For Ship MCP Framework Development
+### Quick Install (CLI)
 
 ```bash
-# Add Ship SDK to your Go project
-go mod init my-mcp-server
-go get github.com/cloudshipai/ship/pkg/ship
-go get github.com/cloudshipai/ship/pkg/ship  # Ship framework
-```
-
-### Quick Install (CLI + Framework)
-
-```bash
-# Install Ship CLI and SDK with one command
+# Install Ship CLI with one command
 curl -fsSL https://raw.githubusercontent.com/cloudshipai/ship/main/install.sh | bash
 ```
 
@@ -137,31 +128,22 @@ go build -o echo-server .
 
 #### Three Usage Patterns
 
-**1. Pure Ship SDK (Custom Tools Only):**
-```go
-server := ship.NewServer("custom-server", "1.0.0").
-    AddContainerTool("my-tool", ship.ContainerToolConfig{...}).
-    Build()
+**1. Single Tool MCP Server:**
+```bash
+# Start MCP server with just TFLint
+ship mcp lint
 ```
 
-**2. Cherry-Pick Ship Tools:**
-```go
-import "github.com/cloudshipai/ship/pkg/ship"
-
-server := ship.NewServer("hybrid-server", "1.0.0").
-    AddTool(tools.NewTFLintTool()).
-    AddContainerTool("my-custom-tool", config).
-    Build()
+**2. Multiple Tools MCP Server:**
+```bash
+# Start MCP server with Checkov and TFLint
+ship mcp checkov lint
 ```
 
-**3. Everything Plus Custom Extensions:**
-```go
-import "github.com/cloudshipai/ship/pkg/ship"
-
-server := all.AddAllTools(
-    ship.NewServer("full-server", "1.0.0").
-    AddContainerTool("my-extension", config),
-).Build()
+**3. All Tools MCP Server:**
+```bash
+# Start MCP server with all Ship tools
+ship mcp all
 ```
 
 #### Integration with AI Assistants
@@ -171,14 +153,15 @@ Configure your custom MCP server in Claude Code:
 ```json
 {
   "mcpServers": {
-    "my-server": {
-      "command": "/path/to/my-mcp-server"
+    "ship-terraform": {
+      "command": "ship",
+      "args": ["mcp", "all"]
     }
   }
 }
 ```
 
-📚 **Learn More**: Check out the [Ship SDK Documentation](docs/ship-sdk-overview.md) for complete guides, API reference, and examples.
+📚 **Learn More**: Check out the [Ship Documentation](docs/) for complete guides and tool reference.
 
 ### 2. AI Assistant Integration (MCP)
 

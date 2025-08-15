@@ -2,8 +2,8 @@
 package all
 
 import (
+	"github.com/cloudshipai/ship/internal/ship"
 	"github.com/cloudshipai/ship/internal/tools"
-	"github.com/cloudshipai/ship/pkg/ship"
 )
 
 // TerraformRegistry returns a registry with all Terraform-related tools

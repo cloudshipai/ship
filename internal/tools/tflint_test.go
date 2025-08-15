@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/cloudshipai/ship/internal/ship"
 	"github.com/cloudshipai/ship/pkg/dagger"
-	"github.com/cloudshipai/ship/pkg/ship"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

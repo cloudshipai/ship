@@ -66,12 +66,32 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 		Description string
 		Type        string
 	}{
+		// Terraform Tools
 		{"lint", "TFLint for syntax and best practices", "terraform"},
-		{"checkov", "Checkov security scanning", "security"},
-		{"trivy", "Trivy security scanning", "security"},
-		{"cost", "OpenInfraQuote cost analysis", "cost"},
-		{"docs", "terraform-docs documentation", "documentation"},
-		{"diagram", "InfraMap diagram generation", "visualization"},
+		{"checkov", "Checkov security scanning", "terraform"},
+		{"trivy", "Trivy security scanning", "terraform"},
+		{"cost", "OpenInfraQuote cost analysis", "terraform"},
+		{"docs", "terraform-docs documentation", "terraform"},
+		{"diagram", "InfraMap diagram generation", "terraform"},
+		
+		// Security Tools
+		{"gitleaks", "Secret detection with Gitleaks", "security"},
+		{"grype", "Vulnerability scanning with Grype", "security"},
+		{"syft", "SBOM generation with Syft", "security"},
+		{"prowler", "Multi-cloud security assessment", "security"},
+		{"trufflehog", "Verified secret detection", "security"},
+		{"cosign", "Container signing and verification", "security"},
+		
+		// AWS IAM Tools
+		{"cloudsplaining", "AWS IAM security assessment", "aws-iam"},
+		{"parliament", "AWS IAM policy linting", "aws-iam"},
+		{"pmapper", "AWS IAM privilege mapping", "aws-iam"},
+		{"policy-sentry", "AWS IAM policy generation", "aws-iam"},
+		
+		// Collections
+		{"terraform", "All Terraform tools", "meta"},
+		{"security", "All security tools", "meta"},
+		{"aws-iam", "All AWS IAM tools", "meta"},
 		{"all", "All tools combined", "meta"},
 	}
 

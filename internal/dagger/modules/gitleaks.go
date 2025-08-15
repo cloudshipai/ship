@@ -1,0 +1,98 @@
+package modules
+
+import (
+	"context"
+	"path/filepath"
+
+	"dagger.io/dagger"
+)
+
+// GitleaksModule runs Gitleaks for secret detection
+type GitleaksModule struct {
+	client *dagger.Client
+	name   string
+}
+
+// NewGitleaksModule creates a new Gitleaks module
+func NewGitleaksModule(client *dagger.Client) *GitleaksModule {
+	return &GitleaksModule{
+		client: client,
+		name:   "gitleaks",
+	}
+}
+
+// ScanDirectory scans a directory for secrets using Gitleaks
+func (m *GitleaksModule) ScanDirectory(ctx context.Context, dir string) (string, error) {
+	container := m.client.Container().
+		From("zricethezav/gitleaks:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(dir)).
+		WithWorkdir("/workspace").
+		WithExec([]string{"gitleaks", "detect", "--source", ".", "--report-format", "json", "--no-git"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		// Gitleaks returns non-zero exit code when secrets are found
+		// Try to get the output anyway
+		output, _ = container.Stderr(ctx)
+		return output, nil
+	}
+
+	return output, nil
+}
+
+// ScanFile scans a specific file for secrets
+func (m *GitleaksModule) ScanFile(ctx context.Context, filePath string) (string, error) {
+	dir := filepath.Dir(filePath)
+	filename := filepath.Base(filePath)
+
+	container := m.client.Container().
+		From("zricethezav/gitleaks:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(dir)).
+		WithWorkdir("/workspace").
+		WithExec([]string{"gitleaks", "detect", "--source", filename, "--report-format", "json", "--no-git"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		// Try to get stderr output if stdout fails
+		output, _ = container.Stderr(ctx)
+		return output, nil
+	}
+
+	return output, nil
+}
+
+// ScanGitRepo scans a git repository for secrets
+func (m *GitleaksModule) ScanGitRepo(ctx context.Context, repoDir string) (string, error) {
+	container := m.client.Container().
+		From("zricethezav/gitleaks:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(repoDir)).
+		WithWorkdir("/workspace").
+		WithExec([]string{"gitleaks", "detect", "--source", ".", "--report-format", "json"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		// Try to get stderr output if stdout fails
+		output, _ = container.Stderr(ctx)
+		return output, nil
+	}
+
+	return output, nil
+}
+
+// ScanWithConfig scans using a custom Gitleaks configuration
+func (m *GitleaksModule) ScanWithConfig(ctx context.Context, dir string, configFile string) (string, error) {
+	container := m.client.Container().
+		From("zricethezav/gitleaks:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(dir)).
+		WithWorkdir("/workspace").
+		WithExec([]string{"gitleaks", "detect", "--source", ".", "--config", configFile, "--report-format", "json", "--no-git"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		// Try to get stderr output if stdout fails
+		output, _ = container.Stderr(ctx)
+		return output, nil
+	}
+
+	return output, nil
+}

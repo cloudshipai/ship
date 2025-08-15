@@ -1,0 +1,102 @@
+package modules
+
+import (
+	"context"
+	"fmt"
+
+	"dagger.io/dagger"
+)
+
+// TfstateReaderModule reads and analyzes Terraform state files
+type TfstateReaderModule struct {
+	client *dagger.Client
+	name   string
+}
+
+// NewTfstateReaderModule creates a new Terraform state reader module
+func NewTfstateReaderModule(client *dagger.Client) *TfstateReaderModule {
+	return &TfstateReaderModule{
+		client: client,
+		name:   "tfstate-reader",
+	}
+}
+
+// AnalyzeState analyzes a Terraform state file
+func (m *TfstateReaderModule) AnalyzeState(ctx context.Context, statePath string) (string, error) {
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "jq"}).
+		WithFile("/terraform.tfstate", m.client.Host().File(statePath)).
+		WithExec([]string{
+			"jq",
+			"{ version: .version, terraform_version: .terraform_version, serial: .serial, lineage: .lineage, resources: [.resources[] | {type: .type, name: .name, provider: .provider, instances: (.instances | length)}] }",
+			"/terraform.tfstate",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to analyze state: %w", err)
+	}
+
+	return output, nil
+}
+
+// ListResources lists resources in state file
+func (m *TfstateReaderModule) ListResources(ctx context.Context, statePath string) (string, error) {
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "jq"}).
+		WithFile("/terraform.tfstate", m.client.Host().File(statePath)).
+		WithExec([]string{
+			"jq",
+			"[.resources[] | {type: .type, name: .name, mode: .mode, provider: .provider}]",
+			"/terraform.tfstate",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to list resources: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetResourceByType gets resources by type
+func (m *TfstateReaderModule) GetResourceByType(ctx context.Context, statePath string, resourceType string) (string, error) {
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "jq"}).
+		WithFile("/terraform.tfstate", m.client.Host().File(statePath)).
+		WithExec([]string{
+			"jq",
+			fmt.Sprintf(`[.resources[] | select(.type == "%s")]`, resourceType),
+			"/terraform.tfstate",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get resources by type: %w", err)
+	}
+
+	return output, nil
+}
+
+// ExtractOutputs extracts outputs from state file
+func (m *TfstateReaderModule) ExtractOutputs(ctx context.Context, statePath string) (string, error) {
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "jq"}).
+		WithFile("/terraform.tfstate", m.client.Host().File(statePath)).
+		WithExec([]string{
+			"jq",
+			".outputs",
+			"/terraform.tfstate",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract outputs: %w", err)
+	}
+
+	return output, nil
+}

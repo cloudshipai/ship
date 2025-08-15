@@ -18,7 +18,7 @@ NC='\033[0m' # No Color
 REPO="cloudshipai/ship"
 BINARY_NAME="ship"
 INSTALL_DIR=""  # Will be determined by get_install_dir()
-SHIP_VERSION="v0.6.2"  # Updated by CI on release
+SHIP_VERSION="v0.6.3"  # Updated by CI on release
 
 # Banner
 print_banner() {
@@ -371,7 +371,7 @@ main() {
     while [[ $# -gt 0 ]]; do
         case $1 in
             --version)
-                SHIP_VERSION="v0.6.2"
+                SHIP_VERSION="v0.6.3"
                 shift 2
                 ;;
             --install-dir)

@@ -18,7 +18,6 @@ type MCPServer struct {
 	registry *Registry
 	engine   *dagger.Engine
 	server   *server.MCPServer
-	proxies  map[string]*MCPProxy // For managing external MCP server connections
 }
 
 // ServerBuilder provides a fluent API for building MCP servers
@@ -154,14 +153,7 @@ func (s *MCPServer) ServeHTTP(host string, port int) error {
 func (s *MCPServer) Close() error {
 	var lastErr error
 	
-	// Close all proxy connections
-	if s.proxies != nil {
-		for name, proxy := range s.proxies {
-			if err := proxy.Close(); err != nil {
-				lastErr = fmt.Errorf("failed to close proxy %s: %w", name, err)
-			}
-		}
-	}
+	// Note: External MCP server proxies are managed at the CLI level, not here
 	
 	// Close Dagger engine
 	if s.engine != nil {

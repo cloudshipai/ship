@@ -241,7 +241,7 @@ func (p *MCPProxy) DiscoverTools(ctx context.Context) ([]Tool, error) {
 		}
 		
 		// Create proxy tool with namespace prefix
-		proxyToolName := fmt.Sprintf("%s.%s", p.config.Name, tool.Name)
+		proxyToolName := fmt.Sprintf("%s_%s", p.config.Name, tool.Name)
 		description := tool.Description
 		if description == "" {
 			description = fmt.Sprintf("Proxied tool %s from %s", tool.Name, p.config.Name)

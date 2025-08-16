@@ -51,10 +51,10 @@ func TestMCPProxyConnection(t *testing.T) {
 
 		// Check for expected filesystem tools
 		expectedTools := []string{
-			"filesystem-test.read_file",
-			"filesystem-test.write_file", 
-			"filesystem-test.list_directory",
-			"filesystem-test.create_directory",
+			"filesystem-test_read_file",
+			"filesystem-test_write_file", 
+			"filesystem-test_list_directory",
+			"filesystem-test_create_directory",
 		}
 
 		for _, expectedTool := range expectedTools {
@@ -94,7 +94,7 @@ func TestMCPProxyConnection(t *testing.T) {
 
 		// Verify tools are namespaced
 		for _, tool := range tools {
-			assert.Contains(t, tool.Name(), "memory-test.", "Tool name should be namespaced with server name")
+			assert.Contains(t, tool.Name(), "memory-test_", "Tool name should be namespaced with server name")
 		}
 
 		toolNames := make([]string, len(tools))

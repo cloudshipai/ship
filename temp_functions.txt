@@ -1,0 +1,473 @@
+// Additional security tool run functions
+func runAllstar(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	engine, err := shipdagger.NewEngine(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize dagger: %w", err)
+	}
+	defer engine.Close()
+
+	module := modules.NewAllstarModule(engine.GetClient())
+	command := "check"
+	if len(args) > 0 {
+		command = args[0]
+	}
+
+	var result string
+	switch command {
+	case "check":
+		result, err = module.CheckPolicies(ctx, ".")
+	case "install":
+		result, err = module.InstallPolicies(ctx, ".")
+	case "version":
+		result, err = module.GetVersion(ctx)
+	default:
+		return fmt.Errorf("unknown command: %s. Available: check, install, version", command)
+	}
+
+	if err != nil {
+		return fmt.Errorf("allstar %s failed: %w", command, err)
+	}
+	fmt.Print(result)
+	return nil
+}
+
+func runCheckov(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	engine, err := shipdagger.NewEngine(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize dagger: %w", err)
+	}
+	defer engine.Close()
+
+	module := modules.NewCheckovModule(engine.GetClient())
+	directory := "."
+	if len(args) > 0 {
+		directory = args[0]
+	}
+
+	result, err := module.ScanDirectory(ctx, directory)
+	if err != nil {
+		return fmt.Errorf("checkov scan failed: %w", err)
+	}
+	fmt.Print(result)
+	return nil
+}
+
+func runCosignGolden(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	engine, err := shipdagger.NewEngine(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize dagger: %w", err)
+	}
+	defer engine.Close()
+
+	module := modules.NewCosignGoldenModule(engine.GetClient())
+	command := "verify"
+	if len(args) > 0 {
+		command = args[0]
+	}
+
+	var result string
+	switch command {
+	case "verify":
+		result, err = module.VerifyGoldenImage(ctx, "")
+	case "sign":
+		result, err = module.SignGoldenImage(ctx, "")
+	default:
+		return fmt.Errorf("unknown command: %s. Available: verify, sign", command)
+	}
+
+	if err != nil {
+		return fmt.Errorf("cosign-golden %s failed: %w", command, err)
+	}
+	fmt.Print(result)
+	return nil
+}
+
+func runGoldilocks(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	engine, err := shipdagger.NewEngine(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize dagger: %w", err)
+	}
+	defer engine.Close()
+
+	module := modules.NewGoldilocksModule(engine.GetClient())
+	command := "recommend"
+	if len(args) > 0 {
+		command = args[0]
+	}
+
+	var result string
+	switch command {
+	case "recommend":
+		result, err = module.RecommendResources(ctx, "")
+	case "dashboard":
+		result, err = module.StartDashboard(ctx)
+	default:
+		return fmt.Errorf("unknown command: %s. Available: recommend, dashboard", command)
+	}
+
+	if err != nil {
+		return fmt.Errorf("goldilocks %s failed: %w", command, err)
+	}
+	fmt.Print(result)
+	return nil
+}
+
+func runHistoryScrub(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	engine, err := shipdagger.NewEngine(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize dagger: %w", err)
+	}
+	defer engine.Close()
+
+	module := modules.NewHistoryScrubModule(engine.GetClient())
+	directory := "."
+	if len(args) > 0 {
+		directory = args[0]
+	}
+
+	result, err := module.ScrubSecrets(ctx, directory)
+	if err != nil {
+		return fmt.Errorf("history-scrub failed: %w", err)
+	}
+	fmt.Print(result)
+	return nil
+}
+
+func runIacPlan(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	engine, err := shipdagger.NewEngine(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize dagger: %w", err)
+	}
+	defer engine.Close()
+
+	module := modules.NewIacPlanModule(engine.GetClient())
+	directory := "."
+	if len(args) > 0 {
+		directory = args[0]
+	}
+
+	result, err := module.AnalyzePlan(ctx, directory)
+	if err != nil {
+		return fmt.Errorf("iac-plan failed: %w", err)
+	}
+	fmt.Print(result)
+	return nil
+}
+
+func runLicenseDetector(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	engine, err := shipdagger.NewEngine(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize dagger: %w", err)
+	}
+	defer engine.Close()
+
+	module := modules.NewLicenseDetectorModule(engine.GetClient())
+	directory := "."
+	if len(args) > 0 {
+		directory = args[0]
+	}
+
+	result, err := module.DetectLicenses(ctx, directory)
+	if err != nil {
+		return fmt.Errorf("license-detector failed: %w", err)
+	}
+	fmt.Print(result)
+	return nil
+}
+
+func runNikto(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	engine, err := shipdagger.NewEngine(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize dagger: %w", err)
+	}
+	defer engine.Close()
+
+	module := modules.NewNiktoModule(engine.GetClient())
+	target := "localhost"
+	if len(args) > 0 {
+		target = args[0]
+	}
+
+	result, err := module.ScanWebServer(ctx, target)
+	if err != nil {
+		return fmt.Errorf("nikto scan failed: %w", err)
+	}
+	fmt.Print(result)
+	return nil
+}
+
+func runOpenSCAP(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	engine, err := shipdagger.NewEngine(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize dagger: %w", err)
+	}
+	defer engine.Close()
+
+	module := modules.NewOpenSCAPModule(engine.GetClient())
+	command := "scan"
+	if len(args) > 0 {
+		command = args[0]
+	}
+
+	var result string
+	switch command {
+	case "scan":
+		result, err = module.ScanSystem(ctx)
+	case "evaluate":
+		result, err = module.EvaluateProfile(ctx, "")
+	default:
+		return fmt.Errorf("unknown command: %s. Available: scan, evaluate", command)
+	}
+
+	if err != nil {
+		return fmt.Errorf("openscap %s failed: %w", command, err)
+	}
+	fmt.Print(result)
+	return nil
+}
+
+func runOSSFScorecard(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	engine, err := shipdagger.NewEngine(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize dagger: %w", err)
+	}
+	defer engine.Close()
+
+	module := modules.NewOSSFScorecardModule(engine.GetClient())
+	repository := ""
+	if len(args) > 0 {
+		repository = args[0]
+	}
+
+	result, err := module.ScoreRepository(ctx, repository)
+	if err != nil {
+		return fmt.Errorf("ossf-scorecard failed: %w", err)
+	}
+	fmt.Print(result)
+	return nil
+}
+
+func runOSVScanner(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	engine, err := shipdagger.NewEngine(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize dagger: %w", err)
+	}
+	defer engine.Close()
+
+	module := modules.NewOSVScannerModule(engine.GetClient())
+	directory := "."
+	if len(args) > 0 {
+		directory = args[0]
+	}
+
+	result, err := module.ScanDirectory(ctx, directory)
+	if err != nil {
+		return fmt.Errorf("osv-scanner failed: %w", err)
+	}
+	fmt.Print(result)
+	return nil
+}
+
+func runPowerpipe(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	engine, err := shipdagger.NewEngine(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize dagger: %w", err)
+	}
+	defer engine.Close()
+
+	module := modules.NewPowerpipeModule(engine.GetClient())
+	command := "benchmark"
+	if len(args) > 0 {
+		command = args[0]
+	}
+
+	var result string
+	switch command {
+	case "benchmark":
+		result, err = module.RunBenchmark(ctx, "")
+	case "check":
+		result, err = module.RunCheck(ctx, "")
+	default:
+		return fmt.Errorf("unknown command: %s. Available: benchmark, check", command)
+	}
+
+	if err != nil {
+		return fmt.Errorf("powerpipe %s failed: %w", command, err)
+	}
+	fmt.Print(result)
+	return nil
+}
+
+func runRegistry(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	engine, err := shipdagger.NewEngine(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize dagger: %w", err)
+	}
+	defer engine.Close()
+
+	module := modules.NewRegistryModule(engine.GetClient())
+	command := "scan"
+	if len(args) > 0 {
+		command = args[0]
+	}
+
+	var result string
+	switch command {
+	case "scan":
+		result, err = module.ScanRegistry(ctx, "")
+	case "list":
+		result, err = module.ListImages(ctx, "")
+	default:
+		return fmt.Errorf("unknown command: %s. Available: scan, list", command)
+	}
+
+	if err != nil {
+		return fmt.Errorf("registry %s failed: %w", command, err)
+	}
+	fmt.Print(result)
+	return nil
+}
+
+func runRekor(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	engine, err := shipdagger.NewEngine(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize dagger: %w", err)
+	}
+	defer engine.Close()
+
+	module := modules.NewRekorModule(engine.GetClient())
+	command := "search"
+	if len(args) > 0 {
+		command = args[0]
+	}
+
+	var result string
+	switch command {
+	case "search":
+		result, err = module.SearchEntries(ctx, "")
+	case "get":
+		result, err = module.GetEntry(ctx, "")
+	default:
+		return fmt.Errorf("unknown command: %s. Available: search, get", command)
+	}
+
+	if err != nil {
+		return fmt.Errorf("rekor %s failed: %w", command, err)
+	}
+	fmt.Print(result)
+	return nil
+}
+
+func runScoutSuite(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	engine, err := shipdagger.NewEngine(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize dagger: %w", err)
+	}
+	defer engine.Close()
+
+	module := modules.NewScoutSuiteModule(engine.GetClient())
+	provider := "aws"
+	if len(args) > 0 {
+		provider = args[0]
+	}
+
+	result, err := module.ScanProvider(ctx, provider)
+	if err != nil {
+		return fmt.Errorf("scout-suite scan failed: %w", err)
+	}
+	fmt.Print(result)
+	return nil
+}
+
+func runTerrascan(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	engine, err := shipdagger.NewEngine(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize dagger: %w", err)
+	}
+	defer engine.Close()
+
+	module := modules.NewTerrascanModule(engine.GetClient())
+	directory := "."
+	if len(args) > 0 {
+		directory = args[0]
+	}
+
+	result, err := module.ScanDirectory(ctx, directory)
+	if err != nil {
+		return fmt.Errorf("terrascan scan failed: %w", err)
+	}
+	fmt.Print(result)
+	return nil
+}
+
+func runTrivyGolden(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	engine, err := shipdagger.NewEngine(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize dagger: %w", err)
+	}
+	defer engine.Close()
+
+	module := modules.NewTrivyGoldenModule(engine.GetClient())
+	target := ""
+	if len(args) > 0 {
+		target = args[0]
+	}
+
+	result, err := module.ScanGoldenImage(ctx, target)
+	if err != nil {
+		return fmt.Errorf("trivy-golden scan failed: %w", err)
+	}
+	fmt.Print(result)
+	return nil
+}
+
+func runVelero(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	engine, err := shipdagger.NewEngine(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize dagger: %w", err)
+	}
+	defer engine.Close()
+
+	module := modules.NewVeleroModule(engine.GetClient())
+	command := "backup"
+	if len(args) > 0 {
+		command = args[0]
+	}
+
+	var result string
+	switch command {
+	case "backup":
+		result, err = module.CreateBackup(ctx, "")
+	case "restore":
+		result, err = module.RestoreBackup(ctx, "")
+	case "list":
+		result, err = module.ListBackups(ctx)
+	default:
+		return fmt.Errorf("unknown command: %s. Available: backup, restore, list", command)
+	}
+
+	if err != nil {
+		return fmt.Errorf("velero %s failed: %w", command, err)
+	}
+	fmt.Print(result)
+	return nil
+}
+

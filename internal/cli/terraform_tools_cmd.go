@@ -1,11 +1,12 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/cloudshipai/ship/internal/dagger"
+	shipdagger "github.com/cloudshipai/ship/internal/dagger"
 	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -37,6 +38,14 @@ var generateDocsCmd = &cobra.Command{
 	Short: "Generate documentation for Terraform modules",
 	Args:  cobra.MaximumNArgs(1),
 	RunE:  runGenerateDocs,
+}
+
+var awsPricingCmd = &cobra.Command{
+	Use:   "aws-pricing [command]",
+	Short: "Get AWS pricing information",
+	Long:  `Get pricing information for AWS services including EC2, RDS, and S3.`,
+	Args:  cobra.MinimumNArgs(1),
+	RunE:  runAWSPricing,
 }
 
 var lintCmd = &cobra.Command{
@@ -77,6 +86,7 @@ func init() {
 	terraformToolsCmd.AddCommand(lintCmd)
 	terraformToolsCmd.AddCommand(checkovScanCmd)
 	terraformToolsCmd.AddCommand(infracostCmd)
+	terraformToolsCmd.AddCommand(awsPricingCmd)
 	terraformToolsCmd.AddCommand(infraMapCmd)
 
 	// Add output file flags
@@ -151,7 +161,7 @@ func runCostAnalysis(cmd *cobra.Command, args []string) error {
 
 	// Initialize Dagger engine
 	fmt.Println("Initializing Dagger engine...")
-	engine, err := dagger.NewEngine(ctx)
+	engine, err := shipdagger.NewEngine(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize dagger: %w", err)
 	}
@@ -204,7 +214,7 @@ func runSecurityScan(cmd *cobra.Command, args []string) error {
 
 	// Initialize Dagger engine
 	fmt.Println("Initializing Dagger engine...")
-	engine, err := dagger.NewEngine(ctx)
+	engine, err := shipdagger.NewEngine(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize dagger: %w", err)
 	}
@@ -254,7 +264,7 @@ func runGenerateDocs(cmd *cobra.Command, args []string) error {
 
 	// Initialize Dagger engine
 	fmt.Println("Initializing Dagger engine...")
-	engine, err := dagger.NewEngine(ctx)
+	engine, err := shipdagger.NewEngine(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize dagger: %w", err)
 	}
@@ -289,7 +299,7 @@ func runLint(cmd *cobra.Command, args []string) error {
 
 	// Initialize Dagger engine
 	fmt.Println("Initializing Dagger engine...")
-	engine, err := dagger.NewEngine(ctx)
+	engine, err := shipdagger.NewEngine(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize dagger: %w", err)
 	}
@@ -327,7 +337,7 @@ func runCheckovScan(cmd *cobra.Command, args []string) error {
 
 	// Initialize Dagger engine
 	fmt.Println("Initializing Dagger engine...")
-	engine, err := dagger.NewEngine(ctx)
+	engine, err := shipdagger.NewEngine(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize dagger: %w", err)
 	}
@@ -339,7 +349,7 @@ func runCheckovScan(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Scanning Terraform code with Checkov in: %s\n", dir)
 	output, err := module.ScanDirectory(ctx, dir)
 	if err != nil {
-		return fmt.Errorf("Checkov scan failed: %w", err)
+		return fmt.Errorf("checkov scan failed: %w", err)
 	}
 
 	// Get output flag
@@ -365,7 +375,7 @@ func runInfracost(cmd *cobra.Command, args []string) error {
 
 	// Initialize Dagger engine
 	fmt.Println("Initializing Dagger engine...")
-	engine, err := dagger.NewEngine(ctx)
+	engine, err := shipdagger.NewEngine(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize dagger: %w", err)
 	}
@@ -410,7 +420,7 @@ func runInfraMap(cmd *cobra.Command, args []string) error {
 
 	// Initialize Dagger engine
 	fmt.Println("Initializing Dagger engine...")
-	engine, err := dagger.NewEngine(ctx)
+	engine, err := shipdagger.NewEngine(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize dagger: %w", err)
 	}
@@ -468,4 +478,71 @@ func runInfraMap(cmd *cobra.Command, args []string) error {
 
 	// For text formats or stdout
 	return saveOrPrintOutput(output, outputFile, "Infrastructure diagram generated!")
+}
+
+func runAWSPricing(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	engine, err := shipdagger.NewEngine(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize dagger: %w", err)
+	}
+	defer engine.Close()
+
+	module := modules.NewAWSPricingModule(engine.GetClient())
+
+	command := args[0]
+	outputFile, _ := cmd.Flags().GetString("output")
+
+	var result string
+
+	switch command {
+	case "ec2":
+		instanceType := ""
+		region := ""
+		if len(args) > 1 {
+			instanceType = args[1]
+		}
+		if len(args) > 2 {
+			region = args[2]
+		}
+		result, err = module.GetEC2Pricing(ctx, instanceType, region)
+	case "rds":
+		instanceClass := ""
+		engine := ""
+		region := ""
+		if len(args) > 1 {
+			instanceClass = args[1]
+		}
+		if len(args) > 2 {
+			engine = args[2]
+		}
+		if len(args) > 3 {
+			region = args[3]
+		}
+		result, err = module.GetRDSPricing(ctx, instanceClass, engine, region)
+	case "services":
+		result, err = module.ListServices(ctx)
+	case "calculate":
+		resourceType := ""
+		size := ""
+		region := ""
+		if len(args) > 1 {
+			resourceType = args[1]
+		}
+		if len(args) > 2 {
+			size = args[2]
+		}
+		if len(args) > 3 {
+			region = args[3]
+		}
+		result, err = module.CalculateMonthlyCost(ctx, resourceType, size, region)
+	default:
+		return fmt.Errorf("unknown command: %s. Available: ec2, rds, services, calculate", command)
+	}
+
+	if err != nil {
+		return fmt.Errorf("aws pricing %s failed: %w", command, err)
+	}
+
+	return saveOrPrintOutput(result, outputFile, fmt.Sprintf("AWS %s pricing retrieved!", command))
 }

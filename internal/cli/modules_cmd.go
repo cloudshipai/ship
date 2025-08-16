@@ -77,6 +77,7 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 		{"tflint", "Terraform linting", "terraform"},
 		{"terrascan", "Infrastructure as Code security scanning", "terraform"},
 		{"openinfraquote", "Infrastructure cost estimation", "terraform"},
+		{"aws-pricing-builtin", "Built-in AWS pricing information", "terraform"},
 
 		// Security Tools (Core)
 		{"gitleaks", "Secret detection with Gitleaks", "security"},
@@ -114,7 +115,6 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 		{"openscap", "Security compliance scanning", "security"},
 		{"ossf-scorecard", "Open Source Security Foundation scorecard", "security"},
 		{"scout-suite", "Multi-cloud security auditing", "security"},
-		{"steampipe", "Cloud infrastructure queries", "security"},
 		{"powerpipe", "Infrastructure benchmarking", "security"},
 		{"velero", "Kubernetes backup and disaster recovery", "security"},
 		{"goldilocks", "Kubernetes resource recommendations", "security"},
@@ -168,7 +168,8 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 		{"filesystem", "Filesystem operations MCP server", "mcp-external"},
 		{"memory", "Memory/knowledge storage MCP server", "mcp-external"},
 		{"brave-search", "Brave search MCP server", "mcp-external"},
-		
+		{"steampipe", "Cloud infrastructure queries MCP server", "mcp-external"},
+
 		// AWS Labs Official MCP Servers
 		{"aws-core", "AWS core operations and general services", "aws-mcp"},
 		{"aws-iam", "AWS IAM operations and identity management", "aws-mcp"},
@@ -552,7 +553,7 @@ echo "%s completed successfully"
 // isExternalMCPServerModule checks if the given name is an external MCP server
 func isExternalMCPServerModule(serverName string) bool {
 	externalServers := []string{
-		"filesystem", "memory", "brave-search",
+		"filesystem", "memory", "brave-search", "steampipe",
 		"aws-core", "aws-iam", "aws-pricing", "aws-eks", "aws-ec2", "aws-s3",
 	}
 	for _, server := range externalServers {
@@ -842,6 +843,28 @@ func getHardcodedMCPServerConfigs() map[string]struct {
 				},
 			},
 		},
+		"steampipe": {
+			Name:        "steampipe",
+			Description: "Cloud infrastructure queries MCP server with SQL-based tools for cloud resources",
+			Command:     "npx",
+			Args:        []string{"-y", "@turbot/steampipe-mcp"},
+			Transport:   "stdio",
+			Variables: []struct {
+				Name        string
+				Description string
+				Required    bool
+				Default     string
+				Secret      bool
+			}{
+				{
+					Name:        "STEAMPIPE_DATABASE_CONNECTIONS",
+					Description: "Database connections configuration for Steampipe",
+					Required:    false,
+					Default:     "postgres://steampipe@localhost:9193/steampipe",
+					Secret:      false,
+				},
+			},
+		},
 	}
 }
 
@@ -851,6 +874,7 @@ func getServerDescription(serverName string) string {
 		"filesystem":   "Filesystem operations MCP server with tools for file and directory management",
 		"memory":       "Memory/knowledge storage MCP server for persistent data storage",
 		"brave-search": "Brave search MCP server for web search capabilities",
+		"steampipe":    "Cloud infrastructure queries MCP server with SQL-based tools for cloud resources",
 	}
 	if desc, exists := descriptions[serverName]; exists {
 		return desc
@@ -875,7 +899,7 @@ func hasOptionalVariables(variables []struct {
 }
 
 // getOptionalVariableExample generates an example with optional variables
-func getOptionalVariableExample(serverName string, variables []struct {
+func getOptionalVariableExample(serverName string, _ []struct {
 	Name        string
 	Description string
 	Required    bool

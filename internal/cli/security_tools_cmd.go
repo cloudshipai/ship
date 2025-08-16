@@ -373,7 +373,7 @@ func init() {
 	securityToolsCmd.AddCommand(dependencyTrackCmd)
 	securityToolsCmd.AddCommand(guacCmd)
 	securityToolsCmd.AddCommand(sigstorePolicyControllerCmd)
-	
+
 	// Additional security tools
 	securityToolsCmd.AddCommand(allstarCmd)
 	securityToolsCmd.AddCommand(checkovCmd)
@@ -2172,6 +2172,7 @@ func runSteampipe(cmd *cobra.Command, args []string) error {
 	}
 	return nil
 }
+
 // Simple run functions for additional security tools
 func runAllstar(cmd *cobra.Command, args []string) error {
 	fmt.Println("Allstar: GitHub security policy enforcement")

@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddVeleroTools adds Velero (Kubernetes backup and restore) MCP tool implementations using real CLI commands
+// AddVeleroTools adds Velero (Kubernetes backup and restore) MCP tool implementations using direct Dagger calls
 func AddVeleroTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addVeleroToolsDirect(s)
+}
+
+// addVeleroToolsDirect adds Velero tools using direct Dagger module calls
+func addVeleroToolsDirect(s *server.MCPServer) {
 	// Velero install with provider configuration
 	installTool := mcp.NewTool("velero_install",
 		mcp.WithDescription("Install Velero with storage provider configuration using real velero CLI"),
@@ -40,35 +49,37 @@ func AddVeleroTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(installTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"velero", "install"}
-		
-		if provider := request.GetString("provider", ""); provider != "" {
-			args = append(args, "--provider", provider)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if bucket := request.GetString("bucket", ""); bucket != "" {
-			args = append(args, "--bucket", bucket)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewVeleroModule(client)
+
+		// Get parameters
+		provider := request.GetString("provider", "")
+		bucket := request.GetString("bucket", "")
+		region := request.GetString("region", "")
+		secretFile := request.GetString("secret_file", "")
+		useNodeAgent := request.GetBool("use_node_agent", false)
+		namespace := request.GetString("namespace", "")
+		noSecret := request.GetBool("no_secret", false)
+		plugins := request.GetString("plugins", "")
+
+		if bucket == "" {
+			return mcp.NewToolResultError("bucket is required"), nil
 		}
-		if region := request.GetString("region", ""); region != "" {
-			args = append(args, "--backup-location-config", "region="+region)
+
+		// Install Velero
+		output, err := module.Install(ctx, provider, bucket, region, secretFile, useNodeAgent, namespace, noSecret, plugins)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Velero install failed: %v", err)), nil
 		}
-		if secretFile := request.GetString("secret_file", ""); secretFile != "" {
-			args = append(args, "--secret-file", secretFile)
-		}
-		if request.GetBool("use_node_agent", false) {
-			args = append(args, "--use-node-agent")
-		}
-		if namespace := request.GetString("namespace", ""); namespace != "" {
-			args = append(args, "--namespace", namespace)
-		}
-		if request.GetBool("no_secret", false) {
-			args = append(args, "--no-secret")
-		}
-		if plugins := request.GetString("plugins", ""); plugins != "" {
-			args = append(args, "--plugins", plugins)
-		}
-		args = append(args, "--wait")
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Velero create backup schedule
@@ -96,24 +107,39 @@ func AddVeleroTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(createScheduleTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewVeleroModule(client)
+
+		// Get parameters
 		name := request.GetString("name", "")
 		schedule := request.GetString("schedule", "")
-		args := []string{"velero", "schedule", "create", name, "--schedule", schedule}
-		
-		if ttl := request.GetString("ttl", ""); ttl != "" {
-			args = append(args, "--ttl", ttl)
+		if name == "" {
+			return mcp.NewToolResultError("name is required"), nil
 		}
-		if includeNs := request.GetString("include_namespaces", ""); includeNs != "" {
-			args = append(args, "--include-namespaces", includeNs)
+		if schedule == "" {
+			return mcp.NewToolResultError("schedule is required"), nil
 		}
-		if excludeNs := request.GetString("exclude_namespaces", ""); excludeNs != "" {
-			args = append(args, "--exclude-namespaces", excludeNs)
+
+		includeNamespaces := request.GetString("include_namespaces", "")
+		excludeNamespaces := request.GetString("exclude_namespaces", "")
+		ttl := request.GetString("ttl", "")
+		labels := request.GetString("labels", "")
+		kubeconfig := "" // Note: kubeconfig parameter not available in MCP interface
+
+		// Create schedule
+		output, err := module.CreateSchedule(ctx, name, schedule, includeNamespaces, excludeNamespaces, ttl, labels, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Velero create schedule failed: %v", err)), nil
 		}
-		if labels := request.GetString("labels", ""); labels != "" {
-			args = append(args, "--labels", labels)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Velero create backup on demand
@@ -140,26 +166,36 @@ func AddVeleroTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(createBackupTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewVeleroModule(client)
+
+		// Get parameters
 		name := request.GetString("name", "")
-		args := []string{"velero", "backup", "create", name}
-		
-		if fromSchedule := request.GetString("from_schedule", ""); fromSchedule != "" {
-			args = append(args, "--from-schedule", fromSchedule)
+		if name == "" {
+			return mcp.NewToolResultError("name is required"), nil
 		}
-		if includeNs := request.GetString("include_namespaces", ""); includeNs != "" {
-			args = append(args, "--include-namespaces", includeNs)
+
+		fromSchedule := request.GetString("from_schedule", "")
+		includeNamespaces := request.GetString("include_namespaces", "")
+		excludeNamespaces := request.GetString("exclude_namespaces", "")
+		labels := request.GetString("labels", "")
+		wait := request.GetBool("wait", false)
+		kubeconfig := "" // Note: kubeconfig parameter not available in MCP interface
+
+		// Create backup
+		output, err := module.CreateBackupAdvanced(ctx, name, fromSchedule, includeNamespaces, excludeNamespaces, labels, wait, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Velero backup create failed: %v", err)), nil
 		}
-		if excludeNs := request.GetString("exclude_namespaces", ""); excludeNs != "" {
-			args = append(args, "--exclude-namespaces", excludeNs)
-		}
-		if labels := request.GetString("labels", ""); labels != "" {
-			args = append(args, "--labels", labels)
-		}
-		if request.GetBool("wait", false) {
-			args = append(args, "--wait")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Velero restore from backup
@@ -190,27 +226,40 @@ func AddVeleroTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(createRestoreTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewVeleroModule(client)
+
+		// Get parameters
 		name := request.GetString("name", "")
 		fromBackup := request.GetString("from_backup", "")
-		args := []string{"velero", "restore", "create", name, "--from-backup", fromBackup}
-		
-		if namespaceMappings := request.GetString("namespace_mappings", ""); namespaceMappings != "" {
-			args = append(args, "--namespace-mappings", namespaceMappings)
+		if name == "" {
+			return mcp.NewToolResultError("name is required"), nil
 		}
-		if includeNs := request.GetString("include_namespaces", ""); includeNs != "" {
-			args = append(args, "--include-namespaces", includeNs)
+		if fromBackup == "" {
+			return mcp.NewToolResultError("from_backup is required"), nil
 		}
-		if excludeNs := request.GetString("exclude_namespaces", ""); excludeNs != "" {
-			args = append(args, "--exclude-namespaces", excludeNs)
+
+		namespaceMappings := request.GetString("namespace_mappings", "")
+		includeNamespaces := request.GetString("include_namespaces", "")
+		excludeNamespaces := request.GetString("exclude_namespaces", "")
+		restorePVs := request.GetBool("restore_pvs", false)
+		wait := request.GetBool("wait", false)
+		kubeconfig := "" // Note: kubeconfig parameter not available in MCP interface
+
+		// Create restore
+		output, err := module.CreateRestoreAdvanced(ctx, name, fromBackup, namespaceMappings, includeNamespaces, excludeNamespaces, restorePVs, wait, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Velero restore create failed: %v", err)), nil
 		}
-		if request.GetBool("restore_pvs", false) {
-			args = append(args, "--restore-volumes=true")
-		}
-		if request.GetBool("wait", false) {
-			args = append(args, "--wait")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Velero get backups
@@ -222,13 +271,27 @@ func AddVeleroTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(getBackupsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"velero", "backup", "get"}
-		
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "-o", output)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewVeleroModule(client)
+
+		// Get parameters
+		output := request.GetString("output", "")
+		kubeconfig := "" // Note: kubeconfig parameter not available in MCP interface
+
+		// Get backups
+		result, err := module.GetBackups(ctx, output, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Velero get backups failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Velero describe backup
@@ -240,9 +303,31 @@ func AddVeleroTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(describeBackupTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewVeleroModule(client)
+
+		// Get parameters
 		name := request.GetString("name", "")
-		args := []string{"velero", "backup", "describe", name}
-		return executeShipCommand(args)
+		if name == "" {
+			return mcp.NewToolResultError("name is required"), nil
+		}
+
+		kubeconfig := "" // Note: kubeconfig parameter not available in MCP interface
+
+		// Describe backup
+		result, err := module.DescribeBackup(ctx, name, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Velero describe backup failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Velero get restores  
@@ -254,13 +339,27 @@ func AddVeleroTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(getRestoresTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"velero", "restore", "get"}
-		
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "-o", output)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewVeleroModule(client)
+
+		// Get parameters
+		output := request.GetString("output", "")
+		kubeconfig := "" // Note: kubeconfig parameter not available in MCP interface
+
+		// Get restores
+		result, err := module.GetRestores(ctx, output, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Velero get restores failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Velero describe restore
@@ -272,9 +371,31 @@ func AddVeleroTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(describeRestoreTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewVeleroModule(client)
+
+		// Get parameters
 		name := request.GetString("name", "")
-		args := []string{"velero", "restore", "describe", name}
-		return executeShipCommand(args)
+		if name == "" {
+			return mcp.NewToolResultError("name is required"), nil
+		}
+
+		kubeconfig := "" // Note: kubeconfig parameter not available in MCP interface
+
+		// Describe restore
+		result, err := module.DescribeRestore(ctx, name, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Velero describe restore failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Velero get schedules
@@ -286,13 +407,27 @@ func AddVeleroTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(getSchedulesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"velero", "schedule", "get"}
-		
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "-o", output)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewVeleroModule(client)
+
+		// Get parameters
+		output := request.GetString("output", "")
+		kubeconfig := "" // Note: kubeconfig parameter not available in MCP interface
+
+		// Get schedules
+		result, err := module.GetSchedules(ctx, output, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Velero get schedules failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Velero delete backup
@@ -307,14 +442,32 @@ func AddVeleroTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(deleteBackupTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		name := request.GetString("name", "")
-		args := []string{"velero", "backup", "delete", name}
-		
-		if request.GetBool("confirm", false) {
-			args = append(args, "--confirm")
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewVeleroModule(client)
+
+		// Get parameters
+		name := request.GetString("name", "")
+		if name == "" {
+			return mcp.NewToolResultError("name is required"), nil
+		}
+
+		confirm := request.GetBool("confirm", false)
+		kubeconfig := "" // Note: kubeconfig parameter not available in MCP interface
+
+		// Delete backup
+		result, err := module.DeleteBackup(ctx, name, confirm, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Velero delete backup failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Velero delete schedule
@@ -329,14 +482,32 @@ func AddVeleroTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(deleteScheduleTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		name := request.GetString("name", "")
-		args := []string{"velero", "schedule", "delete", name}
-		
-		if request.GetBool("confirm", false) {
-			args = append(args, "--confirm")
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewVeleroModule(client)
+
+		// Get parameters
+		name := request.GetString("name", "")
+		if name == "" {
+			return mcp.NewToolResultError("name is required"), nil
+		}
+
+		confirm := request.GetBool("confirm", false)
+		kubeconfig := "" // Note: kubeconfig parameter not available in MCP interface
+
+		// Delete schedule
+		result, err := module.DeleteSchedule(ctx, name, confirm, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Velero delete schedule failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Velero backup location create
@@ -359,17 +530,41 @@ func AddVeleroTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(backupLocationCreateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewVeleroModule(client)
+
+		// Get parameters
 		name := request.GetString("name", "")
 		provider := request.GetString("provider", "")
 		bucket := request.GetString("bucket", "")
-		
-		args := []string{"velero", "backup-location", "create", name, "--provider", provider, "--bucket", bucket}
-		
-		if config := request.GetString("config", ""); config != "" {
-			args = append(args, "--config", config)
+		config := request.GetString("config", "")
+
+		if name == "" {
+			return mcp.NewToolResultError("name is required"), nil
 		}
-		
-		return executeShipCommand(args)
+		if provider == "" {
+			return mcp.NewToolResultError("provider is required"), nil
+		}
+		if bucket == "" {
+			return mcp.NewToolResultError("bucket is required"), nil
+		}
+
+		kubeconfig := "" // Note: kubeconfig parameter not available in MCP interface
+
+		// Create backup location
+		result, err := module.CreateBackupLocation(ctx, name, provider, bucket, config, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Velero create backup location failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Velero backup location get
@@ -381,13 +576,27 @@ func AddVeleroTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(backupLocationGetTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"velero", "backup-location", "get"}
-		
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "-o", output)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewVeleroModule(client)
+
+		// Get parameters
+		output := request.GetString("output", "")
+		kubeconfig := "" // Note: kubeconfig parameter not available in MCP interface
+
+		// Get backup locations
+		result, err := module.GetBackupLocations(ctx, output, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Velero get backup locations failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Velero get version tool
@@ -398,11 +607,28 @@ func AddVeleroTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"velero", "version"}
-		if request.GetBool("client_only", false) {
-			args = append(args, "--client-only")
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewVeleroModule(client)
+
+		// Note: client_only parameter not directly supported in Dagger GetVersion function (it's hardcoded as client-only)
+		if !request.GetBool("client_only", false) {
+			return mcp.NewToolResultError("Warning: Dagger GetVersion always returns client-only version"), nil
+		}
+
+		// Get version
+		result, err := module.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Velero get version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Velero backup logs
@@ -414,9 +640,31 @@ func AddVeleroTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(backupLogsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewVeleroModule(client)
+
+		// Get parameters
 		name := request.GetString("name", "")
-		args := []string{"velero", "backup", "logs", name}
-		return executeShipCommand(args)
+		if name == "" {
+			return mcp.NewToolResultError("name is required"), nil
+		}
+
+		kubeconfig := "" // Note: kubeconfig parameter not available in MCP interface
+
+		// Get backup logs
+		result, err := module.GetBackupLogs(ctx, name, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Velero backup logs failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Velero restore logs
@@ -428,8 +676,30 @@ func AddVeleroTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(restoreLogsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewVeleroModule(client)
+
+		// Get parameters
 		name := request.GetString("name", "")
-		args := []string{"velero", "restore", "logs", name}
-		return executeShipCommand(args)
+		if name == "" {
+			return mcp.NewToolResultError("name is required"), nil
+		}
+
+		kubeconfig := "" // Note: kubeconfig parameter not available in MCP interface
+
+		// Get restore logs
+		result, err := module.GetRestoreLogs(ctx, name, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Velero restore logs failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 }

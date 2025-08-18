@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddTrivyGoldenTools adds enhanced Trivy for golden images MCP tool implementations using real trivy CLI commands
+// AddTrivyGoldenTools adds enhanced Trivy for golden images MCP tool implementations using direct Dagger calls
 func AddTrivyGoldenTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addTrivyGoldenToolsDirect(s)
+}
+
+// addTrivyGoldenToolsDirect adds Trivy golden tools using direct Dagger module calls
+func addTrivyGoldenToolsDirect(s *server.MCPServer) {
 	// Trivy image scan tool for golden images
 	scanImageTool := mcp.NewTool("trivy_golden_scan_image",
 		mcp.WithDescription("Scan container image for vulnerabilities using real trivy CLI"),
@@ -35,27 +44,35 @@ func AddTrivyGoldenTools(s *server.MCPServer, executeShipCommand ExecuteShipComm
 		),
 	)
 	s.AddTool(scanImageTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTrivyGoldenModule(client)
+
+		// Get parameters
 		image := request.GetString("image", "")
-		args := []string{"trivy", "image"}
-		
-		if severity := request.GetString("severity", ""); severity != "" {
-			args = append(args, "--severity", severity)
+		if image == "" {
+			return mcp.NewToolResultError("image is required"), nil
 		}
-		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--format", format)
+
+		severity := request.GetString("severity", "")
+		format := request.GetString("format", "")
+		scanners := request.GetString("scanners", "")
+		exitCode := request.GetBool("exit_code", false)
+		output := request.GetString("output", "")
+
+		// Scan image
+		result, err := module.ScanImageBasic(ctx, image, severity, format, scanners, exitCode, output)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Trivy golden image scan failed: %v", err)), nil
 		}
-		if scanners := request.GetString("scanners", ""); scanners != "" {
-			args = append(args, "--scanners", scanners)
-		}
-		if request.GetBool("exit_code", false) {
-			args = append(args, "--exit-code", "1")
-		}
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "--output", output)
-		}
-		args = append(args, image)
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Trivy filesystem scan tool for golden image builds
@@ -80,24 +97,34 @@ func AddTrivyGoldenTools(s *server.MCPServer, executeShipCommand ExecuteShipComm
 		),
 	)
 	s.AddTool(scanFilesystemTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTrivyGoldenModule(client)
+
+		// Get parameters
 		path := request.GetString("path", "")
-		args := []string{"trivy", "fs"}
-		
-		if scanners := request.GetString("scanners", ""); scanners != "" {
-			args = append(args, "--scanners", scanners)
+		if path == "" {
+			return mcp.NewToolResultError("path is required"), nil
 		}
-		if severity := request.GetString("severity", ""); severity != "" {
-			args = append(args, "--severity", severity)
+
+		scanners := request.GetString("scanners", "")
+		severity := request.GetString("severity", "")
+		format := request.GetString("format", "")
+		output := request.GetString("output", "")
+
+		// Scan filesystem
+		result, err := module.ScanFilesystemBasic(ctx, path, scanners, severity, format, output)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Trivy golden filesystem scan failed: %v", err)), nil
 		}
-		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--format", format)
-		}
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "--output", output)
-		}
-		args = append(args, path)
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Trivy config scan tool for IaC compliance
@@ -122,24 +149,34 @@ func AddTrivyGoldenTools(s *server.MCPServer, executeShipCommand ExecuteShipComm
 		),
 	)
 	s.AddTool(scanConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTrivyGoldenModule(client)
+
+		// Get parameters
 		path := request.GetString("path", "")
-		args := []string{"trivy", "config"}
-		
-		if severity := request.GetString("severity", ""); severity != "" {
-			args = append(args, "--severity", severity)
+		if path == "" {
+			return mcp.NewToolResultError("path is required"), nil
 		}
-		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--format", format)
+
+		severity := request.GetString("severity", "")
+		format := request.GetString("format", "")
+		policy := request.GetString("policy", "")
+		output := request.GetString("output", "")
+
+		// Scan config
+		result, err := module.ScanConfigBasic(ctx, path, severity, format, policy, output)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Trivy golden config scan failed: %v", err)), nil
 		}
-		if policy := request.GetString("policy", ""); policy != "" {
-			args = append(args, "--policy", policy)
-		}
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "--output", output)
-		}
-		args = append(args, path)
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Trivy SBOM generation tool
@@ -159,16 +196,35 @@ func AddTrivyGoldenTools(s *server.MCPServer, executeShipCommand ExecuteShipComm
 		),
 	)
 	s.AddTool(generateSBOMTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTrivyGoldenModule(client)
+
+		// Get parameters
 		image := request.GetString("image", "")
 		format := request.GetString("format", "")
-		args := []string{"trivy", "image", "--format", format}
-		
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "--output", output)
+		output := request.GetString("output", "")
+
+		if image == "" {
+			return mcp.NewToolResultError("image is required"), nil
 		}
-		args = append(args, image)
-		
-		return executeShipCommand(args)
+		if format == "" {
+			return mcp.NewToolResultError("format is required"), nil
+		}
+
+		// Generate SBOM
+		result, err := module.GenerateSBOMBasic(ctx, image, format, output)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Trivy golden SBOM generation failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Trivy secret detection tool
@@ -192,19 +248,36 @@ func AddTrivyGoldenTools(s *server.MCPServer, executeShipCommand ExecuteShipComm
 		),
 	)
 	s.AddTool(scanSecretsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTrivyGoldenModule(client)
+
+		// Get parameters
 		target := request.GetString("target", "")
 		targetType := request.GetString("target_type", "")
-		args := []string{"trivy", targetType, "--scanners", "secret"}
-		
-		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--format", format)
+		format := request.GetString("format", "")
+		output := request.GetString("output", "")
+
+		if target == "" {
+			return mcp.NewToolResultError("target is required"), nil
 		}
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "--output", output)
+		if targetType == "" {
+			return mcp.NewToolResultError("target_type is required"), nil
 		}
-		args = append(args, target)
-		
-		return executeShipCommand(args)
+
+		// Scan secrets
+		result, err := module.ScanSecretsBasic(ctx, target, targetType, format, output)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Trivy golden secrets scan failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Trivy version tool
@@ -212,7 +285,22 @@ func AddTrivyGoldenTools(s *server.MCPServer, executeShipCommand ExecuteShipComm
 		mcp.WithDescription("Get Trivy version information using real trivy CLI"),
 	)
 	s.AddTool(versionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"trivy", "version"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTrivyGoldenModule(client)
+
+		// Get version
+		result, err := module.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Trivy golden get version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 }

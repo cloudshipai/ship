@@ -553,6 +553,107 @@ func (m *TruffleHogModule) CICDPipelineIntegration(ctx context.Context, scanTarg
 	return output, nil
 }
 
+// PerformanceOptimization performs high-performance secret scanning with optimization features
+func (m *TruffleHogModule) PerformanceOptimization(ctx context.Context, target string, sourceType string, concurrency string, maxFileSize string, bufferSize string, skipBinaries bool, enableSampling bool, memoryLimit string, enableMetrics bool) (string, error) {
+	container := m.client.Container().
+		From("trufflesecurity/trufflehog:latest")
+
+	if sourceType == "filesystem" {
+		container = container.WithDirectory("/workspace", m.client.Host().Directory(target)).
+			WithWorkdir("/workspace")
+		target = "."
+	}
+
+	args := []string{trufflehogBinary, sourceType, target}
+	if concurrency != "" {
+		args = append(args, "--concurrency", concurrency)
+	}
+	if maxFileSize != "" {
+		args = append(args, "--max-file-size", maxFileSize)
+	}
+	if bufferSize != "" {
+		args = append(args, "--buffer-size", bufferSize)
+	}
+	if skipBinaries {
+		args = append(args, "--skip-binaries")
+	}
+	if enableSampling {
+		args = append(args, "--enable-sampling")
+	}
+	if memoryLimit != "" {
+		args = append(args, "--memory-limit", memoryLimit)
+	}
+	if enableMetrics {
+		args = append(args, "--metrics")
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return output, nil
+	}
+
+	return output, nil
+}
+
+// ComprehensiveReporting generates comprehensive secret scanning reports with analytics
+func (m *TruffleHogModule) ComprehensiveReporting(ctx context.Context, target string, sourceType string, reportType string, outputFormats string, outputDirectory string, includeVerificationStatus bool, includeRiskAssessment bool, baselineComparison string, includeTrends bool) (string, error) {
+	container := m.client.Container().
+		From("trufflesecurity/trufflehog:latest")
+
+	if sourceType == "filesystem" {
+		container = container.WithDirectory("/workspace", m.client.Host().Directory(target)).
+			WithWorkdir("/workspace")
+		target = "."
+	}
+
+	args := []string{trufflehogBinary, sourceType, target}
+
+	// Configure report-specific settings
+	switch reportType {
+	case "executive-summary":
+		args = append(args, "--only-verified", "--format", "json")
+	case "technical-detail":
+		args = append(args, "--include-detectors", "--format", "jsonl")
+	case "compliance-audit":
+		args = append(args, "--only-verified", "--format", "sarif")
+	case "remediation-guide":
+		args = append(args, "--include-detectors", "--format", "json")
+	}
+
+	if outputFormats != "" {
+		args = append(args, "--format", outputFormats)
+	}
+	if outputDirectory != "" {
+		args = append(args, "--output", outputDirectory+"/trufflehog-report")
+	}
+	if includeVerificationStatus {
+		args = append(args, "--include-verification")
+	}
+	if baselineComparison != "" {
+		container = container.WithFile("/baseline.json", m.client.Host().File(baselineComparison))
+		args = append(args, "--baseline", "/baseline.json")
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return output, nil
+	}
+
+	return output, nil
+}
+
 // GetVersion returns the version of TruffleHog
 func (m *TruffleHogModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().

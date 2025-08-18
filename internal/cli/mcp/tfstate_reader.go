@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddTfstateReaderTools adds Terraform state analysis MCP tool implementations using real CLI commands
+// AddTfstateReaderTools adds Terraform state analysis MCP tool implementations using direct Dagger calls
 func AddTfstateReaderTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addTfstateReaderToolsDirect(s)
+}
+
+// addTfstateReaderToolsDirect adds Terraform state reader tools using direct Dagger module calls
+func addTfstateReaderToolsDirect(s *server.MCPServer) {
 	// Terraform state list resources tool
 	stateListTool := mcp.NewTool("terraform_state_list",
 		mcp.WithDescription("List all resources in Terraform state using real terraform CLI"),
@@ -20,16 +29,31 @@ func AddTfstateReaderTools(s *server.MCPServer, executeShipCommand ExecuteShipCo
 		),
 	)
 	s.AddTool(stateListTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"terraform", "state", "list"}
-		
-		if state := request.GetString("state", ""); state != "" {
-			args = append(args, "-state="+state)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if id := request.GetString("id", ""); id != "" {
-			args = append(args, id)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTfstateReaderModule(client)
+
+		// Get parameters
+		statePath := request.GetString("state", "")
+		resourceId := request.GetString("id", "")
+
+		if statePath == "" {
+			return mcp.NewToolResultError("state file path is required"), nil
 		}
-		
-		return executeShipCommand(args)
+
+		// List state resources
+		output, err := module.StateListResources(ctx, statePath, resourceId)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Terraform state list failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Terraform state show resource tool
@@ -44,15 +68,31 @@ func AddTfstateReaderTools(s *server.MCPServer, executeShipCommand ExecuteShipCo
 		),
 	)
 	s.AddTool(stateShowTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		resourceAddress := request.GetString("resource_address", "")
-		args := []string{"terraform", "state", "show"}
-		
-		if state := request.GetString("state", ""); state != "" {
-			args = append(args, "-state="+state)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		args = append(args, resourceAddress)
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTfstateReaderModule(client)
+
+		// Get parameters
+		resourceAddress := request.GetString("resource_address", "")
+		statePath := request.GetString("state", "")
+
+		if statePath == "" {
+			return mcp.NewToolResultError("state file path is required"), nil
+		}
+
+		// Show state resource
+		output, err := module.StateShowResource(ctx, statePath, resourceAddress)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Terraform state show failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Terraform state pull tool
@@ -60,8 +100,23 @@ func AddTfstateReaderTools(s *server.MCPServer, executeShipCommand ExecuteShipCo
 		mcp.WithDescription("Download and output the state from remote backend using real terraform CLI"),
 	)
 	s.AddTool(statePullTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"terraform", "state", "pull"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTfstateReaderModule(client)
+
+		// Pull remote state - requires a workspace directory (use current working directory)
+		output, err := module.PullRemoteState(ctx, ".")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Terraform state pull failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Terraform show JSON state tool
@@ -72,13 +127,30 @@ func AddTfstateReaderTools(s *server.MCPServer, executeShipCommand ExecuteShipCo
 		),
 	)
 	s.AddTool(showJsonTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"terraform", "show", "-json"}
-		
-		if statePath := request.GetString("state_path", ""); statePath != "" {
-			args = append(args, statePath)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTfstateReaderModule(client)
+
+		// Get parameters
+		statePath := request.GetString("state_path", "")
+
+		if statePath == "" {
+			return mcp.NewToolResultError("state file path is required"), nil
+		}
+
+		// Show state in JSON format
+		output, err := module.ShowState(ctx, statePath)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Terraform show JSON failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// tfstate-lookup query tool
@@ -102,29 +174,47 @@ func AddTfstateReaderTools(s *server.MCPServer, executeShipCommand ExecuteShipCo
 		),
 	)
 	s.AddTool(tfstateLookupTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"tfstate-lookup"}
-		
-		if state := request.GetString("state_file", ""); state != "" {
-			args = append(args, "-s", state)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if request.GetBool("interactive", false) {
-			args = append(args, "-i")
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTfstateReaderModule(client)
+
+		// Get parameters
+		resourceAddress := request.GetString("resource_address", "")
+		statePath := request.GetString("state_file", "")
+		interactive := request.GetBool("interactive", false)
+		dump := request.GetBool("dump", false)
+
+		if statePath == "" {
+			return mcp.NewToolResultError("state file path is required"), nil
 		}
-		if request.GetBool("dump", false) {
-			args = append(args, "-dump")
-		}
+
+		// Note: jid parameter not supported with direct Dagger calls
 		if request.GetBool("jid", false) {
-			args = append(args, "-j")
+			return mcp.NewToolResultError("Warning: jid parameter is not supported with direct Dagger calls"), nil
 		}
-		
-		if !request.GetBool("interactive", false) && !request.GetBool("dump", false) {
-			resourceAddress := request.GetString("resource_address", "")
-			if resourceAddress != "" {
-				args = append(args, resourceAddress)
-			}
+
+		// Handle different modes
+		var output string
+
+		if dump {
+			output, err = module.DumpAllResources(ctx, statePath)
+		} else if interactive {
+			output, err = module.InteractiveExplorer(ctx, statePath)
+		} else {
+			output, err = module.LookupResource(ctx, statePath, resourceAddress)
 		}
-		
-		return executeShipCommand(args)
+
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Tfstate lookup failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// tfstate-lookup dump all tool
@@ -135,13 +225,30 @@ func AddTfstateReaderTools(s *server.MCPServer, executeShipCommand ExecuteShipCo
 		),
 	)
 	s.AddTool(tfstateDumpTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"tfstate-lookup", "-dump"}
-		
-		if state := request.GetString("state_file", ""); state != "" {
-			args = append(args, "-s", state)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTfstateReaderModule(client)
+
+		// Get parameters
+		statePath := request.GetString("state_file", "")
+
+		if statePath == "" {
+			return mcp.NewToolResultError("state file path is required"), nil
+		}
+
+		// Dump all resources
+		output, err := module.DumpAllResources(ctx, statePath)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Tfstate dump all failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// tfstate-lookup interactive tool
@@ -152,12 +259,29 @@ func AddTfstateReaderTools(s *server.MCPServer, executeShipCommand ExecuteShipCo
 		),
 	)
 	s.AddTool(tfstateInteractiveTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"tfstate-lookup", "-i"}
-		
-		if state := request.GetString("state_file", ""); state != "" {
-			args = append(args, "-s", state)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTfstateReaderModule(client)
+
+		// Get parameters
+		statePath := request.GetString("state_file", "")
+
+		if statePath == "" {
+			return mcp.NewToolResultError("state file path is required"), nil
+		}
+
+		// Interactive exploration
+		output, err := module.InteractiveExplorer(ctx, statePath)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Tfstate interactive failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 }

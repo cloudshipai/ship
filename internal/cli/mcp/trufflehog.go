@@ -2,14 +2,23 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddTrufflehogTools adds TruffleHog MCP tool implementations using real trufflehog CLI commands
+// AddTrufflehogTools adds TruffleHog MCP tool implementations using direct Dagger calls
 func AddTrufflehogTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addTrufflehogToolsDirect(s)
+}
+
+// addTrufflehogToolsDirect adds TruffleHog tools using direct Dagger module calls
+func addTrufflehogToolsDirect(s *server.MCPServer) {
 	// TruffleHog scan directory tool
 	scanDirectoryTool := mcp.NewTool("trufflehog_scan_directory",
 		mcp.WithDescription("Scan directory for secrets using TruffleHog"),
@@ -18,11 +27,26 @@ func AddTrufflehogTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(scanDirectoryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"trufflehog", "filesystem"}
-		if dir := request.GetString("directory", ""); dir != "" {
-			args = append(args, dir)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTruffleHogModule(client)
+
+		// Get parameters
+		dir := request.GetString("directory", ".")
+
+		// Scan directory
+		output, err := module.ScanDirectory(ctx, dir)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("TruffleHog directory scan failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// TruffleHog scan git repository tool
@@ -34,9 +58,29 @@ func AddTrufflehogTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(scanGitRepoTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTruffleHogModule(client)
+
+		// Get parameters
 		repoURL := request.GetString("repo_url", "")
-		args := []string{"trufflehog", "git", repoURL}
-		return executeShipCommand(args)
+		if repoURL == "" {
+			return mcp.NewToolResultError("repo_url is required"), nil
+		}
+
+		// Scan git repo
+		output, err := module.ScanGitRepo(ctx, repoURL)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("TruffleHog git repo scan failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// TruffleHog scan GitHub repository tool
@@ -52,10 +96,34 @@ func AddTrufflehogTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(scanGitHubTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTruffleHogModule(client)
+
+		// Get parameters
 		repo := request.GetString("repo", "")
 		token := request.GetString("token", "")
-		args := []string{"trufflehog", "github", "--repo", repo, "--token", token}
-		return executeShipCommand(args)
+
+		if repo == "" {
+			return mcp.NewToolResultError("repo is required"), nil
+		}
+		if token == "" {
+			return mcp.NewToolResultError("token is required"), nil
+		}
+
+		// Scan GitHub repo
+		output, err := module.ScanGitHub(ctx, repo, token)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("TruffleHog GitHub scan failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// TruffleHog scan GitHub organization tool
@@ -71,10 +139,34 @@ func AddTrufflehogTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(scanGitHubOrgTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTruffleHogModule(client)
+
+		// Get parameters
 		org := request.GetString("org", "")
 		token := request.GetString("token", "")
-		args := []string{"trufflehog", "github", "--org", org, "--token", token}
-		return executeShipCommand(args)
+
+		if org == "" {
+			return mcp.NewToolResultError("org is required"), nil
+		}
+		if token == "" {
+			return mcp.NewToolResultError("token is required"), nil
+		}
+
+		// Scan GitHub org
+		output, err := module.ScanGitHubOrg(ctx, org, token)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("TruffleHog GitHub org scan failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// TruffleHog scan Docker image tool
@@ -86,9 +178,29 @@ func AddTrufflehogTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(scanDockerImageTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTruffleHogModule(client)
+
+		// Get parameters
 		imageName := request.GetString("image_name", "")
-		args := []string{"trufflehog", "docker", "--image", imageName}
-		return executeShipCommand(args)
+		if imageName == "" {
+			return mcp.NewToolResultError("image_name is required"), nil
+		}
+
+		// Scan Docker image
+		output, err := module.ScanDockerImage(ctx, imageName)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("TruffleHog Docker scan failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// TruffleHog scan S3 bucket tool
@@ -100,9 +212,29 @@ func AddTrufflehogTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(scanS3Tool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTruffleHogModule(client)
+
+		// Get parameters
 		bucket := request.GetString("bucket", "")
-		args := []string{"trufflehog", "s3", "--bucket", bucket}
-		return executeShipCommand(args)
+		if bucket == "" {
+			return mcp.NewToolResultError("bucket is required"), nil
+		}
+
+		// Scan S3 bucket
+		output, err := module.ScanS3(ctx, bucket)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("TruffleHog S3 scan failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// TruffleHog scan with verification tool
@@ -119,10 +251,34 @@ func AddTrufflehogTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(scanWithVerificationTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTruffleHogModule(client)
+
+		// Get parameters
 		target := request.GetString("target", "")
 		targetType := request.GetString("target_type", "")
-		args := []string{"trufflehog", targetType, target, "--verify"}
-		return executeShipCommand(args)
+
+		if target == "" {
+			return mcp.NewToolResultError("target is required"), nil
+		}
+		if targetType == "" {
+			return mcp.NewToolResultError("target_type is required"), nil
+		}
+
+		// Scan with verification
+		output, err := module.ScanWithVerification(ctx, target, targetType)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("TruffleHog verification scan failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// TruffleHog scan git with advanced options tool
@@ -153,33 +309,46 @@ func AddTrufflehogTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(scanGitAdvancedTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTruffleHogModule(client)
+
+		// Get parameters
 		repoURL := request.GetString("repo_url", "")
-		args := []string{"trufflehog", "git", repoURL}
-		
-		if branch := request.GetString("branch", ""); branch != "" {
-			args = append(args, "--branch", branch)
+		if repoURL == "" {
+			return mcp.NewToolResultError("repo_url is required"), nil
 		}
-		if sinceDate := request.GetString("since_date", ""); sinceDate != "" {
-			args = append(args, "--since", sinceDate)
-		}
-		if untilDate := request.GetString("until_date", ""); untilDate != "" {
-			args = append(args, "--until", untilDate)
-		}
-		if request.GetBool("only_verified", false) {
-			args = append(args, "--only-verified")
-		}
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "--format", outputFormat)
-		}
-		if excludePaths := request.GetString("exclude_paths", ""); excludePaths != "" {
-			for _, path := range strings.Split(excludePaths, ",") {
+
+		branch := request.GetString("branch", "")
+		sinceDate := request.GetString("since_date", "")
+		untilDate := request.GetString("until_date", "")
+		onlyVerified := request.GetBool("only_verified", false)
+		outputFormat := request.GetString("output_format", "")
+		excludePathsStr := request.GetString("exclude_paths", "")
+
+		// Parse exclude paths
+		var excludePaths []string
+		if excludePathsStr != "" {
+			for _, path := range strings.Split(excludePathsStr, ",") {
 				if strings.TrimSpace(path) != "" {
-					args = append(args, "--exclude", strings.TrimSpace(path))
+					excludePaths = append(excludePaths, strings.TrimSpace(path))
 				}
 			}
 		}
-		
-		return executeShipCommand(args)
+
+		// Scan git advanced
+		output, err := module.ScanGitAdvanced(ctx, repoURL, branch, sinceDate, untilDate, onlyVerified, outputFormat, excludePaths)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("TruffleHog advanced git scan failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// TruffleHog scan filesystem with exclusions tool
@@ -204,27 +373,44 @@ func AddTrufflehogTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(scanFilesystemAdvancedTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTruffleHogModule(client)
+
+		// Get parameters
 		path := request.GetString("path", "")
-		args := []string{"trufflehog", "filesystem", path}
-		
-		if request.GetBool("only_verified", false) {
-			args = append(args, "--only-verified")
+		if path == "" {
+			return mcp.NewToolResultError("path is required"), nil
 		}
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "--format", outputFormat)
-		}
-		if maxDepth := request.GetString("max_depth", ""); maxDepth != "" {
-			args = append(args, "--max-depth", maxDepth)
-		}
-		if excludePaths := request.GetString("exclude_paths", ""); excludePaths != "" {
-			for _, excludePath := range strings.Split(excludePaths, ",") {
+
+		onlyVerified := request.GetBool("only_verified", false)
+		outputFormat := request.GetString("output_format", "")
+		maxDepth := request.GetString("max_depth", "")
+		excludePathsStr := request.GetString("exclude_paths", "")
+
+		// Parse exclude paths
+		var excludePaths []string
+		if excludePathsStr != "" {
+			for _, excludePath := range strings.Split(excludePathsStr, ",") {
 				if strings.TrimSpace(excludePath) != "" {
-					args = append(args, "--exclude", strings.TrimSpace(excludePath))
+					excludePaths = append(excludePaths, strings.TrimSpace(excludePath))
 				}
 			}
 		}
-		
-		return executeShipCommand(args)
+
+		// Scan filesystem advanced
+		output, err := module.ScanFilesystemAdvanced(ctx, path, onlyVerified, excludePaths, outputFormat, maxDepth)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("TruffleHog advanced filesystem scan failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// TruffleHog scan docker with advanced options tool
@@ -246,20 +432,33 @@ func AddTrufflehogTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(scanDockerAdvancedTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTruffleHogModule(client)
+
+		// Get parameters
 		image := request.GetString("image", "")
-		args := []string{"trufflehog", "docker", image}
-		
-		if request.GetBool("only_verified", false) {
-			args = append(args, "--only-verified")
+		if image == "" {
+			return mcp.NewToolResultError("image is required"), nil
 		}
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "--format", outputFormat)
+
+		onlyVerified := request.GetBool("only_verified", false)
+		outputFormat := request.GetString("output_format", "")
+		layers := request.GetString("layers", "")
+
+		// Scan docker advanced
+		output, err := module.ScanDockerAdvanced(ctx, image, onlyVerified, outputFormat, layers)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("TruffleHog advanced docker scan failed: %v", err)), nil
 		}
-		if layers := request.GetString("layers", ""); layers != "" {
-			args = append(args, "--layers", layers)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// TruffleHog comprehensive secret detection tool
@@ -299,41 +498,56 @@ func AddTrufflehogTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(comprehensiveSecretDetectionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTruffleHogModule(client)
+
+		// Get parameters
 		target := request.GetString("target", "")
 		sourceType := request.GetString("source_type", "")
-		args := []string{"trufflehog", sourceType, target}
-		
-		if request.GetBool("only_verified", false) {
-			args = append(args, "--only-verified")
+		if target == "" {
+			return mcp.NewToolResultError("target is required"), nil
 		}
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "--format", outputFormat)
+		if sourceType == "" {
+			return mcp.NewToolResultError("source_type is required"), nil
 		}
-		if outputFile := request.GetString("output_file", ""); outputFile != "" {
-			args = append(args, "--output", outputFile)
-		}
-		if request.GetBool("include_detectors", false) {
-			args = append(args, "--include-detectors")
-		}
-		if confidenceLevel := request.GetString("confidence_level", ""); confidenceLevel != "" {
-			args = append(args, "--confidence", confidenceLevel)
-		}
-		if excludePaths := request.GetString("exclude_paths", ""); excludePaths != "" {
-			for _, path := range strings.Split(excludePaths, ",") {
+
+		outputFormat := request.GetString("output_format", "")
+		outputFile := request.GetString("output_file", "")
+		onlyVerified := request.GetBool("only_verified", false)
+		includeDetectors := request.GetBool("include_detectors", false)
+		confidenceLevel := request.GetString("confidence_level", "")
+
+		// Parse exclude and include paths
+		var excludePaths, includePaths []string
+		if excludePathsStr := request.GetString("exclude_paths", ""); excludePathsStr != "" {
+			for _, path := range strings.Split(excludePathsStr, ",") {
 				if strings.TrimSpace(path) != "" {
-					args = append(args, "--exclude", strings.TrimSpace(path))
+					excludePaths = append(excludePaths, strings.TrimSpace(path))
 				}
 			}
 		}
-		if includePaths := request.GetString("include_paths", ""); includePaths != "" {
-			for _, path := range strings.Split(includePaths, ",") {
+		if includePathsStr := request.GetString("include_paths", ""); includePathsStr != "" {
+			for _, path := range strings.Split(includePathsStr, ",") {
 				if strings.TrimSpace(path) != "" {
-					args = append(args, "--include", strings.TrimSpace(path))
+					includePaths = append(includePaths, strings.TrimSpace(path))
 				}
 			}
 		}
-		
-		return executeShipCommand(args)
+
+		// Comprehensive secret detection
+		output, err := module.ComprehensiveSecretDetection(ctx, target, sourceType, outputFormat, outputFile, onlyVerified, includeDetectors, confidenceLevel, excludePaths, includePaths)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("TruffleHog comprehensive detection failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// TruffleHog cloud storage scanning tool
@@ -368,41 +582,40 @@ func AddTrufflehogTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(cloudStorageScanningTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTruffleHogModule(client)
+
+		// Get parameters
 		cloudProvider := request.GetString("cloud_provider", "")
 		resourceIdentifier := request.GetString("resource_identifier", "")
-		
-		var args []string
-		switch cloudProvider {
-		case "s3":
-			args = []string{"trufflehog", "s3", "--bucket", resourceIdentifier}
-		case "gcs":
-			args = []string{"trufflehog", "gcs", "--bucket", resourceIdentifier}
-		case "azure-storage":
-			args = []string{"trufflehog", "azure", "--container", resourceIdentifier}
-		default:
-			args = []string{"trufflehog", cloudProvider, resourceIdentifier}
+		if cloudProvider == "" {
+			return mcp.NewToolResultError("cloud_provider is required"), nil
 		}
-		
-		if credentialsProfile := request.GetString("credentials_profile", ""); credentialsProfile != "" {
-			args = append(args, "--credentials", credentialsProfile)
+		if resourceIdentifier == "" {
+			return mcp.NewToolResultError("resource_identifier is required"), nil
 		}
-		if region := request.GetString("region", ""); region != "" {
-			args = append(args, "--region", region)
+
+		credentialsProfile := request.GetString("credentials_profile", "")
+		region := request.GetString("region", "")
+		recursive := request.GetBool("recursive", false)
+		filePatterns := request.GetString("file_patterns", "")
+		onlyVerified := request.GetBool("only_verified", false)
+		maxFileSize := request.GetString("max_file_size", "")
+
+		// Cloud storage scanning
+		output, err := module.CloudStorageScanning(ctx, cloudProvider, resourceIdentifier, credentialsProfile, region, recursive, filePatterns, onlyVerified, maxFileSize)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("TruffleHog cloud storage scan failed: %v", err)), nil
 		}
-		if request.GetBool("recursive", false) {
-			args = append(args, "--recursive")
-		}
-		if request.GetBool("only_verified", false) {
-			args = append(args, "--only-verified")
-		}
-		if filePatterns := request.GetString("file_patterns", ""); filePatterns != "" {
-			args = append(args, "--include-patterns", filePatterns)
-		}
-		if maxFileSize := request.GetString("max_file_size", ""); maxFileSize != "" {
-			args = append(args, "--max-file-size", maxFileSize)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// TruffleHog custom detector management tool
@@ -427,32 +640,34 @@ func AddTrufflehogTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(customDetectorManagementTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		action := request.GetString("action", "")
-		
-		switch action {
-		case "list":
-			args := []string{"trufflehog", "--list-detectors"}
-			return executeShipCommand(args)
-		case "validate":
-			detectorConfig := request.GetString("detector_config", "")
-			args := []string{"trufflehog", "--validate-config", detectorConfig}
-			return executeShipCommand(args)
-		case "scan-with-custom":
-			target := request.GetString("target", "")
-			detectorConfig := request.GetString("detector_config", "")
-			args := []string{"trufflehog", "filesystem", target, "--config", detectorConfig}
-			if request.GetBool("include_builtin", false) {
-				args = append(args, "--include-builtin")
-			}
-			return executeShipCommand(args)
-		case "test-detector":
-			detectorPattern := request.GetString("detector_pattern", "")
-			args := []string{"trufflehog", "--test-detector", detectorPattern}
-			return executeShipCommand(args)
-		default:
-			args := []string{"trufflehog", "--help"}
-			return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTruffleHogModule(client)
+
+		// Get parameters
+		action := request.GetString("action", "")
+		detectorConfig := request.GetString("detector_config", "")
+		target := request.GetString("target", "")
+		detectorPattern := request.GetString("detector_pattern", "")
+		includeBuiltin := request.GetBool("include_builtin", false)
+
+		if action == "" {
+			return mcp.NewToolResultError("action is required"), nil
+		}
+
+		// Custom detector management
+		output, err := module.CustomDetectorManagement(ctx, action, detectorConfig, target, detectorPattern, includeBuiltin)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("TruffleHog custom detector management failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// TruffleHog enterprise git scanning tool
@@ -495,46 +710,42 @@ func AddTrufflehogTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(enterpriseGitScanningTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTruffleHogModule(client)
+
+		// Get parameters
 		gitSource := request.GetString("git_source", "")
 		repository := request.GetString("repository", "")
-		
-		var args []string
-		switch gitSource {
-		case "github":
-			args = []string{"trufflehog", "github", "--repo", repository}
-		case "gitlab":
-			args = []string{"trufflehog", "gitlab", "--repo", repository}
-		case "bitbucket":
-			args = []string{"trufflehog", "bitbucket", "--repo", repository}
-		case "git-url":
-			args = []string{"trufflehog", "git", repository}
-		default:
-			args = []string{"trufflehog", "git", repository}
+		if gitSource == "" {
+			return mcp.NewToolResultError("git_source is required"), nil
 		}
-		
-		if authentication := request.GetString("authentication", ""); authentication != "" {
-			args = append(args, "--token", authentication)
+		if repository == "" {
+			return mcp.NewToolResultError("repository is required"), nil
 		}
-		if commitRange := request.GetString("commit_range", ""); commitRange != "" {
-			args = append(args, "--commit-range", commitRange)
+
+		authentication := request.GetString("authentication", "")
+		scanMode := request.GetString("scan_mode", "")
+		commitRange := request.GetString("commit_range", "")
+		branches := request.GetString("branches", "")
+		includeForks := request.GetBool("include_forks", false)
+		includeIssues := request.GetBool("include_issues", false)
+		includePullRequests := request.GetBool("include_pull_requests", false)
+		outputFormat := request.GetString("output_format", "")
+
+		// Enterprise git scanning
+		output, err := module.EnterpriseGitScanning(ctx, gitSource, repository, authentication, scanMode, commitRange, branches, includeForks, includeIssues, includePullRequests, outputFormat)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("TruffleHog enterprise git scan failed: %v", err)), nil
 		}
-		if branches := request.GetString("branches", ""); branches != "" {
-			args = append(args, "--branches", branches)
-		}
-		if request.GetBool("include_forks", false) {
-			args = append(args, "--include-forks")
-		}
-		if request.GetBool("include_issues", false) {
-			args = append(args, "--include-issues")
-		}
-		if request.GetBool("include_pull_requests", false) {
-			args = append(args, "--include-prs")
-		}
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "--format", outputFormat)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// TruffleHog CI/CD pipeline integration tool
@@ -572,41 +783,38 @@ func AddTrufflehogTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(cicdPipelineIntegrationTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTruffleHogModule(client)
+
+		// Get parameters
 		scanTarget := request.GetString("scan_target", "")
+		if scanTarget == "" {
+			return mcp.NewToolResultError("scan_target is required"), nil
+		}
+
 		scanType := request.GetString("scan_type", "scheduled")
-		args := []string{"trufflehog", "filesystem", scanTarget}
-		
-		// Configure based on scan type
-		switch scanType {
-		case "pre-commit":
-			args = append(args, "--only-verified", "--max-depth", "1")
-		case "post-commit":
-			args = append(args, "--include-detectors")
-		case "pull-request":
-			args = append(args, "--only-verified", "--format", "sarif")
-		case "release":
-			args = append(args, "--only-verified", "--include-detectors")
-		case "scheduled":
-			args = append(args, "--include-detectors")
+		baselineFile := request.GetString("baseline_file", "")
+		outputFormat := request.GetString("output_format", "")
+		outputFile := request.GetString("output_file", "")
+		failOnVerified := request.GetBool("fail_on_verified", false)
+		failOnUnverified := request.GetBool("fail_on_unverified", false)
+		quietMode := request.GetBool("quiet_mode", false)
+		timeout := request.GetString("timeout", "")
+
+		// CI/CD pipeline integration
+		output, err := module.CICDPipelineIntegration(ctx, scanTarget, scanType, baselineFile, outputFormat, outputFile, failOnVerified, failOnUnverified, quietMode, timeout)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("TruffleHog CI/CD integration failed: %v", err)), nil
 		}
-		
-		if baselineFile := request.GetString("baseline_file", ""); baselineFile != "" {
-			args = append(args, "--baseline", baselineFile)
-		}
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "--format", outputFormat)
-		}
-		if outputFile := request.GetString("output_file", ""); outputFile != "" {
-			args = append(args, "--output", outputFile)
-		}
-		if request.GetBool("quiet_mode", false) {
-			args = append(args, "--quiet")
-		}
-		if timeout := request.GetString("timeout", ""); timeout != "" {
-			args = append(args, "--timeout", timeout+"s")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// TruffleHog performance optimization tool
@@ -644,33 +852,41 @@ func AddTrufflehogTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(performanceOptimizationTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTruffleHogModule(client)
+
+		// Get parameters
 		target := request.GetString("target", "")
 		sourceType := request.GetString("source_type", "")
-		args := []string{"trufflehog", sourceType, target}
-		
-		if concurrency := request.GetString("concurrency", ""); concurrency != "" {
-			args = append(args, "--concurrency", concurrency)
+		if target == "" {
+			return mcp.NewToolResultError("target is required"), nil
 		}
-		if maxFileSize := request.GetString("max_file_size", ""); maxFileSize != "" {
-			args = append(args, "--max-file-size", maxFileSize)
+		if sourceType == "" {
+			return mcp.NewToolResultError("source_type is required"), nil
 		}
-		if bufferSize := request.GetString("buffer_size", ""); bufferSize != "" {
-			args = append(args, "--buffer-size", bufferSize)
+
+		concurrency := request.GetString("concurrency", "")
+		maxFileSize := request.GetString("max_file_size", "")
+		bufferSize := request.GetString("buffer_size", "")
+		skipBinaries := request.GetBool("skip_binaries", false)
+		enableSampling := request.GetBool("enable_sampling", false)
+		memoryLimit := request.GetString("memory_limit", "")
+		enableMetrics := request.GetBool("enable_metrics", false)
+
+		// Performance optimization
+		output, err := module.PerformanceOptimization(ctx, target, sourceType, concurrency, maxFileSize, bufferSize, skipBinaries, enableSampling, memoryLimit, enableMetrics)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("TruffleHog performance optimization failed: %v", err)), nil
 		}
-		if request.GetBool("skip_binaries", false) {
-			args = append(args, "--skip-binaries")
-		}
-		if request.GetBool("enable_sampling", false) {
-			args = append(args, "--enable-sampling")
-		}
-		if memoryLimit := request.GetString("memory_limit", ""); memoryLimit != "" {
-			args = append(args, "--memory-limit", memoryLimit)
-		}
-		if request.GetBool("enable_metrics", false) {
-			args = append(args, "--metrics")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// TruffleHog comprehensive reporting tool
@@ -710,37 +926,44 @@ func AddTrufflehogTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(comprehensiveReportingTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTruffleHogModule(client)
+
+		// Get parameters
 		target := request.GetString("target", "")
 		sourceType := request.GetString("source_type", "")
 		reportType := request.GetString("report_type", "")
-		args := []string{"trufflehog", sourceType, target}
-		
-		// Configure report-specific settings
-		switch reportType {
-		case "executive-summary":
-			args = append(args, "--only-verified", "--format", "json")
-		case "technical-detail":
-			args = append(args, "--include-detectors", "--format", "jsonl")
-		case "compliance-audit":
-			args = append(args, "--only-verified", "--format", "sarif")
-		case "remediation-guide":
-			args = append(args, "--include-detectors", "--format", "json")
+		if target == "" {
+			return mcp.NewToolResultError("target is required"), nil
 		}
-		
-		if outputFormats := request.GetString("output_formats", ""); outputFormats != "" {
-			args = append(args, "--format", outputFormats)
+		if sourceType == "" {
+			return mcp.NewToolResultError("source_type is required"), nil
 		}
-		if outputDirectory := request.GetString("output_directory", ""); outputDirectory != "" {
-			args = append(args, "--output", outputDirectory+"/trufflehog-report")
+		if reportType == "" {
+			return mcp.NewToolResultError("report_type is required"), nil
 		}
-		if request.GetBool("include_verification_status", false) {
-			args = append(args, "--include-verification")
+
+		outputFormats := request.GetString("output_formats", "")
+		outputDirectory := request.GetString("output_directory", "")
+		includeVerificationStatus := request.GetBool("include_verification_status", false)
+		includeRiskAssessment := request.GetBool("include_risk_assessment", false)
+		baselineComparison := request.GetString("baseline_comparison", "")
+		includeTrends := request.GetBool("include_trends", false)
+
+		// Comprehensive reporting
+		output, err := module.ComprehensiveReporting(ctx, target, sourceType, reportType, outputFormats, outputDirectory, includeVerificationStatus, includeRiskAssessment, baselineComparison, includeTrends)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("TruffleHog comprehensive reporting failed: %v", err)), nil
 		}
-		if baselineComparison := request.GetString("baseline_comparison", ""); baselineComparison != "" {
-			args = append(args, "--baseline", baselineComparison)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// TruffleHog get version tool
@@ -751,10 +974,27 @@ func AddTrufflehogTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"trufflehog", "--version"}
-		if request.GetBool("show_detectors", false) {
-			args = append(args, "--list-detectors")
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTruffleHogModule(client)
+
+		// Note: show_detectors parameter not directly supported in Dagger GetVersion function
+		if request.GetBool("show_detectors", false) {
+			return mcp.NewToolResultError("Warning: show_detectors parameter not supported with direct Dagger calls"), nil
+		}
+
+		// Get version
+		output, err := module.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("TruffleHog get version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 }

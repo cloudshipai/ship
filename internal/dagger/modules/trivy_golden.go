@@ -109,6 +109,158 @@ func (m *TrivyGoldenModule) GenerateImageAttestation(ctx context.Context, imageN
 	return output, nil
 }
 
+// ScanImageBasic performs basic image scanning with customizable parameters
+func (m *TrivyGoldenModule) ScanImageBasic(ctx context.Context, imageName string, severity string, format string, scanners string, exitCode bool, outputFile string) (string, error) {
+	container := m.client.Container().
+		From("aquasec/trivy:latest")
+
+	args := []string{trivyGoldenBinary, "image"}
+	if severity != "" {
+		args = append(args, "--severity", severity)
+	}
+	if format != "" {
+		args = append(args, "--format", format)
+	}
+	if scanners != "" {
+		args = append(args, "--scanners", scanners)
+	}
+	if exitCode {
+		args = append(args, "--exit-code", "1")
+	}
+	if outputFile != "" {
+		args = append(args, "--output", outputFile)
+	}
+	args = append(args, imageName)
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to scan image: %w", err)
+	}
+
+	return output, nil
+}
+
+// ScanFilesystemBasic performs basic filesystem scanning with customizable parameters
+func (m *TrivyGoldenModule) ScanFilesystemBasic(ctx context.Context, path string, scanners string, severity string, format string, outputFile string) (string, error) {
+	container := m.client.Container().
+		From("aquasec/trivy:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(path)).
+		WithWorkdir("/workspace")
+
+	args := []string{trivyGoldenBinary, "fs"}
+	if scanners != "" {
+		args = append(args, "--scanners", scanners)
+	}
+	if severity != "" {
+		args = append(args, "--severity", severity)
+	}
+	if format != "" {
+		args = append(args, "--format", format)
+	}
+	if outputFile != "" {
+		args = append(args, "--output", outputFile)
+	}
+	args = append(args, ".")
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to scan filesystem: %w", err)
+	}
+
+	return output, nil
+}
+
+// ScanConfigBasic performs basic configuration scanning with customizable parameters
+func (m *TrivyGoldenModule) ScanConfigBasic(ctx context.Context, path string, severity string, format string, policy string, outputFile string) (string, error) {
+	container := m.client.Container().
+		From("aquasec/trivy:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(path)).
+		WithWorkdir("/workspace")
+
+	if policy != "" {
+		container = container.WithFile("/policy.rego", m.client.Host().File(policy))
+	}
+
+	args := []string{trivyGoldenBinary, "config"}
+	if severity != "" {
+		args = append(args, "--severity", severity)
+	}
+	if format != "" {
+		args = append(args, "--format", format)
+	}
+	if policy != "" {
+		args = append(args, "--policy", "/policy.rego")
+	}
+	if outputFile != "" {
+		args = append(args, "--output", outputFile)
+	}
+	args = append(args, ".")
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to scan config: %w", err)
+	}
+
+	return output, nil
+}
+
+// GenerateSBOMBasic generates SBOM with customizable parameters
+func (m *TrivyGoldenModule) GenerateSBOMBasic(ctx context.Context, imageName string, format string, outputFile string) (string, error) {
+	container := m.client.Container().
+		From("aquasec/trivy:latest")
+
+	args := []string{trivyGoldenBinary, "image", "--format", format}
+	if outputFile != "" {
+		args = append(args, "--output", outputFile)
+	}
+	args = append(args, imageName)
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate SBOM: %w", err)
+	}
+
+	return output, nil
+}
+
+// ScanSecretsBasic performs secret scanning with customizable parameters
+func (m *TrivyGoldenModule) ScanSecretsBasic(ctx context.Context, target string, targetType string, format string, outputFile string) (string, error) {
+	container := m.client.Container().
+		From("aquasec/trivy:latest")
+
+	if targetType == "fs" {
+		container = container.WithDirectory("/workspace", m.client.Host().Directory(target)).
+			WithWorkdir("/workspace")
+		target = "."
+	}
+
+	args := []string{trivyGoldenBinary, targetType, "--scanners", "secret"}
+	if format != "" {
+		args = append(args, "--format", format)
+	}
+	if outputFile != "" {
+		args = append(args, "--output", outputFile)
+	}
+	args = append(args, target)
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to scan secrets: %w", err)
+	}
+
+	return output, nil
+}
+
 // GetVersion returns the version of Trivy
 func (m *TrivyGoldenModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().

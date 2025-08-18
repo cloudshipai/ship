@@ -105,6 +105,40 @@ func (m *ZapModule) ScanWithContext(ctx context.Context, target string, contextP
 	return output, nil
 }
 
+// SpiderScan performs a spider crawl and scan
+func (m *ZapModule) SpiderScan(ctx context.Context, target string, maxDepth int, outputFormat string) (string, error) {
+	container := m.client.Container().
+		From("ghcr.io/zaproxy/zaproxy:stable")
+
+	args := []string{"zap-baseline.py", "-t", target}
+	
+	// Add spider-specific options
+	if maxDepth > 0 {
+		args = append(args, "-d", fmt.Sprintf("%d", maxDepth))
+	}
+	
+	// Add output format options
+	switch outputFormat {
+	case "json":
+		args = append(args, "-J", "/zap/wrk/spider-report.json")
+	case "xml":
+		args = append(args, "-x", "/zap/wrk/spider-report.xml")
+	case "html":
+		args = append(args, "-r", "/zap/wrk/spider-report.html")
+	default:
+		args = append(args, "-r", "/zap/wrk/spider-report.html")
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to run ZAP spider scan: %w", err)
+	}
+
+	return output, nil
+}
+
 // GetVersion returns the version of ZAP
 func (m *ZapModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().

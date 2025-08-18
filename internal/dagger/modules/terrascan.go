@@ -436,3 +436,145 @@ func (m *TerrascanModule) GetVersion(ctx context.Context) (string, error) {
 
 	return output, nil
 }
+
+// CloudProviderScan performs cloud provider specific security scanning
+func (m *TerrascanModule) CloudProviderScan(ctx context.Context, target string, cloudProvider string, iacType string, securityCategories string, serviceFocus string, includeBestPractices bool, outputFormat string) (string, error) {
+	container := m.client.Container().
+		From("tenable/terrascan:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(target)).
+		WithWorkdir("/workspace")
+
+	args := []string{terrascanBinary, "scan", "-i", iacType, "-d", ".", "--policy-type", cloudProvider}
+	if securityCategories != "" {
+		args = append(args, "--categories", securityCategories)
+	}
+	if serviceFocus != "" {
+		args = append(args, "--services", serviceFocus)
+	}
+	if includeBestPractices {
+		args = append(args, "--include-best-practices")
+	}
+	if outputFormat != "" {
+		args = append(args, "-o", outputFormat)
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed cloud provider scan: %w", err)
+	}
+
+	return output, nil
+}
+
+// PerformanceOptimization performs high-performance IaC scanning with optimization features
+func (m *TerrascanModule) PerformanceOptimization(ctx context.Context, target string, iacType string, scanMode string, parallelWorkers string, maxFileSize string, skipLargeFiles bool, enableCaching bool, excludeDirs string, enableMetrics bool) (string, error) {
+	container := m.client.Container().
+		From("tenable/terrascan:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(target)).
+		WithWorkdir("/workspace")
+
+	args := []string{terrascanBinary, "scan", "-i", iacType, "-d", "."}
+
+	// Configure scan mode
+	switch scanMode {
+	case "fast":
+		args = append(args, "--severity", "HIGH", "--skip-rules", "low-priority")
+	case "thorough":
+		args = append(args, "--severity", "LOW", "--show-passed")
+	case "balanced":
+		args = append(args, "--severity", "MEDIUM")
+	}
+
+	if parallelWorkers != "" {
+		args = append(args, "--workers", parallelWorkers)
+	}
+	if maxFileSize != "" {
+		args = append(args, "--max-file-size", maxFileSize)
+	}
+	if skipLargeFiles {
+		args = append(args, "--skip-large-files")
+	}
+	if enableCaching {
+		args = append(args, "--cache")
+	}
+	if excludeDirs != "" {
+		args = append(args, "--exclude-dirs", excludeDirs)
+	}
+	if enableMetrics {
+		args = append(args, "--metrics")
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed performance optimized scan: %w", err)
+	}
+
+	return output, nil
+}
+
+// ComprehensiveReporting generates comprehensive IaC security reports with analytics
+func (m *TerrascanModule) ComprehensiveReporting(ctx context.Context, target string, iacType string, reportType string, outputFormats string, outputDirectory string, includeRemediation bool, includeTrends bool, baselineComparison string, includePolicyDetails bool) (string, error) {
+	container := m.client.Container().
+		From("tenable/terrascan:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(target)).
+		WithWorkdir("/workspace")
+
+	if baselineComparison != "" {
+		container = container.WithFile("/baseline.json", m.client.Host().File(baselineComparison))
+	}
+
+	args := []string{terrascanBinary, "scan", "-i", iacType, "-d", "."}
+
+	// Configure report-specific settings
+	switch reportType {
+	case "executive-summary":
+		args = append(args, "--severity", "HIGH", "-o", "html")
+	case "technical-detail":
+		args = append(args, "--severity", "LOW", "--show-passed", "-o", "json")
+	case "compliance-audit":
+		args = append(args, "--policy-type", "all", "-o", "sarif")
+	case "risk-assessment":
+		args = append(args, "--severity", "MEDIUM", "-o", "yaml")
+	}
+
+	if outputFormats != "" {
+		args = append(args, "-o", outputFormats)
+	}
+	if outputDirectory != "" {
+		args = append(args, "--output-file", outputDirectory+"/terrascan-report")
+	}
+	if includeRemediation {
+		args = append(args, "--include-remediation")
+	}
+	if includePolicyDetails {
+		args = append(args, "-v")
+	}
+	if baselineComparison != "" {
+		args = append(args, "--baseline", "/baseline.json")
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed comprehensive reporting: %w", err)
+	}
+
+	return output, nil
+}

@@ -13,11 +13,13 @@ type TerraformerModule struct {
 	name   string
 }
 
+const terraformerBinary = "/usr/local/bin/terraformer"
+
 // NewTerraformerModule creates a new Terraformer module
 func NewTerraformerModule(client *dagger.Client) *TerraformerModule {
 	return &TerraformerModule{
 		client: client,
-		name:   "terraformer",
+		name:   terraformerBinary,
 	}
 }
 
@@ -91,6 +93,93 @@ func (m *TerraformerModule) ImportAzure(ctx context.Context, subscription string
 	output, err := container.Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to import Azure resources: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetVersion returns the version of terraformer
+func (m *TerraformerModule) GetVersion(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("quay.io/GoogleCloudPlatform/terraformer:latest").
+		WithExec([]string{terraformerBinary, "version"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get terraformer version: %w", err)
+	}
+
+	return output, nil
+}
+
+// ListResources lists available resources for a provider
+func (m *TerraformerModule) ListResources(ctx context.Context, provider string) (string, error) {
+	container := m.client.Container().
+		From("quay.io/GoogleCloudPlatform/terraformer:latest").
+		WithExec([]string{
+			terraformerBinary,
+			"import", provider,
+			"--list",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to list resources for provider %s: %w", provider, err)
+	}
+
+	return output, nil
+}
+
+// Plan shows what resources would be imported without actually importing
+func (m *TerraformerModule) Plan(ctx context.Context, provider string, region string, resources []string) (string, error) {
+	args := []string{
+		terraformerBinary,
+		"plan", provider,
+		"--regions", region,
+		"--output", "/output",
+	}
+
+	for _, resource := range resources {
+		args = append(args, "--resources", resource)
+	}
+
+	container := m.client.Container().
+		From("quay.io/GoogleCloudPlatform/terraformer:latest").
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to plan import for provider %s: %w", provider, err)
+	}
+
+	return output, nil
+}
+
+// Import imports resources from any supported provider
+func (m *TerraformerModule) Import(ctx context.Context, provider string, region string, resources []string, extraArgs map[string]string) (string, error) {
+	args := []string{
+		terraformerBinary,
+		"import", provider,
+		"--regions", region,
+		"--output", "/output",
+	}
+
+	for _, resource := range resources {
+		args = append(args, "--resources", resource)
+	}
+
+	// Add extra provider-specific arguments
+	for key, value := range extraArgs {
+		args = append(args, "--"+key, value)
+	}
+
+	container := m.client.Container().
+		From("quay.io/GoogleCloudPlatform/terraformer:latest").
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to import resources from provider %s: %w", provider, err)
 	}
 
 	return output, nil

@@ -2,116 +2,172 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddTerraformDocsTools adds Terraform Docs MCP tool implementations using real terraform-docs CLI
+// AddTerraformDocsTools adds Terraform Docs MCP tool implementations using direct Dagger calls
 func AddTerraformDocsTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addTerraformDocsToolsDirect(s)
+}
+
+// addTerraformDocsToolsDirect adds Terraform Docs tools using direct Dagger module calls
+func addTerraformDocsToolsDirect(s *server.MCPServer) {
 	// Terraform docs generate markdown tool
 	generateMarkdownTool := mcp.NewTool("terraform_docs_markdown",
 		mcp.WithDescription("Generate Terraform documentation in Markdown format using real terraform-docs CLI"),
 		mcp.WithString("directory",
-			mcp.Description("Directory containing Terraform files (default: current directory)"),
-		),
-		mcp.WithString("output_file",
-			mcp.Description("Output file for documentation"),
-		),
-		mcp.WithString("output_mode",
-			mcp.Description("Output mode (inject, replace)"),
-			mcp.Enum("inject", "replace"),
+			mcp.Description("Directory containing Terraform files"),
+			mcp.Required(),
 		),
 	)
 	s.AddTool(generateMarkdownTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"terraform-docs", "markdown"}
-		
-		if outputFile := request.GetString("output_file", ""); outputFile != "" {
-			args = append(args, "--output-file", outputFile)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if outputMode := request.GetString("output_mode", ""); outputMode != "" {
-			args = append(args, "--output-mode", outputMode)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTerraformDocsModule(client)
+
+		// Get parameters
+		directory := request.GetString("directory", "")
+
+		// Generate markdown documentation
+		output, err := module.GenerateMarkdown(ctx, directory)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Terraform docs markdown generation failed: %v", err)), nil
 		}
-		
-		if dir := request.GetString("directory", ""); dir != "" {
-			args = append(args, dir)
-		} else {
-			args = append(args, ".")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Terraform docs markdown table tool
-	markdownTableTool := mcp.NewTool("terraform_docs_markdown_table",
-		mcp.WithDescription("Generate Terraform documentation as markdown table using real terraform-docs CLI"),
+	// Terraform docs generate JSON tool
+	generateJSONTool := mcp.NewTool("terraform_docs_json",
+		mcp.WithDescription("Generate Terraform documentation in JSON format using real terraform-docs CLI"),
 		mcp.WithString("directory",
-			mcp.Description("Directory containing Terraform files (default: current directory)"),
-		),
-		mcp.WithString("output_file",
-			mcp.Description("Output file for documentation"),
-		),
-		mcp.WithString("output_mode",
-			mcp.Description("Output mode (inject, replace)"),
-			mcp.Enum("inject", "replace"),
+			mcp.Description("Directory containing Terraform files"),
+			mcp.Required(),
 		),
 	)
-	s.AddTool(markdownTableTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"terraform-docs", "markdown", "table"}
-		
-		if outputFile := request.GetString("output_file", ""); outputFile != "" {
-			args = append(args, "--output-file", outputFile)
+	s.AddTool(generateJSONTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if outputMode := request.GetString("output_mode", ""); outputMode != "" {
-			args = append(args, "--output-mode", outputMode)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTerraformDocsModule(client)
+
+		// Get parameters
+		directory := request.GetString("directory", "")
+
+		// Generate JSON documentation
+		output, err := module.GenerateJSON(ctx, directory)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Terraform docs JSON generation failed: %v", err)), nil
 		}
-		
-		if dir := request.GetString("directory", ""); dir != "" {
-			args = append(args, dir)
-		} else {
-			args = append(args, ".")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Terraform docs with config tool
-	generateWithConfigTool := mcp.NewTool("terraform_docs_with_config",
-		mcp.WithDescription("Generate Terraform documentation using configuration file with real terraform-docs CLI"),
+	// Terraform docs generate table tool
+	generateTableTool := mcp.NewTool("terraform_docs_table",
+		mcp.WithDescription("Generate Terraform documentation as table using real terraform-docs CLI"),
 		mcp.WithString("directory",
-			mcp.Description("Directory containing Terraform files (default: current directory)"),
+			mcp.Description("Directory containing Terraform files"),
+			mcp.Required(),
+		),
+	)
+	s.AddTool(generateTableTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTerraformDocsModule(client)
+
+		// Get parameters
+		directory := request.GetString("directory", "")
+
+		// Generate table documentation
+		output, err := module.GenerateTable(ctx, directory)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Terraform docs table generation failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
+	})
+
+	// Terraform docs generate with config tool
+	generateWithConfigTool := mcp.NewTool("terraform_docs_with_config",
+		mcp.WithDescription("Generate Terraform documentation with custom config using real terraform-docs CLI"),
+		mcp.WithString("directory",
+			mcp.Description("Directory containing Terraform files"),
+			mcp.Required(),
 		),
 		mcp.WithString("config_file",
-			mcp.Description("Path to .terraform-docs.yml configuration file"),
+			mcp.Description("Configuration file path"),
+			mcp.Required(),
 		),
 	)
 	s.AddTool(generateWithConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"terraform-docs"}
-		
-		if configFile := request.GetString("config_file", ""); configFile != "" {
-			args = append(args, "--config", configFile)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		if dir := request.GetString("directory", ""); dir != "" {
-			args = append(args, dir)
-		} else {
-			args = append(args, ".")
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTerraformDocsModule(client)
+
+		// Get parameters
+		directory := request.GetString("directory", "")
+		configFile := request.GetString("config_file", "")
+
+		// Generate documentation with config
+		output, err := module.GenerateWithConfig(ctx, directory, configFile)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Terraform docs config generation failed: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-
-
-
-
-
-	// Terraform docs version tool
-	getVersionTool := mcp.NewTool("terraform_docs_version",
+	// Terraform docs version tool (using extra function from Dagger module)
+	versionTool := mcp.NewTool("terraform_docs_version",
 		mcp.WithDescription("Get terraform-docs version information using real terraform-docs CLI"),
 	)
-	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"terraform-docs", "--version"}
-		return executeShipCommand(args)
+	s.AddTool(versionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTerraformDocsModule(client)
+
+		// Get version
+		output, err := module.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Terraform docs get version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 }

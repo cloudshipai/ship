@@ -2,14 +2,23 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddZapTools adds OWASP ZAP (web application security scanner) MCP tool implementations
+// AddZapTools adds OWASP ZAP (web application security scanner) MCP tool implementations using direct Dagger calls
 func AddZapTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// ZAP passive scan tool
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addZapToolsDirect(s)
+}
+
+// addZapToolsDirect adds ZAP tools using direct Dagger module calls
+func addZapToolsDirect(s *server.MCPServer) {
+	// ZAP passive scan tool (using baseline scan)
 	passiveScanTool := mcp.NewTool("zap_passive_scan",
 		mcp.WithDescription("Perform passive security scan using OWASP ZAP"),
 		mcp.WithString("target",
@@ -22,19 +31,34 @@ func AddZapTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc)
 		),
 	)
 	s.AddTool(passiveScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		target := request.GetString("target", "")
-		args := []string{"zap-baseline.py", "-t", target}
-		if format := request.GetString("output_format", ""); format != "" {
-			switch format {
-			case "json":
-				args = append(args, "-J", "/tmp/zap-report.json")
-			case "xml":
-				args = append(args, "-x", "/tmp/zap-report.xml")
-			case "html":
-				args = append(args, "-r", "/tmp/zap-report.html")
-			}
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewZapModule(client)
+
+		// Get parameters
+		target := request.GetString("target", "")
+		if target == "" {
+			return mcp.NewToolResultError("target is required"), nil
+		}
+
+		outputFormat := request.GetString("output_format", "")
+		if outputFormat != "" {
+			return mcp.NewToolResultError("Warning: output_format parameter not supported with direct Dagger calls"), nil
+		}
+
+		// Perform baseline scan (passive)
+		output, err := module.BaselineScan(ctx, target)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("ZAP passive scan failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// ZAP active scan tool
@@ -50,19 +74,34 @@ func AddZapTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc)
 		),
 	)
 	s.AddTool(activeScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		target := request.GetString("target", "")
-		args := []string{"zap-full-scan.py", "-t", target}
-		if format := request.GetString("output_format", ""); format != "" {
-			switch format {
-			case "json":
-				args = append(args, "-J", "/tmp/zap-report.json")
-			case "xml":
-				args = append(args, "-x", "/tmp/zap-report.xml")
-			case "html":
-				args = append(args, "-r", "/tmp/zap-report.html")
-			}
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewZapModule(client)
+
+		// Get parameters
+		target := request.GetString("target", "")
+		if target == "" {
+			return mcp.NewToolResultError("target is required"), nil
+		}
+
+		outputFormat := request.GetString("output_format", "")
+		if outputFormat != "" {
+			return mcp.NewToolResultError("Warning: output_format parameter not supported with direct Dagger calls"), nil
+		}
+
+		// Perform full scan (active)
+		output, err := module.FullScan(ctx, target, 60) // Default 60 minutes
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("ZAP active scan failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// ZAP spider scan tool
@@ -81,22 +120,32 @@ func AddZapTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc)
 		),
 	)
 	s.AddTool(spiderScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewZapModule(client)
+
+		// Get parameters
 		target := request.GetString("target", "")
-		args := []string{"zap.sh", "-cmd", "-quickurl", target, "-quickout", "/tmp/zap-spider.html"}
-		if maxDepth := request.GetInt("max_depth", 0); maxDepth > 0 {
-			args = append(args, "-quickout", "/tmp/zap-spider-depth-"+string(rune(maxDepth))+".html")
+		if target == "" {
+			return mcp.NewToolResultError("target is required"), nil
 		}
-		if format := request.GetString("output_format", ""); format != "" {
-			switch format {
-			case "json":
-				args = append(args, "-J", "/tmp/zap-report.json")
-			case "xml":
-				args = append(args, "-x", "/tmp/zap-report.xml")
-			case "html":
-				args = append(args, "-r", "/tmp/zap-report.html")
-			}
+
+		maxDepth := request.GetInt("max_depth", 0)
+		outputFormat := request.GetString("output_format", "")
+
+		// Perform spider scan
+		output, err := module.SpiderScan(ctx, target, maxDepth, outputFormat)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("ZAP spider scan failed: %v", err)), nil
 		}
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// ZAP full scan tool
@@ -115,22 +164,35 @@ func AddZapTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc)
 		),
 	)
 	s.AddTool(fullScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewZapModule(client)
+
+		// Get parameters
 		target := request.GetString("target", "")
-		args := []string{"zap-full-scan.py", "-t", target}
-		if maxDuration := request.GetInt("max_duration", 0); maxDuration > 0 {
-			args = append(args, "-m", string(rune(maxDuration)))
+		if target == "" {
+			return mcp.NewToolResultError("target is required"), nil
 		}
-		if format := request.GetString("output_format", ""); format != "" {
-			switch format {
-			case "json":
-				args = append(args, "-J", "/tmp/zap-report.json")
-			case "xml":
-				args = append(args, "-x", "/tmp/zap-report.xml")
-			case "html":
-				args = append(args, "-r", "/tmp/zap-report.html")
-			}
+
+		maxDuration := request.GetInt("max_duration", 60) // Default 60 minutes
+		outputFormat := request.GetString("output_format", "")
+		if outputFormat != "" {
+			return mcp.NewToolResultError("Warning: output_format parameter not supported with direct Dagger calls"), nil
 		}
-		return executeShipCommand(args)
+
+		// Perform full scan
+		output, err := module.FullScan(ctx, target, maxDuration)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("ZAP full scan failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// ZAP baseline scan tool
@@ -146,19 +208,34 @@ func AddZapTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc)
 		),
 	)
 	s.AddTool(baselineScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		target := request.GetString("target", "")
-		args := []string{"zap-baseline.py", "-t", target}
-		if format := request.GetString("output_format", ""); format != "" {
-			switch format {
-			case "json":
-				args = append(args, "-J", "/tmp/zap-report.json")
-			case "xml":
-				args = append(args, "-x", "/tmp/zap-report.xml")
-			case "html":
-				args = append(args, "-r", "/tmp/zap-report.html")
-			}
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewZapModule(client)
+
+		// Get parameters
+		target := request.GetString("target", "")
+		if target == "" {
+			return mcp.NewToolResultError("target is required"), nil
+		}
+
+		outputFormat := request.GetString("output_format", "")
+		if outputFormat != "" {
+			return mcp.NewToolResultError("Warning: output_format parameter not supported with direct Dagger calls"), nil
+		}
+
+		// Perform baseline scan
+		output, err := module.BaselineScan(ctx, target)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("ZAP baseline scan failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// ZAP get version tool
@@ -166,7 +243,22 @@ func AddZapTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc)
 		mcp.WithDescription("Get OWASP ZAP version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"zap.sh", "-version"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewZapModule(client)
+
+		// Get version
+		output, err := module.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("ZAP get version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 }

@@ -11,7 +11,7 @@ BEFORE: MCP → executeShipCommand() → CLI (broken) → Dagger
 AFTER:  MCP → dagger.Connect() → Dagger Module → Container
 ```
 
-## Conversion Progress: 62/72 (86.1%)
+## Conversion Progress: 74/74 (100%)
 
 ### 📋 **ALPHABETICAL CONVERSION LIST**
 
@@ -80,17 +80,17 @@ AFTER:  MCP → dagger.Connect() → Dagger Module → Container
 | 61 | **sops** | ✅ DONE | sops.go | sops.go | 6→6 | Secrets management |
 | 62 | **steampipe** | ✅ DONE | steampipe.go | steampipe.go | 10→11 | Cloud queries |
 | 63 | **step-ca** | ✅ DONE | step_ca.go | step_ca.go | 6→6 | CA operations |
-| 64 | **syft** | ⬜ TODO | syft.go | syft.go | 12 | SBOM generation |
-| 65 | **terraform-docs** | ⬜ TODO | terraform_docs.go | terraform_docs.go | 6 | TF documentation |
-| 66 | **terraformer** | ⬜ TODO | terraformer.go | terraformer.go | 6 | Infrastructure import |
-| 67 | **terrascan** | ⬜ TODO | terrascan.go | terrascan.go | 15 | IaC scanner |
-| 68 | **tflint** | ⬜ TODO | tflint.go | tflint.go | 8 | Terraform linter |
-| 69 | **tfstate-reader** | ⬜ TODO | tfstate_reader.go | tfstate_reader.go | 7 | State analysis |
-| 70 | **trivy** | ⬜ TODO | trivy.go | trivy.go | 10+ | Vulnerability scanner |
-| 71 | **trivy-golden** | ⬜ TODO | trivy_golden.go | trivy_golden.go | 6 | Golden image trivy |
-| 72 | **trufflehog** | ⬜ TODO | trufflehog.go | trufflehog.go | 15 | Secret scanner |
-| 73 | **velero** | ⬜ TODO | velero.go | velero.go | 15 | K8s backup/restore |
-| 74 | **zap** | ⬜ TODO | zap.go | zap.go | 6 | Web app scanner |
+| 64 | **syft** | ✅ DONE | syft.go | syft.go | 11→11 | SBOM generation |
+| 65 | **terraform-docs** | ✅ DONE | terraform_docs.go | terraform_docs.go | 4→5 | TF documentation |
+| 66 | **terraformer** | ✅ DONE | terraformer.go | terraformer.go | 4→7 | Infrastructure import |
+| 67 | **terrascan** | ✅ DONE | terrascan.go | terrascan.go | 15→18 | IaC scanner |
+| 68 | **tflint** | ✅ DONE | tflint.go | tflint.go | 6→9 | Terraform linter |
+| 69 | **tfstate-reader** | ✅ DONE | tfstate_reader.go | tfstate_reader.go | 7→11 | State analysis |
+| 70 | **trivy** | ✅ DONE | trivy.go | trivy.go | 15→15 | Vulnerability scanner |
+| 71 | **trivy-golden** | ✅ DONE | trivy_golden.go | trivy_golden.go | 6→11 | Golden image trivy |
+| 72 | **trufflehog** | ✅ DONE | trufflehog.go | trufflehog.go | 18→18 | Secret scanner |
+| 73 | **velero** | ✅ DONE | velero.go | velero.go | 17→19 | K8s backup/restore |
+| 74 | **zap** | ✅ DONE | zap.go | zap.go | 6→6 | Web app scanner |
 
 ## Conversion Checklist (Per Tool)
 

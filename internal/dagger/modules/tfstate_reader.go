@@ -13,6 +13,8 @@ type TfstateReaderModule struct {
 	name   string
 }
 
+const tfstateReaderBinary = "/usr/local/bin/tfstate-lookup"
+
 // NewTfstateReaderModule creates a new Terraform state reader module
 func NewTfstateReaderModule(client *dagger.Client) *TfstateReaderModule {
 	return &TfstateReaderModule{
@@ -150,6 +152,100 @@ func (m *TfstateReaderModule) InteractiveExplorer(ctx context.Context, statePath
 	output, err := container.Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to explore state interactively: %w", err)
+	}
+
+	return output, nil
+}
+
+// StateListResources lists resources using terraform state list
+func (m *TfstateReaderModule) StateListResources(ctx context.Context, statePath string, resourceId string) (string, error) {
+	container := m.client.Container().
+		From("hashicorp/terraform:latest").
+		WithFile("/terraform.tfstate", m.client.Host().File(statePath))
+
+	args := []string{"terraform", "state", "list", "-state=/terraform.tfstate"}
+	if resourceId != "" {
+		args = append(args, resourceId)
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to list state resources: %w", err)
+	}
+
+	return output, nil
+}
+
+// StateShowResource shows a specific resource using terraform state show
+func (m *TfstateReaderModule) StateShowResource(ctx context.Context, statePath string, resourceAddress string) (string, error) {
+	container := m.client.Container().
+		From("hashicorp/terraform:latest").
+		WithFile("/terraform.tfstate", m.client.Host().File(statePath)).
+		WithExec([]string{
+			"terraform", "state", "show", "-state=/terraform.tfstate", resourceAddress,
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to show state resource: %w", err)
+	}
+
+	return output, nil
+}
+
+// LookupResource looks up resource using tfstate-lookup functionality (simulated with jq)
+func (m *TfstateReaderModule) LookupResource(ctx context.Context, statePath string, resourceAddress string) (string, error) {
+	// Since we don't have tfstate-lookup in container, simulate with jq
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "jq"}).
+		WithFile("/terraform.tfstate", m.client.Host().File(statePath)).
+		WithExec([]string{
+			"jq",
+			fmt.Sprintf(`[.resources[] | select(.type + "." + .name == "%s") | .instances[]]`, resourceAddress),
+			"/terraform.tfstate",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to lookup resource: %w", err)
+	}
+
+	return output, nil
+}
+
+// DumpAllResources dumps all resources (simulated tfstate-lookup -dump)
+func (m *TfstateReaderModule) DumpAllResources(ctx context.Context, statePath string) (string, error) {
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "jq"}).
+		WithFile("/terraform.tfstate", m.client.Host().File(statePath)).
+		WithExec([]string{
+			"jq",
+			`{
+				version: .version,
+				terraform_version: .terraform_version,
+				serial: .serial,
+				lineage: .lineage,
+				outputs: .outputs,
+				resources: [.resources[] | {
+					type: .type,
+					name: .name,
+					provider: .provider,
+					instances: [.instances[] | {
+						attributes: .attributes,
+						dependencies: .dependencies
+					}]
+				}]
+			}`,
+			"/terraform.tfstate",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to dump all resources: %w", err)
 	}
 
 	return output, nil

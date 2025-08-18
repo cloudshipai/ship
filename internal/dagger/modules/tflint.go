@@ -166,3 +166,52 @@ func (m *TFLintModule) GetVersion(ctx context.Context) (string, error) {
 
 	return output, nil
 }
+
+// LintWithVarFile lints Terraform files with a variable file
+func (m *TFLintModule) LintWithVarFile(ctx context.Context, dir string, varFile string, format string) (string, error) {
+	container := m.client.Container().
+		From("ghcr.io/terraform-linters/tflint:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(dir)).
+		WithFile("/workspace/vars.tfvars", m.client.Host().File(varFile)).
+		WithWorkdir("/workspace")
+
+	args := []string{tflintBinary, "--var-file", "/workspace/vars.tfvars"}
+	if format != "" {
+		args = append(args, "--format", format)
+	} else {
+		args = append(args, "--format", "json")
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to run tflint with var file: %w", err)
+	}
+
+	return output, nil
+}
+
+// LintWithVar lints Terraform files with individual variables
+func (m *TFLintModule) LintWithVar(ctx context.Context, dir string, variable string, format string) (string, error) {
+	container := m.client.Container().
+		From("ghcr.io/terraform-linters/tflint:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(dir)).
+		WithWorkdir("/workspace")
+
+	args := []string{tflintBinary, "--var", variable}
+	if format != "" {
+		args = append(args, "--format", format)
+	} else {
+		args = append(args, "--format", "json")
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to run tflint with var: %w", err)
+	}
+
+	return output, nil
+}

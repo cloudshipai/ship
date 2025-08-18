@@ -2,592 +2,583 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddSyftTools adds Syft (SBOM generation from container images and filesystems) MCP tool implementations using real syft CLI commands
+// AddSyftTools adds Syft (SBOM generation from container images and filesystems) MCP tool implementations using direct Dagger calls
 func AddSyftTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// Syft comprehensive SBOM generation tool
-	comprehensiveSBOMTool := mcp.NewTool("syft_comprehensive_sbom_generation",
-		mcp.WithDescription("Generate comprehensive SBOM with advanced cataloging options"),
-		mcp.WithString("target",
-			mcp.Description("Target to scan (directory, image, archive, etc.)"),
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addSyftToolsDirect(s)
+}
+
+// addSyftToolsDirect adds Syft tools using direct Dagger module calls
+func addSyftToolsDirect(s *server.MCPServer) {
+	// Syft generate SBOM from directory tool
+	generateSBOMDirectoryTool := mcp.NewTool("syft_generate_sbom_directory",
+		mcp.WithDescription("Generate SBOM from directory using real Syft CLI"),
+		mcp.WithString("directory",
+			mcp.Description("Directory path to scan"),
 			mcp.Required(),
 		),
-		mcp.WithString("output_format",
-			mcp.Description("SBOM output format"),
-			mcp.Enum("cyclonedx-json", "spdx-json", "syft-json", "github-json", "spdx-tag-value", "cyclonedx-xml", "table", "text"),
-		),
-		mcp.WithString("output_file",
-			mcp.Description("Output file path for SBOM"),
-		),
-		mcp.WithString("cataloger_scope",
-			mcp.Description("Cataloger scope for package discovery"),
-			mcp.Enum("Squashed", "AllLayers"),
-		),
-		mcp.WithString("package_catalogers",
-			mcp.Description("Comma-separated package catalogers to enable"),
-		),
-		mcp.WithString("exclude_paths",
-			mcp.Description("Comma-separated paths to exclude from scanning"),
-		),
-		mcp.WithString("platform",
-			mcp.Description("Platform for multi-platform container images"),
-		),
-		mcp.WithBoolean("include_metadata",
-			mcp.Description("Include additional metadata in SBOM"),
-		),
-		mcp.WithBoolean("quiet",
-			mcp.Description("Suppress progress output"),
+		mcp.WithString("format",
+			mcp.Description("Output format (json, spdx-json, cyclonedx-json, table)"),
 		),
 	)
-	s.AddTool(comprehensiveSBOMTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	s.AddTool(generateSBOMDirectoryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSyftModule(client)
+
+		// Get parameters
+		directory := request.GetString("directory", "")
+		format := request.GetString("format", "json")
+
+		// Generate SBOM from directory
+		output, err := module.GenerateSBOMFromDirectory(ctx, directory, format)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Syft generate SBOM from directory failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
+	})
+
+	// Syft generate SBOM from image tool
+	generateSBOMImageTool := mcp.NewTool("syft_generate_sbom_image",
+		mcp.WithDescription("Generate SBOM from container image using real Syft CLI"),
+		mcp.WithString("image",
+			mcp.Description("Container image name to scan"),
+			mcp.Required(),
+		),
+		mcp.WithString("format",
+			mcp.Description("Output format (json, spdx-json, cyclonedx-json, table)"),
+		),
+	)
+	s.AddTool(generateSBOMImageTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSyftModule(client)
+
+		// Get parameters
+		image := request.GetString("image", "")
+		format := request.GetString("format", "json")
+
+		// Generate SBOM from image
+		output, err := module.GenerateSBOMFromImage(ctx, image, format)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Syft generate SBOM from image failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
+	})
+
+	// Syft generate SBOM from package tool
+	generateSBOMPackageTool := mcp.NewTool("syft_generate_sbom_package",
+		mcp.WithDescription("Generate SBOM from package using real Syft CLI"),
+		mcp.WithString("directory",
+			mcp.Description("Directory containing packages"),
+			mcp.Required(),
+		),
+		mcp.WithString("package_type",
+			mcp.Description("Package type (npm, pip, gem, etc.)"),
+			mcp.Required(),
+		),
+		mcp.WithString("format",
+			mcp.Description("Output format (json, spdx-json, cyclonedx-json, table)"),
+		),
+	)
+	s.AddTool(generateSBOMPackageTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSyftModule(client)
+
+		// Get parameters
+		directory := request.GetString("directory", "")
+		packageType := request.GetString("package_type", "")
+		format := request.GetString("format", "json")
+
+		// Generate SBOM from package
+		output, err := module.GenerateSBOMFromPackage(ctx, directory, packageType, format)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Syft generate SBOM from package failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
+	})
+
+	// Syft generate attestations tool
+	generateAttestationsTool := mcp.NewTool("syft_generate_attestations",
+		mcp.WithDescription("Generate attestations using real Syft CLI"),
+		mcp.WithString("target",
+			mcp.Description("Target to generate attestations for"),
+			mcp.Required(),
+		),
+		mcp.WithString("format",
+			mcp.Description("Attestation format"),
+		),
+	)
+	s.AddTool(generateAttestationsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSyftModule(client)
+
+		// Get parameters
 		target := request.GetString("target", "")
-		args := []string{"syft", target}
-		
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "--output", outputFormat)
+		format := request.GetString("format", "json")
+
+		// Generate attestations
+		output, err := module.GenerateAttestations(ctx, target, format)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Syft generate attestations failed: %v", err)), nil
 		}
-		if outputFile := request.GetString("output_file", ""); outputFile != "" {
-			args = append(args, "--file", outputFile)
-		}
-		if catalogerScope := request.GetString("cataloger_scope", ""); catalogerScope != "" {
-			args = append(args, "--scope", catalogerScope)
-		}
-		if packageCatalogers := request.GetString("package_catalogers", ""); packageCatalogers != "" {
-			args = append(args, "--catalogers", packageCatalogers)
-		}
-		if excludePaths := request.GetString("exclude_paths", ""); excludePaths != "" {
-			for _, path := range strings.Split(excludePaths, ",") {
-				if strings.TrimSpace(path) != "" {
-					args = append(args, "--exclude", strings.TrimSpace(path))
-				}
-			}
-		}
-		if platform := request.GetString("platform", ""); platform != "" {
-			args = append(args, "--platform", platform)
-		}
-		if request.GetBool("quiet", false) {
-			args = append(args, "--quiet")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Syft container image SBOM with security focus tool
-	containerImageSBOMTool := mcp.NewTool("syft_container_image_sbom",
-		mcp.WithDescription("Generate detailed SBOM from container images with security focus"),
-		mcp.WithString("image_name",
-			mcp.Description("Container image name/tag to scan"),
-			mcp.Required(),
-		),
-		mcp.WithString("registry_auth",
-			mcp.Description("Registry authentication (username:password or token)"),
-		),
-		mcp.WithString("output_format",
-			mcp.Description("SBOM output format"),
-			mcp.Enum("cyclonedx-json", "spdx-json", "syft-json"),
-		),
-		mcp.WithString("output_file",
-			mcp.Description("Output file path"),
-		),
-		mcp.WithString("layer_analysis",
-			mcp.Description("Layer analysis strategy"),
-			mcp.Enum("squashed", "all-layers"),
-		),
-		mcp.WithBoolean("include_base_image",
-			mcp.Description("Include base image analysis"),
-		),
-		mcp.WithBoolean("include_vulnerabilities",
-			mcp.Description("Include vulnerability references in SBOM"),
-		),
-		mcp.WithString("platform",
-			mcp.Description("Target platform for multi-arch images"),
-		),
-	)
-	s.AddTool(containerImageSBOMTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		imageName := request.GetString("image_name", "")
-		args := []string{"syft", imageName}
-		
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "--output", outputFormat)
-		}
-		if outputFile := request.GetString("output_file", ""); outputFile != "" {
-			args = append(args, "--file", outputFile)
-		}
-		if layerAnalysis := request.GetString("layer_analysis", ""); layerAnalysis != "" {
-			if layerAnalysis == "all-layers" {
-				args = append(args, "--scope", "AllLayers")
-			} else {
-				args = append(args, "--scope", "Squashed")
-			}
-		}
-		if platform := request.GetString("platform", ""); platform != "" {
-			args = append(args, "--platform", platform)
-		}
-		if registryAuth := request.GetString("registry_auth", ""); registryAuth != "" {
-			args = append(args, "--registry-auth", registryAuth)
-		}
-		
-		return executeShipCommand(args)
-	})
-
-	// Syft language-specific package cataloging tool
+	// Syft language specific cataloging tool
 	languageSpecificCatalogingTool := mcp.NewTool("syft_language_specific_cataloging",
-		mcp.WithDescription("Generate SBOM with focus on specific programming languages"),
+		mcp.WithDescription("Language-specific cataloging using real Syft CLI"),
 		mcp.WithString("target",
-			mcp.Description("Target to scan (directory, archive, or image)"),
+			mcp.Description("Target to scan"),
 			mcp.Required(),
 		),
 		mcp.WithString("languages",
-			mcp.Description("Comma-separated programming languages to focus on"),
-			mcp.Required(),
+			mcp.Description("Comma-separated list of languages"),
 		),
 		mcp.WithString("output_format",
-			mcp.Description("SBOM output format"),
-			mcp.Enum("cyclonedx-json", "spdx-json", "syft-json"),
+			mcp.Description("Output format"),
 		),
 		mcp.WithString("package_managers",
-			mcp.Description("Specific package managers to include"),
+			mcp.Description("Package managers to use"),
 		),
-		mcp.WithBoolean("include_dev_dependencies",
+		mcp.WithBoolean("include_dev_deps",
 			mcp.Description("Include development dependencies"),
 		),
-		mcp.WithBoolean("include_test_dependencies",
+		mcp.WithBoolean("include_test_deps",
 			mcp.Description("Include test dependencies"),
 		),
 		mcp.WithString("depth_limit",
-			mcp.Description("Dependency depth limit for analysis"),
+			mcp.Description("Depth limit for scanning"),
 		),
 	)
 	s.AddTool(languageSpecificCatalogingTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSyftModule(client)
+
+		// Get parameters
 		target := request.GetString("target", "")
-		languages := request.GetString("languages", "")
-		args := []string{"syft", target}
-		
-		// Map languages to catalogers
-		languageMap := map[string]string{
-			"python":     "python-package",
-			"javascript": "javascript-package",
-			"typescript": "javascript-package",
-			"java":       "java-package",
-			"go":         "go-module",
-			"rust":       "rust-cargo",
-			"ruby":       "ruby-gem",
-			"php":        "php-composer",
-			"dotnet":     "dotnet-package",
-			"cpp":        "conan-package",
+		languagesStr := request.GetString("languages", "")
+		var languages []string
+		if languagesStr != "" {
+			languages = strings.Split(languagesStr, ",")
 		}
-		
-		var catalogers []string
-		for _, lang := range strings.Split(languages, ",") {
-			lang = strings.TrimSpace(lang)
-			if cataloger, exists := languageMap[lang]; exists {
-				catalogers = append(catalogers, cataloger)
-			}
+		outputFormat := request.GetString("output_format", "json")
+		packageManagers := request.GetString("package_managers", "")
+		includeDevDeps := request.GetBool("include_dev_deps", false)
+		includeTestDeps := request.GetBool("include_test_deps", false)
+		depthLimit := request.GetString("depth_limit", "")
+
+		// Language specific cataloging
+		output, err := module.LanguageSpecificCataloging(ctx, target, languages, outputFormat, packageManagers, includeDevDeps, includeTestDeps, depthLimit)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Syft language specific cataloging failed: %v", err)), nil
 		}
-		
-		if len(catalogers) > 0 {
-			args = append(args, "--catalogers", strings.Join(catalogers, ","))
-		}
-		
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "--output", outputFormat)
-		}
-		if packageManagers := request.GetString("package_managers", ""); packageManagers != "" {
-			args = append(args, "--catalogers", packageManagers)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Syft supply chain analysis tool
 	supplyChainAnalysisTool := mcp.NewTool("syft_supply_chain_analysis",
-		mcp.WithDescription("Comprehensive supply chain analysis and SBOM generation"),
+		mcp.WithDescription("Supply chain analysis using real Syft CLI"),
 		mcp.WithString("target",
-			mcp.Description("Target for supply chain analysis"),
+			mcp.Description("Target to analyze"),
 			mcp.Required(),
 		),
 		mcp.WithString("analysis_depth",
-			mcp.Description("Depth of supply chain analysis"),
-			mcp.Enum("shallow", "deep", "comprehensive"),
+			mcp.Description("Analysis depth"),
 		),
 		mcp.WithString("output_formats",
-			mcp.Description("Comma-separated output formats for multi-format generation"),
+			mcp.Description("Comma-separated output formats"),
 		),
 		mcp.WithString("output_directory",
-			mcp.Description("Output directory for all generated SBOMs"),
+			mcp.Description("Output directory"),
 		),
 		mcp.WithBoolean("include_transitive_deps",
-			mcp.Description("Include transitive dependencies analysis"),
+			mcp.Description("Include transitive dependencies"),
 		),
 		mcp.WithBoolean("include_license_analysis",
-			mcp.Description("Include license compliance analysis"),
+			mcp.Description("Include license analysis"),
 		),
 		mcp.WithBoolean("include_provenance",
-			mcp.Description("Include package provenance information"),
+			mcp.Description("Include provenance information"),
 		),
 		mcp.WithString("risk_assessment",
-			mcp.Description("Supply chain risk assessment level"),
-			mcp.Enum("basic", "standard", "strict"),
+			mcp.Description("Risk assessment level"),
 		),
 	)
 	s.AddTool(supplyChainAnalysisTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSyftModule(client)
+
+		// Get parameters
 		target := request.GetString("target", "")
-		args := []string{"syft", target}
-		
-		analysisDepth := request.GetString("analysis_depth", "standard")
-		switch analysisDepth {
-		case "shallow":
-			args = append(args, "--scope", "Squashed")
-		case "deep":
-			args = append(args, "--scope", "AllLayers")
-		case "comprehensive":
-			args = append(args, "--scope", "AllLayers")
-			args = append(args, "--catalogers", "all")
+		analysisDepth := request.GetString("analysis_depth", "")
+		outputFormatsStr := request.GetString("output_formats", "")
+		var outputFormats []string
+		if outputFormatsStr != "" {
+			outputFormats = strings.Split(outputFormatsStr, ",")
 		}
-		
-		if outputFormats := request.GetString("output_formats", ""); outputFormats != "" {
-			args = append(args, "--output", outputFormats)
-		} else {
-			args = append(args, "--output", "cyclonedx-json,spdx-json")
+		outputDirectory := request.GetString("output_directory", "")
+		includeTransitiveDeps := request.GetBool("include_transitive_deps", false)
+		includeLicenseAnalysis := request.GetBool("include_license_analysis", false)
+		includeProvenance := request.GetBool("include_provenance", false)
+		riskAssessment := request.GetString("risk_assessment", "")
+
+		// Supply chain analysis
+		output, err := module.SupplyChainAnalysis(ctx, target, analysisDepth, outputFormats, outputDirectory, includeTransitiveDeps, includeLicenseAnalysis, includeProvenance, riskAssessment)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Syft supply chain analysis failed: %v", err)), nil
 		}
-		
-		if outputDirectory := request.GetString("output_directory", ""); outputDirectory != "" {
-			args = append(args, "--file", outputDirectory+"/sbom")
-		}
-		
-		if request.GetBool("include_license_analysis", false) {
-			args = append(args, "--output", "spdx-json")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Syft SBOM comparison and diff tool
+	// Syft SBOM comparison tool
 	sbomComparisonTool := mcp.NewTool("syft_sbom_comparison",
-		mcp.WithDescription("Compare SBOMs and generate difference analysis"),
+		mcp.WithDescription("SBOM comparison using real Syft CLI"),
 		mcp.WithString("baseline_target",
-			mcp.Description("Baseline target for comparison (image, directory, or SBOM file)"),
+			mcp.Description("Baseline target for comparison"),
 			mcp.Required(),
 		),
 		mcp.WithString("comparison_target",
-			mcp.Description("Target to compare against baseline"),
+			mcp.Description("Comparison target"),
 			mcp.Required(),
 		),
 		mcp.WithString("comparison_type",
-			mcp.Description("Type of comparison to perform"),
-			mcp.Enum("packages", "versions", "licenses", "vulnerabilities", "comprehensive"),
+			mcp.Description("Type of comparison"),
 		),
 		mcp.WithString("output_format",
-			mcp.Description("Comparison report format"),
-			mcp.Enum("json", "table", "csv", "sarif"),
+			mcp.Description("Output format"),
 		),
 		mcp.WithString("diff_output_file",
-			mcp.Description("Output file for comparison results"),
+			mcp.Description("Diff output file"),
 		),
 		mcp.WithBoolean("show_added_only",
-			mcp.Description("Show only newly added packages"),
+			mcp.Description("Show only added items"),
 		),
 		mcp.WithBoolean("show_removed_only",
-			mcp.Description("Show only removed packages"),
+			mcp.Description("Show only removed items"),
 		),
 		mcp.WithBoolean("include_version_changes",
-			mcp.Description("Include version change analysis"),
+			mcp.Description("Include version changes"),
 		),
 	)
 	s.AddTool(sbomComparisonTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		baselineTarget := request.GetString("baseline_target", "")
-		_ = request.GetString("comparison_target", "") // TODO: implement comparison logic
-		
-		// Generate SBOM for baseline target
-		// In a real implementation, this would generate both SBOMs and compare them
-		args := []string{"syft", baselineTarget, "--output", "syft-json", "--file", "/tmp/baseline-sbom.json"}
-		
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "--output", outputFormat)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSyftModule(client)
+
+		// Get parameters
+		baselineTarget := request.GetString("baseline_target", "")
+		comparisonTarget := request.GetString("comparison_target", "")
+		comparisonType := request.GetString("comparison_type", "")
+		outputFormat := request.GetString("output_format", "json")
+		diffOutputFile := request.GetString("diff_output_file", "")
+		showAddedOnly := request.GetBool("show_added_only", false)
+		showRemovedOnly := request.GetBool("show_removed_only", false)
+		includeVersionChanges := request.GetBool("include_version_changes", false)
+
+		// SBOM comparison
+		output, err := module.SBOMComparison(ctx, baselineTarget, comparisonTarget, comparisonType, outputFormat, diffOutputFile, showAddedOnly, showRemovedOnly, includeVersionChanges)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Syft SBOM comparison failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Syft compliance and attestation tool
+	// Syft compliance attestation tool
 	complianceAttestationTool := mcp.NewTool("syft_compliance_attestation",
-		mcp.WithDescription("Generate compliance-focused SBOMs with attestation features"),
+		mcp.WithDescription("Compliance attestation using real Syft CLI"),
 		mcp.WithString("target",
-			mcp.Description("Target for compliance SBOM generation"),
+			mcp.Description("Target for compliance attestation"),
 			mcp.Required(),
 		),
 		mcp.WithString("compliance_framework",
-			mcp.Description("Compliance framework requirements"),
-			mcp.Enum("ntia-minimum", "spdx-2.3", "cyclonedx-1.4", "sbom-quality"),
-			mcp.Required(),
+			mcp.Description("Compliance framework"),
 		),
 		mcp.WithString("output_format",
-			mcp.Description("Compliance SBOM format"),
-			mcp.Enum("spdx-json", "cyclonedx-json", "spdx-tag-value"),
+			mcp.Description("Output format"),
 		),
 		mcp.WithString("attestation_format",
-			mcp.Description("Attestation format for SBOM"),
-			mcp.Enum("in-toto", "slsa", "dsse"),
+			mcp.Description("Attestation format"),
 		),
 		mcp.WithString("output_file",
-			mcp.Description("Output file for compliance SBOM"),
+			mcp.Description("Output file"),
 		),
 		mcp.WithBoolean("include_supplier_info",
-			mcp.Description("Include supplier information for compliance"),
+			mcp.Description("Include supplier information"),
 		),
 		mcp.WithBoolean("include_hashes",
-			mcp.Description("Include package/file hashes"),
+			mcp.Description("Include hashes"),
 		),
 		mcp.WithBoolean("validate_completeness",
-			mcp.Description("Validate SBOM completeness against framework"),
+			mcp.Description("Validate completeness"),
 		),
 	)
 	s.AddTool(complianceAttestationTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSyftModule(client)
+
+		// Get parameters
 		target := request.GetString("target", "")
 		complianceFramework := request.GetString("compliance_framework", "")
-		args := []string{"syft", target}
-		
-		// Configure output format based on compliance framework
-		switch complianceFramework {
-		case "ntia-minimum":
-			args = append(args, "--output", "spdx-json")
-		case "spdx-2.3":
-			args = append(args, "--output", "spdx-json")
-		case "cyclonedx-1.4":
-			args = append(args, "--output", "cyclonedx-json")
-		case "sbom-quality":
-			args = append(args, "--output", "syft-json")
+		outputFormat := request.GetString("output_format", "json")
+		attestationFormat := request.GetString("attestation_format", "")
+		outputFile := request.GetString("output_file", "")
+		includeSupplierInfo := request.GetBool("include_supplier_info", false)
+		includeHashes := request.GetBool("include_hashes", false)
+		validateCompleteness := request.GetBool("validate_completeness", false)
+
+		// Compliance attestation
+		output, err := module.ComplianceAttestation(ctx, target, complianceFramework, outputFormat, attestationFormat, outputFile, includeSupplierInfo, includeHashes, validateCompleteness)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Syft compliance attestation failed: %v", err)), nil
 		}
-		
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "--output", outputFormat)
-		}
-		if outputFile := request.GetString("output_file", ""); outputFile != "" {
-			args = append(args, "--file", outputFile)
-		}
-		
-		// Add compliance-specific catalogers
-		args = append(args, "--catalogers", "all")
-		args = append(args, "--scope", "AllLayers")
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Syft archive and file analysis tool
+	// Syft archive analysis tool
 	archiveAnalysisTool := mcp.NewTool("syft_archive_analysis",
-		mcp.WithDescription("Analyze archives, packages, and compressed files for SBOM generation"),
+		mcp.WithDescription("Archive analysis using real Syft CLI"),
 		mcp.WithString("archive_path",
-			mcp.Description("Path to archive file (tar, zip, rpm, deb, etc.)"),
+			mcp.Description("Archive path to analyze"),
 			mcp.Required(),
 		),
 		mcp.WithString("archive_type",
-			mcp.Description("Type of archive to analyze"),
-			mcp.Enum("auto", "tar", "zip", "rpm", "deb", "apk", "jar", "war", "oci"),
+			mcp.Description("Archive type"),
 		),
 		mcp.WithString("output_format",
-			mcp.Description("SBOM output format"),
-			mcp.Enum("cyclonedx-json", "spdx-json", "syft-json"),
+			mcp.Description("Output format"),
 		),
 		mcp.WithBoolean("extract_nested",
-			mcp.Description("Extract and analyze nested archives"),
+			mcp.Description("Extract nested archives"),
 		),
 		mcp.WithBoolean("include_metadata",
-			mcp.Description("Include file metadata in SBOM"),
+			mcp.Description("Include metadata"),
 		),
 		mcp.WithString("extraction_depth",
-			mcp.Description("Maximum extraction depth for nested archives"),
+			mcp.Description("Extraction depth"),
 		),
 	)
 	s.AddTool(archiveAnalysisTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSyftModule(client)
+
+		// Get parameters
 		archivePath := request.GetString("archive_path", "")
-		args := []string{"syft", archivePath}
-		
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "--output", outputFormat)
+		archiveType := request.GetString("archive_type", "")
+		outputFormat := request.GetString("output_format", "json")
+		extractNested := request.GetBool("extract_nested", false)
+		includeMetadata := request.GetBool("include_metadata", false)
+		extractionDepth := request.GetString("extraction_depth", "")
+
+		// Archive analysis
+		output, err := module.ArchiveAnalysis(ctx, archivePath, archiveType, outputFormat, extractNested, includeMetadata, extractionDepth)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Syft archive analysis failed: %v", err)), nil
 		}
-		if archiveType := request.GetString("archive_type", ""); archiveType != "auto" && archiveType != "" {
-			args = append(args, "--from", archiveType)
-		}
-		if request.GetBool("extract_nested", false) {
-			args = append(args, "--scope", "AllLayers")
-		}
-		if extractionDepth := request.GetString("extraction_depth", ""); extractionDepth != "" {
-			args = append(args, "--max-depth", extractionDepth)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Syft CI/CD pipeline integration tool
 	cicdPipelineIntegrationTool := mcp.NewTool("syft_cicd_pipeline_integration",
-		mcp.WithDescription("Optimized SBOM generation for CI/CD pipelines"),
+		mcp.WithDescription("CI/CD pipeline integration using real Syft CLI"),
 		mcp.WithString("target",
-			mcp.Description("Target for CI/CD SBOM generation"),
+			mcp.Description("Target for CI/CD integration"),
 			mcp.Required(),
 		),
 		mcp.WithString("pipeline_stage",
-			mcp.Description("CI/CD pipeline stage"),
-			mcp.Enum("build", "test", "staging", "production", "release"),
+			mcp.Description("Pipeline stage"),
 		),
 		mcp.WithString("artifact_name",
-			mcp.Description("Name/identifier for the artifact"),
+			mcp.Description("Artifact name"),
 		),
 		mcp.WithString("output_formats",
-			mcp.Description("Comma-separated output formats for CI artifacts"),
+			mcp.Description("Comma-separated output formats"),
 		),
 		mcp.WithString("output_directory",
-			mcp.Description("Output directory for CI artifacts"),
+			mcp.Description("Output directory"),
 		),
 		mcp.WithBoolean("fail_on_error",
-			mcp.Description("Fail CI pipeline on SBOM generation errors"),
+			mcp.Description("Fail on error"),
 		),
 		mcp.WithBoolean("quiet_mode",
-			mcp.Description("Suppress progress output for CI logs"),
+			mcp.Description("Quiet mode"),
 		),
 		mcp.WithString("timeout",
-			mcp.Description("Timeout for SBOM generation in CI (seconds)"),
+			mcp.Description("Timeout"),
 		),
 	)
 	s.AddTool(cicdPipelineIntegrationTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSyftModule(client)
+
+		// Get parameters
 		target := request.GetString("target", "")
-		args := []string{"syft", target}
-		
-		// Configure based on pipeline stage
-		pipelineStage := request.GetString("pipeline_stage", "build")
-		switch pipelineStage {
-		case "build":
-			args = append(args, "--output", "syft-json,cyclonedx-json")
-		case "test":
-			args = append(args, "--output", "syft-json")
-		case "staging", "production":
-			args = append(args, "--output", "spdx-json,cyclonedx-json")
-		case "release":
-			args = append(args, "--output", "spdx-json,cyclonedx-json,syft-json")
+		pipelineStage := request.GetString("pipeline_stage", "")
+		artifactName := request.GetString("artifact_name", "")
+		outputFormatsStr := request.GetString("output_formats", "")
+		var outputFormats []string
+		if outputFormatsStr != "" {
+			outputFormats = strings.Split(outputFormatsStr, ",")
 		}
-		
-		if outputFormats := request.GetString("output_formats", ""); outputFormats != "" {
-			args = append(args, "--output", outputFormats)
+		outputDirectory := request.GetString("output_directory", "")
+		failOnError := request.GetBool("fail_on_error", false)
+		quietMode := request.GetBool("quiet_mode", false)
+		timeout := request.GetString("timeout", "")
+
+		// CI/CD pipeline integration
+		output, err := module.CICDPipelineIntegration(ctx, target, pipelineStage, artifactName, outputFormats, outputDirectory, failOnError, quietMode, timeout)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Syft CI/CD pipeline integration failed: %v", err)), nil
 		}
-		if outputDirectory := request.GetString("output_directory", ""); outputDirectory != "" {
-			artifactName := request.GetString("artifact_name", "sbom")
-			args = append(args, "--file", outputDirectory+"/"+artifactName)
-		}
-		if request.GetBool("quiet_mode", false) {
-			args = append(args, "--quiet")
-		}
-		if timeout := request.GetString("timeout", ""); timeout != "" {
-			args = append(args, "--timeout", timeout+"s")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Syft metadata extraction and enrichment tool
+	// Syft metadata extraction tool
 	metadataExtractionTool := mcp.NewTool("syft_metadata_extraction",
-		mcp.WithDescription("Extract and enrich metadata for comprehensive SBOM generation"),
+		mcp.WithDescription("Metadata extraction using real Syft CLI"),
 		mcp.WithString("target",
 			mcp.Description("Target for metadata extraction"),
 			mcp.Required(),
 		),
 		mcp.WithString("metadata_types",
-			mcp.Description("Comma-separated metadata types to extract"),
+			mcp.Description("Comma-separated metadata types"),
 		),
 		mcp.WithString("output_format",
-			mcp.Description("Metadata-enriched SBOM format"),
-			mcp.Enum("syft-json", "cyclonedx-json", "spdx-json"),
+			mcp.Description("Output format"),
 		),
 		mcp.WithBoolean("include_file_metadata",
-			mcp.Description("Include file-level metadata"),
+			mcp.Description("Include file metadata"),
 		),
 		mcp.WithBoolean("include_checksums",
-			mcp.Description("Include file checksums/hashes"),
+			mcp.Description("Include checksums"),
 		),
 		mcp.WithBoolean("include_certificates",
-			mcp.Description("Include certificate information"),
+			mcp.Description("Include certificates"),
 		),
 		mcp.WithBoolean("include_signatures",
-			mcp.Description("Include digital signatures"),
+			mcp.Description("Include signatures"),
 		),
 		mcp.WithString("custom_annotations",
-			mcp.Description("JSON string of custom annotations to add"),
+			mcp.Description("Custom annotations"),
 		),
 	)
 	s.AddTool(metadataExtractionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		target := request.GetString("target", "")
-		args := []string{"syft", target}
-		
-		// Use syft-json for maximum metadata preservation
-		outputFormat := request.GetString("output_format", "syft-json")
-		args = append(args, "--output", outputFormat)
-		
-		// Enable all catalogers for comprehensive metadata
-		args = append(args, "--catalogers", "all")
-		args = append(args, "--scope", "AllLayers")
-		
-		if request.GetBool("include_file_metadata", false) {
-			// Enable file cataloger for file-level metadata
-			args = append(args, "--catalogers", "file-metadata")
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
-	})
+		defer client.Close()
 
-	// Syft performance benchmarking tool
-	performanceBenchmarkingTool := mcp.NewTool("syft_performance_benchmarking",
-		mcp.WithDescription("Benchmark Syft performance and generate optimization recommendations"),
-		mcp.WithString("target",
-			mcp.Description("Target for performance benchmarking"),
-			mcp.Required(),
-		),
-		mcp.WithString("benchmark_type",
-			mcp.Description("Type of performance benchmark"),
-			mcp.Enum("speed", "memory", "accuracy", "comprehensive"),
-		),
-		mcp.WithBoolean("enable_profiling",
-			mcp.Description("Enable detailed performance profiling"),
-		),
-		mcp.WithString("output_metrics_file",
-			mcp.Description("Output file for performance metrics"),
-		),
-		mcp.WithBoolean("compare_catalogers",
-			mcp.Description("Compare performance of different catalogers"),
-		),
-	)
-	s.AddTool(performanceBenchmarkingTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		target := request.GetString("target", "")
-		args := []string{"syft", target}
-		
-		// Add performance tracking flags
-		args = append(args, "--output", "syft-json")
-		
-		if request.GetBool("enable_profiling", false) {
-			args = append(args, "--verbose")
-		}
-		
-		if outputMetricsFile := request.GetString("output_metrics_file", ""); outputMetricsFile != "" {
-			args = append(args, "--file", outputMetricsFile)
-		}
-		
-		return executeShipCommand(args)
-	})
+		// Create module instance
+		module := modules.NewSyftModule(client)
 
-	// Syft get version tool
-	getVersionTool := mcp.NewTool("syft_get_version",
-		mcp.WithDescription("Get Syft version and capability information"),
-		mcp.WithBoolean("detailed",
-			mcp.Description("Include detailed capability information"),
-		),
-	)
-	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"syft", "--version"}
-		if request.GetBool("detailed", false) {
-			args = append(args, "--help")
+		// Get parameters
+		target := request.GetString("target", "")
+		metadataTypesStr := request.GetString("metadata_types", "")
+		var metadataTypes []string
+		if metadataTypesStr != "" {
+			metadataTypes = strings.Split(metadataTypesStr, ",")
 		}
-		return executeShipCommand(args)
+		outputFormat := request.GetString("output_format", "json")
+		includeFileMetadata := request.GetBool("include_file_metadata", false)
+		includeChecksums := request.GetBool("include_checksums", false)
+		includeCertificates := request.GetBool("include_certificates", false)
+		includeSignatures := request.GetBool("include_signatures", false)
+		customAnnotations := request.GetString("custom_annotations", "")
+
+		// Metadata extraction
+		output, err := module.MetadataExtraction(ctx, target, metadataTypes, outputFormat, includeFileMetadata, includeChecksums, includeCertificates, includeSignatures, customAnnotations)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Syft metadata extraction failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 }

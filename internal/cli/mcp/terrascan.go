@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddTerrascanTools adds Terrascan (IaC security scanner) MCP tool implementations using real terrascan CLI commands
+// AddTerrascanTools adds Terrascan (IaC security scanner) MCP tool implementations using direct Dagger calls
 func AddTerrascanTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addTerrascanToolsDirect(s)
+}
+
+// addTerrascanToolsDirect adds Terrascan tools using direct Dagger module calls
+func addTerrascanToolsDirect(s *server.MCPServer) {
 	// Terrascan scan directory tool
 	scanDirectoryTool := mcp.NewTool("terrascan_scan_directory",
 		mcp.WithDescription("Scan directory for IaC security issues using Terrascan"),
@@ -22,12 +31,26 @@ func AddTerrascanTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		),
 	)
 	s.AddTool(scanDirectoryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		directory := request.GetString("directory", "")
-		args := []string{"terrascan", "scan", "-d", directory}
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTerrascanModule(client)
+
+		// Get parameters
+		directory := request.GetString("directory", "")
+
+		// Scan directory
+		output, err := module.ScanDirectory(ctx, directory)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Terrascan directory scan failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Terrascan scan Terraform files tool
@@ -43,12 +66,26 @@ func AddTerrascanTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		),
 	)
 	s.AddTool(scanTerraformTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		directory := request.GetString("directory", "")
-		args := []string{"terrascan", "scan", "-i", "terraform", "-d", directory}
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTerrascanModule(client)
+
+		// Get parameters
+		directory := request.GetString("directory", "")
+
+		// Scan Terraform
+		output, err := module.ScanTerraform(ctx, directory)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Terrascan Terraform scan failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Terrascan scan Kubernetes manifests tool
@@ -64,12 +101,26 @@ func AddTerrascanTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		),
 	)
 	s.AddTool(scanKubernetesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		directory := request.GetString("directory", "")
-		args := []string{"terrascan", "scan", "-i", "k8s", "-d", directory}
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTerrascanModule(client)
+
+		// Get parameters
+		directory := request.GetString("directory", "")
+
+		// Scan Kubernetes
+		output, err := module.ScanKubernetes(ctx, directory)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Terrascan Kubernetes scan failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Terrascan scan with severity filter tool
@@ -90,13 +141,27 @@ func AddTerrascanTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		),
 	)
 	s.AddTool(scanWithSeverityTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTerrascanModule(client)
+
+		// Get parameters
 		directory := request.GetString("directory", "")
 		severity := request.GetString("severity", "")
-		args := []string{"terrascan", "scan", "-d", directory, "--severity", severity}
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
+
+		// Scan with severity
+		output, err := module.ScanWithSeverity(ctx, directory, severity, "")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Terrascan severity scan failed: %v", err)), nil
 		}
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Terrascan scan remote repository tool
@@ -116,15 +181,28 @@ func AddTerrascanTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		),
 	)
 	s.AddTool(scanRemoteTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTerrascanModule(client)
+
+		// Get parameters
 		repoURL := request.GetString("repo_url", "")
-		args := []string{"terrascan", "scan", "-r", repoURL}
-		if repoType := request.GetString("repo_type", ""); repoType != "" {
-			args = append(args, "--remote-type", repoType)
+		repoType := request.GetString("repo_type", "")
+		outputFormat := request.GetString("output_format", "json")
+
+		// Scan remote repository
+		output, err := module.ScanRemote(ctx, repoURL, repoType, outputFormat)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Terrascan remote scan failed: %v", err)), nil
 		}
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
-		}
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Terrascan scan with policy path tool
@@ -144,13 +222,28 @@ func AddTerrascanTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		),
 	)
 	s.AddTool(scanWithPolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTerrascanModule(client)
+
+		// Get parameters
 		directory := request.GetString("directory", "")
 		policyPath := request.GetString("policy_path", "")
-		args := []string{"terrascan", "scan", "-d", directory, "--policy-path", policyPath}
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
+		outputFormat := request.GetString("output_format", "json")
+
+		// Scan with custom policy
+		output, err := module.ScanWithPolicy(ctx, directory, policyPath, outputFormat)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Terrascan policy scan failed: %v", err)), nil
 		}
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Terrascan comprehensive IaC security scanning tool
@@ -190,33 +283,34 @@ func AddTerrascanTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		),
 	)
 	s.AddTool(comprehensiveIaCScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTerrascanModule(client)
+
+		// Get parameters
 		target := request.GetString("target", "")
 		iacType := request.GetString("iac_type", "")
-		args := []string{"terrascan", "scan", "-i", iacType, "-d", target}
-		
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "-o", outputFormat)
+		outputFormat := request.GetString("output_format", "json")
+		outputFile := request.GetString("output_file", "")
+		severityThreshold := request.GetString("severity_threshold", "")
+		policyTypes := request.GetString("policy_types", "")
+		excludeRules := request.GetString("exclude_rules", "")
+		verbose := request.GetBool("verbose", false)
+		showPassed := request.GetBool("show_passed", false)
+
+		// Comprehensive IaC scan
+		output, err := module.ComprehensiveIaCScan(ctx, target, iacType, outputFormat, outputFile, severityThreshold, policyTypes, excludeRules, verbose, showPassed)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Terrascan comprehensive scan failed: %v", err)), nil
 		}
-		if outputFile := request.GetString("output_file", ""); outputFile != "" {
-			args = append(args, "--output-file", outputFile)
-		}
-		if severityThreshold := request.GetString("severity_threshold", ""); severityThreshold != "" {
-			args = append(args, "--severity", severityThreshold)
-		}
-		if policyTypes := request.GetString("policy_types", ""); policyTypes != "" {
-			args = append(args, "--policy-type", policyTypes)
-		}
-		if excludeRules := request.GetString("exclude_rules", ""); excludeRules != "" {
-			args = append(args, "--skip-rules", excludeRules)
-		}
-		if request.GetBool("verbose", false) {
-			args = append(args, "-v")
-		}
-		if request.GetBool("show_passed", false) {
-			args = append(args, "--show-passed")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Terrascan compliance framework scanning tool
@@ -247,22 +341,31 @@ func AddTerrascanTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		),
 	)
 	s.AddTool(complianceFrameworkScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTerrascanModule(client)
+
+		// Get parameters
 		target := request.GetString("target", "")
 		complianceFramework := request.GetString("compliance_framework", "")
 		iacType := request.GetString("iac_type", "terraform")
-		args := []string{"terrascan", "scan", "-i", iacType, "-d", target, "--policy-type", complianceFramework}
-		
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "-o", outputFormat)
+		outputFormat := request.GetString("output_format", "json")
+		outputFile := request.GetString("output_file", "")
+		includeSeverityDetails := request.GetBool("include_severity_details", false)
+
+		// Compliance framework scan
+		output, err := module.ComplianceFrameworkScan(ctx, target, complianceFramework, iacType, outputFormat, outputFile, includeSeverityDetails)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Terrascan compliance scan failed: %v", err)), nil
 		}
-		if outputFile := request.GetString("output_file", ""); outputFile != "" {
-			args = append(args, "--output-file", outputFile)
-		}
-		if request.GetBool("include_severity_details", false) {
-			args = append(args, "--show-passed", "-v")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Terrascan remote repository scanning tool
@@ -298,28 +401,33 @@ func AddTerrascanTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		),
 	)
 	s.AddTool(remoteRepositoryScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTerrascanModule(client)
+
+		// Get parameters
 		repoURL := request.GetString("repository_url", "")
 		repoType := request.GetString("repository_type", "git")
 		iacType := request.GetString("iac_type", "terraform")
-		args := []string{"terrascan", "scan", "-r", repoURL, "-t", repoType, "-i", iacType}
-		
-		if branch := request.GetString("branch", ""); branch != "" {
-			args = append(args, "--remote-branch", branch)
+		branch := request.GetString("branch", "")
+		sshKeyPath := request.GetString("ssh_key_path", "")
+		accessToken := request.GetString("access_token", "")
+		configPath := request.GetString("config_path", "")
+		outputFormat := request.GetString("output_format", "json")
+
+		// Remote repository scan
+		output, err := module.RemoteRepositoryScan(ctx, repoURL, repoType, iacType, branch, sshKeyPath, accessToken, configPath, outputFormat)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Terrascan remote repository scan failed: %v", err)), nil
 		}
-		if sshKeyPath := request.GetString("ssh_key_path", ""); sshKeyPath != "" {
-			args = append(args, "--ssh-key", sshKeyPath)
-		}
-		if accessToken := request.GetString("access_token", ""); accessToken != "" {
-			args = append(args, "--access-token", accessToken)
-		}
-		if configPath := request.GetString("config_path", ""); configPath != "" {
-			args = append(args, "-c", configPath)
-		}
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "-o", outputFormat)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Terrascan custom policy management tool
@@ -345,31 +453,30 @@ func AddTerrascanTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		),
 	)
 	s.AddTool(customPolicyManagementTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		action := request.GetString("action", "")
-		
-		switch action {
-		case "validate":
-			policyPath := request.GetString("policy_path", "")
-			args := []string{"terrascan", "init", "--policy-path", policyPath}
-			return executeShipCommand(args)
-		case "test":
-			policyPath := request.GetString("policy_path", "")
-			testDataPath := request.GetString("test_data_path", "")
-			args := []string{"terrascan", "scan", "--policy-path", policyPath, "-d", testDataPath}
-			return executeShipCommand(args)
-		case "list":
-			args := []string{"terrascan", "--help"}
-			return executeShipCommand(args)
-		case "scan-with-custom":
-			target := request.GetString("target", "")
-			policyPath := request.GetString("policy_path", "")
-			iacType := request.GetString("iac_type", "terraform")
-			args := []string{"terrascan", "scan", "-i", iacType, "-d", target, "--policy-path", policyPath}
-			return executeShipCommand(args)
-		default:
-			args := []string{"terrascan", "--help"}
-			return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTerrascanModule(client)
+
+		// Get parameters
+		action := request.GetString("action", "")
+		policyPath := request.GetString("policy_path", "")
+		target := request.GetString("target", "")
+		iacType := request.GetString("iac_type", "terraform")
+		testDataPath := request.GetString("test_data_path", "")
+
+		// Custom policy management
+		output, err := module.CustomPolicyManagement(ctx, action, policyPath, target, iacType, testDataPath)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Terrascan custom policy management failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Terrascan CI/CD pipeline integration tool
@@ -410,43 +517,34 @@ func AddTerrascanTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		),
 	)
 	s.AddTool(cicdPipelineIntegrationTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTerrascanModule(client)
+
+		// Get parameters
 		target := request.GetString("target", "")
 		iacType := request.GetString("iac_type", "")
-		args := []string{"terrascan", "scan", "-i", iacType, "-d", target}
-		
-		// Configure based on pipeline stage and gate policy
 		pipelineStage := request.GetString("pipeline_stage", "build")
 		gatePolicy := request.GetString("gate_policy", "standard")
-		
-		switch pipelineStage {
-		case "pre-commit":
-			if gatePolicy == "strict" {
-				args = append(args, "--severity", "MEDIUM")
-			} else {
-				args = append(args, "--severity", "HIGH")
-			}
-		case "build":
-			args = append(args, "--severity", "HIGH")
-		case "test":
-			args = append(args, "--severity", "MEDIUM")
-		case "staging", "production":
-			args = append(args, "--severity", "LOW")
+		outputFormat := request.GetString("output_format", "json")
+		outputFile := request.GetString("output_file", "")
+		failOnViolations := request.GetBool("fail_on_violations", false)
+		baselineFile := request.GetString("baseline_file", "")
+		quietMode := request.GetBool("quiet_mode", false)
+
+		// CI/CD pipeline integration
+		output, err := module.CICDPipelineIntegration(ctx, target, iacType, pipelineStage, gatePolicy, outputFormat, outputFile, failOnViolations, baselineFile, quietMode)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Terrascan CI/CD integration failed: %v", err)), nil
 		}
-		
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "-o", outputFormat)
-		}
-		if outputFile := request.GetString("output_file", ""); outputFile != "" {
-			args = append(args, "--output-file", outputFile)
-		}
-		if baselineFile := request.GetString("baseline_file", ""); baselineFile != "" {
-			args = append(args, "--baseline", baselineFile)
-		}
-		if request.GetBool("quiet_mode", false) {
-			args = append(args, "--quiet")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Terrascan cloud provider specific scanning tool
@@ -480,25 +578,32 @@ func AddTerrascanTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		),
 	)
 	s.AddTool(cloudProviderScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTerrascanModule(client)
+
+		// Get parameters
 		target := request.GetString("target", "")
 		cloudProvider := request.GetString("cloud_provider", "")
 		iacType := request.GetString("iac_type", "terraform")
-		args := []string{"terrascan", "scan", "-i", iacType, "-d", target, "--policy-type", cloudProvider}
-		
-		if securityCategories := request.GetString("security_categories", ""); securityCategories != "" {
-			args = append(args, "--categories", securityCategories)
+		securityCategories := request.GetString("security_categories", "")
+		serviceFocus := request.GetString("service_focus", "")
+		includeBestPractices := request.GetBool("include_best_practices", false)
+		outputFormat := request.GetString("output_format", "json")
+
+		// Cloud provider scan
+		output, err := module.CloudProviderScan(ctx, target, cloudProvider, iacType, securityCategories, serviceFocus, includeBestPractices, outputFormat)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Terrascan cloud provider scan failed: %v", err)), nil
 		}
-		if serviceFocus := request.GetString("service_focus", ""); serviceFocus != "" {
-			args = append(args, "--services", serviceFocus)
-		}
-		if request.GetBool("include_best_practices", false) {
-			args = append(args, "--include-best-practices")
-		}
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "-o", outputFormat)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Terrascan performance optimization tool
@@ -537,40 +642,34 @@ func AddTerrascanTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		),
 	)
 	s.AddTool(performanceOptimizationTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTerrascanModule(client)
+
+		// Get parameters
 		target := request.GetString("target", "")
 		iacType := request.GetString("iac_type", "")
-		args := []string{"terrascan", "scan", "-i", iacType, "-d", target}
-		
 		scanMode := request.GetString("scan_mode", "balanced")
-		switch scanMode {
-		case "fast":
-			args = append(args, "--severity", "HIGH", "--skip-rules", "low-priority")
-		case "thorough":
-			args = append(args, "--severity", "LOW", "--show-passed")
-		case "balanced":
-			args = append(args, "--severity", "MEDIUM")
+		parallelWorkers := request.GetString("parallel_workers", "")
+		maxFileSize := request.GetString("max_file_size", "")
+		skipLargeFiles := request.GetBool("skip_large_files", false)
+		enableCaching := request.GetBool("enable_caching", false)
+		excludeDirs := request.GetString("exclude_dirs", "")
+		enableMetrics := request.GetBool("enable_metrics", false)
+
+		// Performance optimization scan
+		output, err := module.PerformanceOptimization(ctx, target, iacType, scanMode, parallelWorkers, maxFileSize, skipLargeFiles, enableCaching, excludeDirs, enableMetrics)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Terrascan performance optimization failed: %v", err)), nil
 		}
-		
-		if parallelWorkers := request.GetString("parallel_workers", ""); parallelWorkers != "" {
-			args = append(args, "--workers", parallelWorkers)
-		}
-		if maxFileSize := request.GetString("max_file_size", ""); maxFileSize != "" {
-			args = append(args, "--max-file-size", maxFileSize)
-		}
-		if request.GetBool("skip_large_files", false) {
-			args = append(args, "--skip-large-files")
-		}
-		if request.GetBool("enable_caching", false) {
-			args = append(args, "--cache")
-		}
-		if excludeDirs := request.GetString("exclude_dirs", ""); excludeDirs != "" {
-			args = append(args, "--exclude-dirs", excludeDirs)
-		}
-		if request.GetBool("enable_metrics", false) {
-			args = append(args, "--metrics")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Terrascan comprehensive reporting tool
@@ -610,40 +709,34 @@ func AddTerrascanTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		),
 	)
 	s.AddTool(comprehensiveReportingTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTerrascanModule(client)
+
+		// Get parameters
 		target := request.GetString("target", "")
 		iacType := request.GetString("iac_type", "")
 		reportType := request.GetString("report_type", "")
-		args := []string{"terrascan", "scan", "-i", iacType, "-d", target}
-		
-		// Configure report-specific settings
-		switch reportType {
-		case "executive-summary":
-			args = append(args, "--severity", "HIGH", "-o", "html")
-		case "technical-detail":
-			args = append(args, "--severity", "LOW", "--show-passed", "-o", "json")
-		case "compliance-audit":
-			args = append(args, "--policy-type", "all", "-o", "sarif")
-		case "risk-assessment":
-			args = append(args, "--severity", "MEDIUM", "-o", "yaml")
+		outputFormats := request.GetString("output_formats", "")
+		outputDirectory := request.GetString("output_directory", "")
+		includeRemediation := request.GetBool("include_remediation", false)
+		includeTrends := request.GetBool("include_trends", false)
+		baselineComparison := request.GetString("baseline_comparison", "")
+		includePolicyDetails := request.GetBool("include_policy_details", false)
+
+		// Comprehensive reporting
+		output, err := module.ComprehensiveReporting(ctx, target, iacType, reportType, outputFormats, outputDirectory, includeRemediation, includeTrends, baselineComparison, includePolicyDetails)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Terrascan comprehensive reporting failed: %v", err)), nil
 		}
-		
-		if outputFormats := request.GetString("output_formats", ""); outputFormats != "" {
-			args = append(args, "-o", outputFormats)
-		}
-		if outputDirectory := request.GetString("output_directory", ""); outputDirectory != "" {
-			args = append(args, "--output-file", outputDirectory+"/terrascan-report")
-		}
-		if request.GetBool("include_remediation", false) {
-			args = append(args, "--include-remediation")
-		}
-		if request.GetBool("include_policy_details", false) {
-			args = append(args, "-v")
-		}
-		if baselineComparison := request.GetString("baseline_comparison", ""); baselineComparison != "" {
-			args = append(args, "--baseline", baselineComparison)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Terrascan get version tool
@@ -654,10 +747,22 @@ func AddTerrascanTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"terrascan", "version"}
-		if request.GetBool("show_supported_types", false) {
-			args = append(args, "--list")
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewTerrascanModule(client)
+
+		// Get version
+		output, err := module.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Terrascan get version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 }

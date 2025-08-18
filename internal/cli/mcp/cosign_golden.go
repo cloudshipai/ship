@@ -7,187 +7,221 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddCosignGoldenTools adds Cosign Golden (advanced signing workflows) MCP tool implementations
-func AddCosignGoldenTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// Cosign sign keyless tool
-	signKeylessTool := mcp.NewTool("cosign_golden_sign_keyless",
+// AddCosignAdvancedTools adds advanced Cosign workflows using real CLI capabilities
+func AddCosignAdvancedTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Cosign keyless signing with OIDC
+	signKeylessTool := mcp.NewTool("cosign_advanced_sign_keyless",
 		mcp.WithDescription("Sign container image using keyless signing with OIDC"),
 		mcp.WithString("image_ref",
 			mcp.Description("Container image reference to sign"),
 			mcp.Required(),
 		),
-		mcp.WithString("identity",
-			mcp.Description("OIDC identity for keyless signing"),
-			mcp.Required(),
+		mcp.WithString("identity_regex",
+			mcp.Description("Identity regex for verification"),
 		),
 		mcp.WithString("issuer",
-			mcp.Description("OIDC issuer for keyless signing"),
-			mcp.Required(),
+			mcp.Description("OIDC issuer URL"),
 		),
 	)
 	s.AddTool(signKeylessTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		imageRef := request.GetString("image_ref", "")
-		identity := request.GetString("identity", "")
-		issuer := request.GetString("issuer", "")
-		args := []string{"security", "cosign-golden", "--sign-keyless", imageRef, "--identity", identity, "--issuer", issuer}
+		args := []string{"cosign", "sign", imageRef}
 		return executeShipCommand(args)
 	})
 
-	// Cosign verify keyless tool
-	verifyKeylessTool := mcp.NewTool("cosign_golden_verify_keyless",
-		mcp.WithDescription("Verify container image signature using keyless verification"),
+	// Cosign verify with certificate identity
+	verifyIdentityTool := mcp.NewTool("cosign_advanced_verify_identity",
+		mcp.WithDescription("Verify container image signature with certificate identity"),
 		mcp.WithString("image_ref",
 			mcp.Description("Container image reference to verify"),
 			mcp.Required(),
 		),
-		mcp.WithString("identity",
-			mcp.Description("OIDC identity for keyless verification"),
-			mcp.Required(),
+		mcp.WithString("certificate_identity",
+			mcp.Description("Certificate identity to verify"),
 		),
-		mcp.WithString("issuer",
-			mcp.Description("OIDC issuer for keyless verification"),
-			mcp.Required(),
+		mcp.WithString("certificate_identity_regexp",
+			mcp.Description("Certificate identity regex pattern"),
 		),
-	)
-	s.AddTool(verifyKeylessTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		imageRef := request.GetString("image_ref", "")
-		identity := request.GetString("identity", "")
-		issuer := request.GetString("issuer", "")
-		args := []string{"security", "cosign-golden", "--verify-keyless", imageRef, "--identity", identity, "--issuer", issuer}
-		return executeShipCommand(args)
-	})
-
-	// Cosign sign golden pipeline tool
-	signGoldenPipelineTool := mcp.NewTool("cosign_golden_sign_pipeline",
-		mcp.WithDescription("Sign container image using golden pipeline workflow"),
-		mcp.WithString("image_ref",
-			mcp.Description("Container image reference to sign"),
-			mcp.Required(),
-		),
-		mcp.WithString("build_metadata",
-			mcp.Description("Build metadata JSON string"),
-		),
-		mcp.WithString("security_attestations",
-			mcp.Description("Security attestations JSON string"),
+		mcp.WithString("certificate_oidc_issuer",
+			mcp.Description("Certificate OIDC issuer"),
 		),
 	)
-	s.AddTool(signGoldenPipelineTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	s.AddTool(verifyIdentityTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		imageRef := request.GetString("image_ref", "")
-		args := []string{"security", "cosign-golden", "--sign-pipeline", imageRef}
-		if buildMetadata := request.GetString("build_metadata", ""); buildMetadata != "" {
-			args = append(args, "--build-metadata", buildMetadata)
+		args := []string{"cosign", "verify"}
+		
+		if certIdentity := request.GetString("certificate_identity", ""); certIdentity != "" {
+			args = append(args, "--certificate-identity", certIdentity)
 		}
-		if securityAttestations := request.GetString("security_attestations", ""); securityAttestations != "" {
-			args = append(args, "--security-attestations", securityAttestations)
+		if certIdentityRegexp := request.GetString("certificate_identity_regexp", ""); certIdentityRegexp != "" {
+			args = append(args, "--certificate-identity-regexp", certIdentityRegexp)
 		}
+		if certOidcIssuer := request.GetString("certificate_oidc_issuer", ""); certOidcIssuer != "" {
+			args = append(args, "--certificate-oidc-issuer", certOidcIssuer)
+		}
+		
+		args = append(args, imageRef)
 		return executeShipCommand(args)
 	})
 
-	// Cosign generate attestation tool
-	generateAttestationTool := mcp.NewTool("cosign_golden_generate_attestation",
-		mcp.WithDescription("Generate attestation for container image"),
-		mcp.WithString("image_ref",
-			mcp.Description("Container image reference"),
+	// Cosign upload eBPF program
+	uploadEbpfTool := mcp.NewTool("cosign_advanced_upload_ebpf",
+		mcp.WithDescription("Upload eBPF program to OCI registry"),
+		mcp.WithString("ebpf_path",
+			mcp.Description("Path to eBPF program file"),
 			mcp.Required(),
 		),
-		mcp.WithString("attestation_type",
-			mcp.Description("Type of attestation (slsa, spdx, vuln, etc.)"),
-			mcp.Required(),
-		),
-		mcp.WithString("predicate_data",
-			mcp.Description("Predicate data for attestation"),
+		mcp.WithString("registry_url",
+			mcp.Description("OCI registry URL"),
 			mcp.Required(),
 		),
 	)
-	s.AddTool(generateAttestationTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		imageRef := request.GetString("image_ref", "")
-		attestationType := request.GetString("attestation_type", "")
-		predicateData := request.GetString("predicate_data", "")
-		args := []string{"security", "cosign-golden", "--generate-attestation", imageRef, "--type", attestationType, "--predicate", predicateData}
+	s.AddTool(uploadEbpfTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		ebpfPath := request.GetString("ebpf_path", "")
+		registryUrl := request.GetString("registry_url", "")
+		args := []string{"cosign", "upload", "blob", "-f", ebpfPath, registryUrl}
 		return executeShipCommand(args)
 	})
 
-	// Cosign verify attestation tool
-	verifyAttestationTool := mcp.NewTool("cosign_golden_verify_attestation",
-		mcp.WithDescription("Verify attestation for container image"),
+	// Cosign attest with predicate type
+	attestWithTypeTool := mcp.NewTool("cosign_advanced_attest_type",
+		mcp.WithDescription("Create attestation with specific predicate type"),
 		mcp.WithString("image_ref",
 			mcp.Description("Container image reference"),
 			mcp.Required(),
 		),
-		mcp.WithString("attestation_type",
-			mcp.Description("Type of attestation to verify"),
+		mcp.WithString("predicate_type",
+			mcp.Description("Predicate type URI (e.g., https://slsa.dev/provenance/v0.2)"),
 			mcp.Required(),
 		),
-		mcp.WithString("identity",
-			mcp.Description("OIDC identity for verification"),
+		mcp.WithString("predicate_file",
+			mcp.Description("Path to predicate JSON file"),
 			mcp.Required(),
 		),
-		mcp.WithString("issuer",
-			mcp.Description("OIDC issuer for verification"),
-			mcp.Required(),
+		mcp.WithString("key",
+			mcp.Description("Path to signing key"),
 		),
 	)
-	s.AddTool(verifyAttestationTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	s.AddTool(attestWithTypeTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		imageRef := request.GetString("image_ref", "")
-		attestationType := request.GetString("attestation_type", "")
-		identity := request.GetString("identity", "")
-		issuer := request.GetString("issuer", "")
-		args := []string{"security", "cosign-golden", "--verify-attestation", imageRef, "--type", attestationType, "--identity", identity, "--issuer", issuer}
-		return executeShipCommand(args)
-	})
-
-	// Cosign copy signatures tool
-	copySignaturesTool := mcp.NewTool("cosign_golden_copy_signatures",
-		mcp.WithDescription("Copy signatures from source to destination image"),
-		mcp.WithString("source_ref",
-			mcp.Description("Source container image reference"),
-			mcp.Required(),
-		),
-		mcp.WithString("destination_ref",
-			mcp.Description("Destination container image reference"),
-			mcp.Required(),
-		),
-		mcp.WithBoolean("force",
-			mcp.Description("Force copy even if destination has signatures"),
-		),
-	)
-	s.AddTool(copySignaturesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		sourceRef := request.GetString("source_ref", "")
-		destinationRef := request.GetString("destination_ref", "")
-		args := []string{"security", "cosign-golden", "--copy", sourceRef, destinationRef}
-		if force := request.GetBool("force", false); force {
-			args = append(args, "--force")
+		predicateType := request.GetString("predicate_type", "")
+		predicateFile := request.GetString("predicate_file", "")
+		
+		args := []string{"cosign", "attest", "--predicate", predicateFile, "--type", predicateType}
+		
+		if key := request.GetString("key", ""); key != "" {
+			args = append(args, "--key", key)
 		}
+		
+		args = append(args, imageRef)
 		return executeShipCommand(args)
 	})
 
-	// Cosign tree view tool
-	treeViewTool := mcp.NewTool("cosign_golden_tree_view",
-		mcp.WithDescription("Display tree view of image signatures and attestations"),
+	// Cosign verify attestation with type and policy
+	verifyAttestationAdvancedTool := mcp.NewTool("cosign_advanced_verify_attestation",
+		mcp.WithDescription("Verify attestation with specific type and policy"),
 		mcp.WithString("image_ref",
 			mcp.Description("Container image reference"),
 			mcp.Required(),
 		),
-		mcp.WithString("output_format",
-			mcp.Description("Output format (text, json)"),
-			mcp.Enum("text", "json"),
+		mcp.WithString("type",
+			mcp.Description("Attestation type to verify"),
+		),
+		mcp.WithString("policy",
+			mcp.Description("Policy file path for verification"),
+		),
+		mcp.WithString("key",
+			mcp.Description("Public key for verification"),
 		),
 	)
-	s.AddTool(treeViewTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	s.AddTool(verifyAttestationAdvancedTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		imageRef := request.GetString("image_ref", "")
-		args := []string{"security", "cosign-golden", "--tree", imageRef}
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "--format", outputFormat)
+		args := []string{"cosign", "verify-attestation"}
+		
+		if attestationType := request.GetString("type", ""); attestationType != "" {
+			args = append(args, "--type", attestationType)
 		}
+		if policy := request.GetString("policy", ""); policy != "" {
+			args = append(args, "--policy", policy)
+		}
+		if key := request.GetString("key", ""); key != "" {
+			args = append(args, "--key", key)
+		}
+		
+		args = append(args, imageRef)
 		return executeShipCommand(args)
 	})
 
-	// Cosign get version tool
-	getVersionTool := mcp.NewTool("cosign_golden_get_version",
-		mcp.WithDescription("Get Cosign Golden version information"),
+	// Cosign verify with offline bundle
+	verifyOfflineTool := mcp.NewTool("cosign_advanced_verify_offline",
+		mcp.WithDescription("Verify signatures using offline bundle"),
+		mcp.WithString("image_ref",
+			mcp.Description("Container image reference"),
+			mcp.Required(),
+		),
+		mcp.WithString("bundle",
+			mcp.Description("Path to offline bundle file"),
+			mcp.Required(),
+		),
+		mcp.WithString("certificate_identity",
+			mcp.Description("Certificate identity to verify"),
+		),
+		mcp.WithString("certificate_oidc_issuer",
+			mcp.Description("Certificate OIDC issuer"),
+		),
 	)
-	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "cosign-golden", "--version"}
+	s.AddTool(verifyOfflineTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		imageRef := request.GetString("image_ref", "")
+		bundle := request.GetString("bundle", "")
+		
+		args := []string{"cosign", "verify", "--bundle", bundle}
+		
+		if certIdentity := request.GetString("certificate_identity", ""); certIdentity != "" {
+			args = append(args, "--certificate-identity", certIdentity)
+		}
+		if certOidcIssuer := request.GetString("certificate_oidc_issuer", ""); certOidcIssuer != "" {
+			args = append(args, "--certificate-oidc-issuer", certOidcIssuer)
+		}
+		
+		args = append(args, imageRef)
+		return executeShipCommand(args)
+	})
+
+	// Cosign triangulate signatures
+	triangulateTool := mcp.NewTool("cosign_advanced_triangulate",
+		mcp.WithDescription("Get signature image reference for a given image"),
+		mcp.WithString("image_ref",
+			mcp.Description("Container image reference"),
+			mcp.Required(),
+		),
+	)
+	s.AddTool(triangulateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		imageRef := request.GetString("image_ref", "")
+		args := []string{"cosign", "triangulate", imageRef}
+		return executeShipCommand(args)
+	})
+
+	// Cosign clean signatures
+	cleanTool := mcp.NewTool("cosign_advanced_clean",
+		mcp.WithDescription("Clean signatures from a given image"),
+		mcp.WithString("image_ref",
+			mcp.Description("Container image reference"),
+			mcp.Required(),
+		),
+		mcp.WithString("type",
+			mcp.Description("Type of signatures to clean (signature, attestation, sbom, all)"),
+			mcp.Enum("signature", "attestation", "sbom", "all"),
+		),
+	)
+	s.AddTool(cleanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		imageRef := request.GetString("image_ref", "")
+		args := []string{"cosign", "clean"}
+		
+		if cleanType := request.GetString("type", ""); cleanType != "" {
+			args = append(args, "--type", cleanType)
+		}
+		
+		args = append(args, imageRef)
 		return executeShipCommand(args)
 	})
 }

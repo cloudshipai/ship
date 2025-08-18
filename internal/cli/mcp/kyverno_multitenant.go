@@ -2,117 +2,155 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddKyvernoMultitenantTools adds Kyverno multi-tenant policy MCP tool implementations
+// AddKyvernoMultitenantTools adds Kyverno multi-tenant policy MCP tool implementations using real CLI commands
 func AddKyvernoMultitenantTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// Kyverno multitenant setup tool
-	setupTool := mcp.NewTool("kyverno_multitenant_setup",
-		mcp.WithDescription("Setup Kyverno for multi-tenant environment"),
+	// Create tenant namespace with labels
+	createTenantNamespaceTool := mcp.NewTool("kyverno_multitenant_create_namespace",
+		mcp.WithDescription("Create namespace for tenant with appropriate labels using kubectl"),
 		mcp.WithString("tenant_name",
 			mcp.Description("Name of the tenant"),
 			mcp.Required(),
 		),
-		mcp.WithString("namespace_prefix",
-			mcp.Description("Namespace prefix for tenant"),
+		mcp.WithString("namespace",
+			mcp.Description("Namespace name for the tenant"),
 			mcp.Required(),
 		),
 	)
-	s.AddTool(setupTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	s.AddTool(createTenantNamespaceTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		tenantName := request.GetString("tenant_name", "")
-		namespacePrefix := request.GetString("namespace_prefix", "")
-		args := []string{"kubernetes", "kyverno-multitenant", "setup", tenantName, "--namespace-prefix", namespacePrefix}
-		return executeShipCommand(args)
-	})
-
-	// Kyverno multitenant create policies tool
-	createPolicesTool := mcp.NewTool("kyverno_multitenant_create_policies",
-		mcp.WithDescription("Create tenant-specific Kyverno policies"),
-		mcp.WithString("tenant_name",
-			mcp.Description("Name of the tenant"),
-			mcp.Required(),
-		),
-		mcp.WithString("policy_set",
-			mcp.Description("Policy set to apply (basic, strict, custom)"),
-			mcp.Required(),
-		),
-	)
-	s.AddTool(createPolicesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		tenantName := request.GetString("tenant_name", "")
-		policySet := request.GetString("policy_set", "")
-		args := []string{"kubernetes", "kyverno-multitenant", "create-policies", tenantName, "--policy-set", policySet}
-		return executeShipCommand(args)
-	})
-
-	// Kyverno multitenant isolate resources tool
-	isolateResourcesTool := mcp.NewTool("kyverno_multitenant_isolate_resources",
-		mcp.WithDescription("Create resource isolation policies for tenant"),
-		mcp.WithString("tenant_name",
-			mcp.Description("Name of the tenant"),
-			mcp.Required(),
-		),
-		mcp.WithString("resource_types",
-			mcp.Description("Comma-separated list of resource types to isolate"),
-		),
-	)
-	s.AddTool(isolateResourcesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		tenantName := request.GetString("tenant_name", "")
-		args := []string{"kubernetes", "kyverno-multitenant", "isolate", tenantName}
-		if resourceTypes := request.GetString("resource_types", ""); resourceTypes != "" {
-			args = append(args, "--resources", resourceTypes)
+		namespace := request.GetString("namespace", "")
+		
+		// Create namespace with tenant label
+		args := []string{"kubectl", "create", "namespace", namespace}
+		result, err := executeShipCommand(args)
+		if err != nil {
+			return result, err
 		}
+		
+		// Label the namespace with tenant information
+		labelArgs := []string{"kubectl", "label", "namespace", namespace, 
+			fmt.Sprintf("tenant=%s", tenantName),
+			fmt.Sprintf("kyverno.io/tenant=%s", tenantName)}
+		return executeShipCommand(labelArgs)
+	})
+
+	// Apply namespace isolation policy
+	applyNamespaceIsolationTool := mcp.NewTool("kyverno_multitenant_namespace_isolation",
+		mcp.WithDescription("Apply Kyverno policy for namespace isolation using kubectl"),
+		mcp.WithString("policy_file",
+			mcp.Description("Path to namespace isolation policy YAML file"),
+			mcp.Required(),
+		),
+	)
+	s.AddTool(applyNamespaceIsolationTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		policyFile := request.GetString("policy_file", "")
+		args := []string{"kubectl", "apply", "-f", policyFile}
 		return executeShipCommand(args)
 	})
 
-	// Kyverno multitenant enforce quotas tool
-	enforceQuotasTool := mcp.NewTool("kyverno_multitenant_enforce_quotas",
-		mcp.WithDescription("Enforce resource quotas for tenant"),
-		mcp.WithString("tenant_name",
-			mcp.Description("Name of the tenant"),
+	// Create ResourceQuota for tenant
+	createResourceQuotaTool := mcp.NewTool("kyverno_multitenant_create_quota",
+		mcp.WithDescription("Create ResourceQuota for tenant namespace using kubectl"),
+		mcp.WithString("namespace",
+			mcp.Description("Tenant namespace"),
 			mcp.Required(),
 		),
 		mcp.WithString("cpu_limit",
-			mcp.Description("CPU limit for tenant (e.g., 4, 8)"),
+			mcp.Description("CPU limit (e.g., '4')"),
 		),
 		mcp.WithString("memory_limit",
-			mcp.Description("Memory limit for tenant (e.g., 8Gi, 16Gi)"),
+			mcp.Description("Memory limit (e.g., '8Gi')"),
+		),
+		mcp.WithString("pods_limit",
+			mcp.Description("Maximum number of pods"),
 		),
 	)
-	s.AddTool(enforceQuotasTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		tenantName := request.GetString("tenant_name", "")
-		args := []string{"kubernetes", "kyverno-multitenant", "enforce-quotas", tenantName}
-		if cpuLimit := request.GetString("cpu_limit", ""); cpuLimit != "" {
-			args = append(args, "--cpu", cpuLimit)
+	s.AddTool(createResourceQuotaTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		namespace := request.GetString("namespace", "")
+		
+		// Build ResourceQuota YAML
+		quotaYAML := fmt.Sprintf(`
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: tenant-quota
+  namespace: %s
+spec:
+  hard:`, namespace)
+		
+		if cpu := request.GetString("cpu_limit", ""); cpu != "" {
+			quotaYAML += fmt.Sprintf("\n    requests.cpu: '%s'", cpu)
+			quotaYAML += fmt.Sprintf("\n    limits.cpu: '%s'", cpu)
 		}
-		if memoryLimit := request.GetString("memory_limit", ""); memoryLimit != "" {
-			args = append(args, "--memory", memoryLimit)
+		if memory := request.GetString("memory_limit", ""); memory != "" {
+			quotaYAML += fmt.Sprintf("\n    requests.memory: %s", memory)
+			quotaYAML += fmt.Sprintf("\n    limits.memory: %s", memory)
 		}
+		if pods := request.GetString("pods_limit", ""); pods != "" {
+			quotaYAML += fmt.Sprintf("\n    pods: '%s'", pods)
+		}
+		
+		// Apply using kubectl with inline YAML
+		args := []string{"sh", "-c", fmt.Sprintf("echo '%s' | kubectl apply -f -", quotaYAML)}
 		return executeShipCommand(args)
 	})
 
-	// Kyverno multitenant validate tenant tool
-	validateTenantTool := mcp.NewTool("kyverno_multitenant_validate_tenant",
-		mcp.WithDescription("Validate tenant configuration and policies"),
-		mcp.WithString("tenant_name",
-			mcp.Description("Name of the tenant to validate"),
+	// Apply Kyverno generate policy for automatic resource creation
+	applyGeneratePolicyTool := mcp.NewTool("kyverno_multitenant_generate_policy",
+		mcp.WithDescription("Apply Kyverno generate policy for automatic resource creation in tenant namespaces"),
+		mcp.WithString("policy_file",
+			mcp.Description("Path to Kyverno generate policy file"),
 			mcp.Required(),
 		),
 	)
-	s.AddTool(validateTenantTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		tenantName := request.GetString("tenant_name", "")
-		args := []string{"kubernetes", "kyverno-multitenant", "validate", tenantName}
+	s.AddTool(applyGeneratePolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		policyFile := request.GetString("policy_file", "")
+		
+		// First validate the policy
+		validateArgs := []string{"kyverno", "apply", policyFile, "--dry-run"}
+		_, err := executeShipCommand(validateArgs)
+		if err != nil {
+			return nil, fmt.Errorf("policy validation failed: %v", err)
+		}
+		
+		// Apply the policy to cluster
+		args := []string{"kubectl", "apply", "-f", policyFile}
 		return executeShipCommand(args)
 	})
 
-	// Kyverno multitenant get version tool
-	getVersionTool := mcp.NewTool("kyverno_multitenant_get_version",
-		mcp.WithDescription("Get Kyverno multitenant tool version information"),
+	// List tenant namespaces
+	listTenantNamespacesTool := mcp.NewTool("kyverno_multitenant_list_namespaces",
+		mcp.WithDescription("List namespaces for a specific tenant using kubectl"),
+		mcp.WithString("tenant_name",
+			mcp.Description("Name of the tenant"),
+			mcp.Required(),
+		),
 	)
-	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"kubernetes", "kyverno-multitenant", "--version"}
+	s.AddTool(listTenantNamespacesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		tenantName := request.GetString("tenant_name", "")
+		args := []string{"kubectl", "get", "namespaces", "-l", fmt.Sprintf("tenant=%s", tenantName)}
+		return executeShipCommand(args)
+	})
+
+	// Get tenant policies
+	getTenantPoliciesTool := mcp.NewTool("kyverno_multitenant_get_policies",
+		mcp.WithDescription("Get Kyverno policies affecting a tenant's namespaces"),
+		mcp.WithString("namespace",
+			mcp.Description("Tenant namespace"),
+			mcp.Required(),
+		),
+	)
+	s.AddTool(getTenantPoliciesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		namespace := request.GetString("namespace", "")
+		
+		// Get policies in the namespace
+		args := []string{"kubectl", "get", "policy", "-n", namespace}
 		return executeShipCommand(args)
 	})
 }

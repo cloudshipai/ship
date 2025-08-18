@@ -96,3 +96,157 @@ func (m *PackerModule) GetVersion(ctx context.Context) (string, error) {
 
 	return output, nil
 }
+
+// InspectTemplate inspects and analyzes Packer template configuration
+func (m *PackerModule) InspectTemplate(ctx context.Context, templatePath string, machineReadable bool) (string, error) {
+	container := m.client.Container().
+		From("hashicorp/packer:latest").
+		WithFile("/template.pkr.hcl", m.client.Host().File(templatePath))
+
+	args := []string{"packer", "inspect"}
+	if machineReadable {
+		args = append(args, "-machine-readable")
+	}
+	args = append(args, "/template.pkr.hcl")
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to inspect template: %w", err)
+	}
+
+	return output, nil
+}
+
+// FixTemplate fixes and upgrades Packer template to current version
+func (m *PackerModule) FixTemplate(ctx context.Context, templatePath string, validate bool) (string, error) {
+	container := m.client.Container().
+		From("hashicorp/packer:latest").
+		WithFile("/template.pkr.hcl", m.client.Host().File(templatePath))
+
+	args := []string{"packer", "fix"}
+	if validate {
+		args = append(args, "-validate")
+	}
+	args = append(args, "/template.pkr.hcl")
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to fix template: %w", err)
+	}
+
+	return output, nil
+}
+
+// InitConfiguration initializes Packer configuration and installs required plugins
+func (m *PackerModule) InitConfiguration(ctx context.Context, configFile string, upgrade bool) (string, error) {
+	container := m.client.Container().
+		From("hashicorp/packer:latest").
+		WithFile("/config.pkr.hcl", m.client.Host().File(configFile))
+
+	args := []string{"packer", "init"}
+	if upgrade {
+		args = append(args, "-upgrade")
+	}
+	args = append(args, "/config.pkr.hcl")
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to initialize configuration: %w", err)
+	}
+
+	return output, nil
+}
+
+// ManagePlugins manages Packer plugins (install, remove, required)
+func (m *PackerModule) ManagePlugins(ctx context.Context, subcommand string, pluginName string, version string, configFile string) (string, error) {
+	container := m.client.Container().
+		From("hashicorp/packer:latest")
+
+	if configFile != "" {
+		container = container.WithFile("/config.pkr.hcl", m.client.Host().File(configFile))
+	}
+
+	args := []string{"packer", "plugins", subcommand}
+	switch subcommand {
+	case "install", "remove":
+		if pluginName != "" {
+			args = append(args, pluginName)
+		}
+		if version != "" {
+			args = append(args, version)
+		}
+	case "required":
+		if configFile != "" {
+			args = append(args, "/config.pkr.hcl")
+		}
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to manage plugins: %w", err)
+	}
+
+	return output, nil
+}
+
+// HCL2Upgrade upgrades JSON Packer template to HCL2
+func (m *PackerModule) HCL2Upgrade(ctx context.Context, templateFile string, outputFile string, withAnnotations bool) (string, error) {
+	container := m.client.Container().
+		From("hashicorp/packer:latest").
+		WithFile("/template.json", m.client.Host().File(templateFile))
+
+	args := []string{"packer", "hcl2_upgrade"}
+	if outputFile != "" {
+		args = append(args, "-output-file", "/output.pkr.hcl")
+	}
+	if withAnnotations {
+		args = append(args, "-with-annotations")
+	}
+	args = append(args, "/template.json")
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to upgrade to HCL2: %w", err)
+	}
+
+	return output, nil
+}
+
+// Console opens Packer console for template debugging
+func (m *PackerModule) Console(ctx context.Context, templateFile string, vars string, varFile string) (string, error) {
+	container := m.client.Container().
+		From("hashicorp/packer:latest").
+		WithFile("/template.pkr.hcl", m.client.Host().File(templateFile))
+
+	if varFile != "" {
+		container = container.WithFile("/vars.pkrvars.hcl", m.client.Host().File(varFile))
+	}
+
+	args := []string{"packer", "console"}
+	if vars != "" {
+		args = append(args, "-var", vars)
+	}
+	if varFile != "" {
+		args = append(args, "-var-file", "/vars.pkrvars.hcl")
+	}
+	args = append(args, "/template.pkr.hcl")
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to open console: %w", err)
+	}
+
+	return output, nil
+}

@@ -7,121 +7,200 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddPMapperTools adds PMapper (AWS IAM privilege escalation analysis) MCP tool implementations
+// AddPMapperTools adds PMapper (AWS IAM privilege escalation analysis) MCP tool implementations using real CLI commands
 func AddPMapperTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
 	// PMapper create graph tool
-	createGraphTool := mcp.NewTool("pmapper_create_graph",
-		mcp.WithDescription("Create IAM privilege graph using PMapper"),
+	createGraphTool := mcp.NewTool("pmapper_graph_create",
+		mcp.WithDescription("Create IAM privilege graph using real pmapper CLI"),
 		mcp.WithString("profile",
 			mcp.Description("AWS profile to use"),
-			mcp.Required(),
+		),
+		mcp.WithString("account",
+			mcp.Description("AWS account number"),
 		),
 	)
 	s.AddTool(createGraphTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		profile := request.GetString("profile", "")
-		args := []string{"security", "pmapper", "--create-graph", "--profile", profile}
-		return executeShipCommand(args)
-	})
-
-	// PMapper query access tool
-	queryAccessTool := mcp.NewTool("pmapper_query_access",
-		mcp.WithDescription("Query IAM access permissions using PMapper"),
-		mcp.WithString("profile",
-			mcp.Description("AWS profile to use"),
-			mcp.Required(),
-		),
-		mcp.WithString("principal",
-			mcp.Description("IAM principal (user/role) to query"),
-			mcp.Required(),
-		),
-		mcp.WithString("action",
-			mcp.Description("AWS action to check (e.g., s3:GetObject)"),
-			mcp.Required(),
-		),
-		mcp.WithString("resource",
-			mcp.Description("AWS resource ARN to check"),
-			mcp.Required(),
-		),
-	)
-	s.AddTool(queryAccessTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		profile := request.GetString("profile", "")
-		principal := request.GetString("principal", "")
-		action := request.GetString("action", "")
-		resource := request.GetString("resource", "")
-		args := []string{"security", "pmapper", "--query", "--profile", profile, "--principal", principal, "--action", action, "--resource", resource}
-		return executeShipCommand(args)
-	})
-
-	// PMapper find privilege escalation tool
-	findPrivEscTool := mcp.NewTool("pmapper_find_privilege_escalation",
-		mcp.WithDescription("Find privilege escalation paths using PMapper"),
-		mcp.WithString("profile",
-			mcp.Description("AWS profile to use"),
-			mcp.Required(),
-		),
-		mcp.WithString("principal",
-			mcp.Description("IAM principal to analyze for privilege escalation"),
-			mcp.Required(),
-		),
-	)
-	s.AddTool(findPrivEscTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		profile := request.GetString("profile", "")
-		principal := request.GetString("principal", "")
-		args := []string{"security", "pmapper", "--privesc", "--profile", profile, "--principal", principal}
-		return executeShipCommand(args)
-	})
-
-	// PMapper visualize graph tool
-	visualizeGraphTool := mcp.NewTool("pmapper_visualize_graph",
-		mcp.WithDescription("Visualize IAM privilege graph using PMapper"),
-		mcp.WithString("profile",
-			mcp.Description("AWS profile to use"),
-			mcp.Required(),
-		),
-		mcp.WithString("output_format",
-			mcp.Description("Output format (svg, png, dot)"),
-			mcp.Enum("svg", "png", "dot"),
-		),
-	)
-	s.AddTool(visualizeGraphTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		profile := request.GetString("profile", "")
-		args := []string{"security", "pmapper", "--visualize", "--profile", profile}
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "--format", outputFormat)
+		args := []string{"pmapper"}
+		
+		if profile := request.GetString("profile", ""); profile != "" {
+			args = append(args, "--profile", profile)
 		}
+		if account := request.GetString("account", ""); account != "" {
+			args = append(args, "--account", account)
+		}
+		
+		args = append(args, "graph", "create")
 		return executeShipCommand(args)
 	})
 
-	// PMapper list principals tool
-	listPrincipalsTool := mcp.NewTool("pmapper_list_principals",
-		mcp.WithDescription("List IAM principals using PMapper"),
-		mcp.WithString("profile",
-			mcp.Description("AWS profile to use"),
+	// PMapper query tool
+	queryTool := mcp.NewTool("pmapper_query",
+		mcp.WithDescription("Query IAM permissions using real pmapper CLI"),
+		mcp.WithString("query_string",
+			mcp.Description("Query string (e.g., 'who can do iam:CreateUser')"),
 			mcp.Required(),
 		),
+		mcp.WithString("profile",
+			mcp.Description("AWS profile to use"),
+		),
+		mcp.WithString("account",
+			mcp.Description("AWS account number"),
+		),
 	)
-	s.AddTool(listPrincipalsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		profile := request.GetString("profile", "")
-		args := []string{"security", "pmapper", "--list-principals", "--profile", profile}
+	s.AddTool(queryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		queryString := request.GetString("query_string", "")
+		args := []string{"pmapper"}
+		
+		if profile := request.GetString("profile", ""); profile != "" {
+			args = append(args, "--profile", profile)
+		}
+		if account := request.GetString("account", ""); account != "" {
+			args = append(args, "--account", account)
+		}
+		
+		args = append(args, "query", queryString)
 		return executeShipCommand(args)
 	})
 
-	// PMapper check admin access tool
-	checkAdminAccessTool := mcp.NewTool("pmapper_check_admin_access",
-		mcp.WithDescription("Check if principal has admin access using PMapper"),
+	// PMapper privilege escalation query tool
+	privEscTool := mcp.NewTool("pmapper_query_privesc",
+		mcp.WithDescription("Find privilege escalation paths using real pmapper CLI preset query"),
+		mcp.WithString("target",
+			mcp.Description("Target principal or wildcard (*) for all principals"),
+			mcp.Required(),
+		),
 		mcp.WithString("profile",
 			mcp.Description("AWS profile to use"),
-			mcp.Required(),
 		),
-		mcp.WithString("principal",
-			mcp.Description("IAM principal to check for admin access"),
-			mcp.Required(),
+		mcp.WithString("account",
+			mcp.Description("AWS account number"),
 		),
 	)
-	s.AddTool(checkAdminAccessTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		profile := request.GetString("profile", "")
-		principal := request.GetString("principal", "")
-		args := []string{"security", "pmapper", "--check-admin", "--profile", profile, "--principal", principal}
+	s.AddTool(privEscTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		target := request.GetString("target", "")
+		args := []string{"pmapper"}
+		
+		if profile := request.GetString("profile", ""); profile != "" {
+			args = append(args, "--profile", profile)
+		}
+		if account := request.GetString("account", ""); account != "" {
+			args = append(args, "--account", account)
+		}
+		
+		queryString := "preset privesc " + target
+		args = append(args, "query", queryString)
 		return executeShipCommand(args)
 	})
+
+	// PMapper visualize tool
+	visualizeTool := mcp.NewTool("pmapper_visualize",
+		mcp.WithDescription("Visualize IAM privilege graph using real pmapper CLI"),
+		mcp.WithString("filetype",
+			mcp.Description("Output file type (svg, png, etc.)"),
+		),
+		mcp.WithString("profile",
+			mcp.Description("AWS profile to use"),
+		),
+		mcp.WithString("account",
+			mcp.Description("AWS account number"),
+		),
+	)
+	s.AddTool(visualizeTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"pmapper"}
+		
+		if profile := request.GetString("profile", ""); profile != "" {
+			args = append(args, "--profile", profile)
+		}
+		if account := request.GetString("account", ""); account != "" {
+			args = append(args, "--account", account)
+		}
+		
+		args = append(args, "visualize")
+		
+		if filetype := request.GetString("filetype", ""); filetype != "" {
+			args = append(args, "--filetype", filetype)
+		}
+		
+		return executeShipCommand(args)
+	})
+
+	// PMapper query who can do action tool
+	queryWhoCanTool := mcp.NewTool("pmapper_query_who_can",
+		mcp.WithDescription("Query who can perform specific action using real pmapper CLI"),
+		mcp.WithString("action",
+			mcp.Description("AWS action to check (e.g., iam:CreateUser)"),
+			mcp.Required(),
+		),
+		mcp.WithString("profile",
+			mcp.Description("AWS profile to use"),
+		),
+		mcp.WithString("account",
+			mcp.Description("AWS account number"),
+		),
+	)
+	s.AddTool(queryWhoCanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		action := request.GetString("action", "")
+		args := []string{"pmapper"}
+		
+		if profile := request.GetString("profile", ""); profile != "" {
+			args = append(args, "--profile", profile)
+		}
+		if account := request.GetString("account", ""); account != "" {
+			args = append(args, "--account", account)
+		}
+		
+		queryString := "who can do " + action
+		args = append(args, "query", queryString)
+		return executeShipCommand(args)
+	})
+
+	// PMapper advanced query tool
+	argqueryTool := mcp.NewTool("pmapper_argquery",
+		mcp.WithDescription("Advanced query with conditions using real pmapper CLI"),
+		mcp.WithString("action",
+			mcp.Description("AWS action to check (e.g., ec2:RunInstances)"),
+			mcp.Required(),
+		),
+		mcp.WithString("condition",
+			mcp.Description("Condition to check (e.g., ec2:InstanceType=c6gd.16xlarge)"),
+		),
+		mcp.WithString("profile",
+			mcp.Description("AWS profile to use"),
+		),
+		mcp.WithString("account",
+			mcp.Description("AWS account number"),
+		),
+		mcp.WithBoolean("skip_admin",
+			mcp.Description("Skip reporting current admin users (-s flag)"),
+		),
+	)
+	s.AddTool(argqueryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		action := request.GetString("action", "")
+		args := []string{"pmapper"}
+		
+		if profile := request.GetString("profile", ""); profile != "" {
+			args = append(args, "--profile", profile)
+		}
+		if account := request.GetString("account", ""); account != "" {
+			args = append(args, "--account", account)
+		}
+		
+		args = append(args, "argquery")
+		
+		if request.GetBool("skip_admin", false) {
+			args = append(args, "-s")
+		}
+		
+		args = append(args, "--action", action)
+		
+		if condition := request.GetString("condition", ""); condition != "" {
+			args = append(args, "--condition", condition)
+		}
+		
+		return executeShipCommand(args)
+	})
+
+
+
+
 }

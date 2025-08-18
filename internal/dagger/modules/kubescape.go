@@ -38,7 +38,7 @@ func (m *KubescapeModule) ScanCluster(ctx context.Context, opts ...KubescapeOpti
 		container = container.WithMountedFile("/root/.kube/config", m.client.Host().File(config.KubeconfigPath))
 	}
 
-	args := []string{"scan"}
+	args := []string{"kubescape", "scan"}
 
 	// Add framework
 	if config.Framework != "" {

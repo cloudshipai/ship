@@ -2,82 +2,192 @@ package mcp
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddPowerpipeTools adds Powerpipe (infrastructure benchmarking) MCP tool implementations
+// AddPowerpipeTools adds Powerpipe MCP tool implementations using real powerpipe CLI commands
 func AddPowerpipeTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// Powerpipe benchmark tool
-	benchmarkTool := mcp.NewTool("powerpipe_benchmark",
-		mcp.WithDescription("Run security and compliance benchmarks using Powerpipe"),
+	// Powerpipe benchmark run tool
+	benchmarkRunTool := mcp.NewTool("powerpipe_benchmark_run",
+		mcp.WithDescription("Run security and compliance benchmarks using real powerpipe CLI"),
 		mcp.WithString("benchmark",
-			mcp.Description("Benchmark to run (e.g., aws_compliance, kubernetes_compliance)"),
+			mcp.Description("Benchmark to run"),
 			mcp.Required(),
 		),
-		mcp.WithString("output_format",
+		mcp.WithString("output",
 			mcp.Description("Output format"),
-			mcp.Enum("json", "yaml", "table", "csv"),
+			mcp.Enum("pretty", "plain", "yaml", "json"),
+		),
+		mcp.WithString("mod_location",
+			mcp.Description("Workspace working directory"),
+		),
+		mcp.WithString("workspace",
+			mcp.Description("Powerpipe workspace profile"),
 		),
 	)
-	s.AddTool(benchmarkTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	s.AddTool(benchmarkRunTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		benchmark := request.GetString("benchmark", "")
-		args := []string{"security", "powerpipe", "benchmark", benchmark}
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
+		args := []string{"powerpipe", "benchmark", "run", benchmark}
+		
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
 		}
+		if modLocation := request.GetString("mod_location", ""); modLocation != "" {
+			args = append(args, "--mod-location", modLocation)
+		}
+		if workspace := request.GetString("workspace", ""); workspace != "" {
+			args = append(args, "--workspace", workspace)
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// Powerpipe query tool
-	queryTool := mcp.NewTool("powerpipe_query",
-		mcp.WithDescription("Execute SQL queries against cloud infrastructure"),
-		mcp.WithString("query",
-			mcp.Description("SQL query to execute"),
-			mcp.Required(),
-		),
-		mcp.WithString("output_format",
+	// Powerpipe benchmark list tool
+	benchmarkListTool := mcp.NewTool("powerpipe_benchmark_list",
+		mcp.WithDescription("List available benchmarks using real powerpipe CLI"),
+		mcp.WithString("output",
 			mcp.Description("Output format"),
-			mcp.Enum("json", "yaml", "table", "csv"),
+			mcp.Enum("pretty", "plain", "yaml", "json"),
+		),
+		mcp.WithString("mod_location",
+			mcp.Description("Workspace working directory"),
 		),
 	)
-	s.AddTool(queryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		query := request.GetString("query", "")
-		args := []string{"security", "powerpipe", "query", query}
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
+	s.AddTool(benchmarkListTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"powerpipe", "benchmark", "list"}
+		
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
 		}
+		if modLocation := request.GetString("mod_location", ""); modLocation != "" {
+			args = append(args, "--mod-location", modLocation)
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// Powerpipe server tool
+	// Powerpipe query run tool
+	queryRunTool := mcp.NewTool("powerpipe_query_run",
+		mcp.WithDescription("Execute SQL queries against cloud infrastructure using real powerpipe CLI"),
+		mcp.WithString("query",
+			mcp.Description("Query to run"),
+			mcp.Required(),
+		),
+		mcp.WithString("output",
+			mcp.Description("Output format"),
+			mcp.Enum("pretty", "plain", "yaml", "json"),
+		),
+		mcp.WithString("mod_location",
+			mcp.Description("Workspace working directory"),
+		),
+	)
+	s.AddTool(queryRunTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		query := request.GetString("query", "")
+		args := []string{"powerpipe", "query", "run", query}
+		
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		if modLocation := request.GetString("mod_location", ""); modLocation != "" {
+			args = append(args, "--mod-location", modLocation)
+		}
+		
+		return executeShipCommand(args)
+	})
+
+	// Powerpipe query list tool
+	queryListTool := mcp.NewTool("powerpipe_query_list",
+		mcp.WithDescription("List available queries using real powerpipe CLI"),
+		mcp.WithString("output",
+			mcp.Description("Output format"),
+			mcp.Enum("pretty", "plain", "yaml", "json"),
+		),
+		mcp.WithString("mod_location",
+			mcp.Description("Workspace working directory"),
+		),
+	)
+	s.AddTool(queryListTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"powerpipe", "query", "list"}
+		
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		if modLocation := request.GetString("mod_location", ""); modLocation != "" {
+			args = append(args, "--mod-location", modLocation)
+		}
+		
+		return executeShipCommand(args)
+	})
+
+	// Powerpipe server start tool
 	serverTool := mcp.NewTool("powerpipe_server",
-		mcp.WithDescription("Start Powerpipe server for interactive analysis"),
+		mcp.WithDescription("Start Powerpipe server using real powerpipe CLI"),
+		mcp.WithString("listen",
+			mcp.Description("Accept connections from specified address (default local)"),
+			mcp.Enum("local", "network"),
+		),
 		mcp.WithNumber("port",
 			mcp.Description("Port for Powerpipe server"),
 		),
-		mcp.WithString("host",
-			mcp.Description("Host for Powerpipe server"),
+		mcp.WithString("mod_location",
+			mcp.Description("Workspace working directory"),
+		),
+		mcp.WithString("workspace",
+			mcp.Description("Powerpipe workspace profile"),
 		),
 	)
 	s.AddTool(serverTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "powerpipe", "server"}
+		args := []string{"powerpipe", "server"}
+		
+		if listen := request.GetString("listen", ""); listen != "" {
+			args = append(args, "--listen", listen)
+		}
 		if port := request.GetInt("port", 0); port > 0 {
-			args = append(args, "--port", string(rune(port)))
+			args = append(args, "--port", strconv.Itoa(port))
 		}
-		if host := request.GetString("host", ""); host != "" {
-			args = append(args, "--host", host)
+		if modLocation := request.GetString("mod_location", ""); modLocation != "" {
+			args = append(args, "--mod-location", modLocation)
 		}
+		if workspace := request.GetString("workspace", ""); workspace != "" {
+			args = append(args, "--workspace", workspace)
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// Powerpipe get version tool
-	getVersionTool := mcp.NewTool("powerpipe_get_version",
-		mcp.WithDescription("Get Powerpipe version information"),
+	// Powerpipe dashboard list tool
+	dashboardListTool := mcp.NewTool("powerpipe_dashboard_list",
+		mcp.WithDescription("List available dashboards using real powerpipe CLI"),
+		mcp.WithString("output",
+			mcp.Description("Output format"),
+			mcp.Enum("pretty", "plain", "yaml", "json"),
+		),
+		mcp.WithString("mod_location",
+			mcp.Description("Workspace working directory"),
+		),
 	)
-	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "powerpipe", "--version"}
+	s.AddTool(dashboardListTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"powerpipe", "dashboard", "list"}
+		
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		if modLocation := request.GetString("mod_location", ""); modLocation != "" {
+			args = append(args, "--mod-location", modLocation)
+		}
+		
+		return executeShipCommand(args)
+	})
+
+	// Powerpipe version tool
+	versionTool := mcp.NewTool("powerpipe_version",
+		mcp.WithDescription("Get Powerpipe version information using real powerpipe CLI"),
+	)
+	s.AddTool(versionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"powerpipe", "--version"}
 		return executeShipCommand(args)
 	})
 }

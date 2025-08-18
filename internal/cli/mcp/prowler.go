@@ -7,175 +7,197 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddProwlerTools adds Prowler MCP tool implementations
+// AddProwlerTools adds Prowler (multi-cloud security assessment) MCP tool implementations using real CLI commands
 func AddProwlerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
 	// Prowler scan AWS tool
-	scanAWSTool := mcp.NewTool("prowler_scan_aws",
-		mcp.WithDescription("Scan AWS account for security issues using Prowler"),
-		mcp.WithString("provider",
-			mcp.Description("AWS provider configuration"),
-		),
-		mcp.WithString("region",
-			mcp.Description("AWS region to scan"),
-		),
-	)
-	s.AddTool(scanAWSTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "prowler", "aws"}
-		if provider := request.GetString("provider", ""); provider != "" {
-			args = append(args, "--provider", provider)
-		}
-		if region := request.GetString("region", ""); region != "" {
-			args = append(args, "--region", region)
-		}
-		return executeShipCommand(args)
-	})
-
-	// Prowler scan Azure tool
-	scanAzureTool := mcp.NewTool("prowler_scan_azure",
-		mcp.WithDescription("Scan Azure subscription for security issues using Prowler"),
-	)
-	s.AddTool(scanAzureTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "prowler", "azure"}
-		return executeShipCommand(args)
-	})
-
-	// Prowler scan GCP tool
-	scanGCPTool := mcp.NewTool("prowler_scan_gcp",
-		mcp.WithDescription("Scan GCP project for security issues using Prowler"),
-		mcp.WithString("project_id",
-			mcp.Description("GCP project ID to scan"),
-			mcp.Required(),
-		),
-	)
-	s.AddTool(scanGCPTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		projectId := request.GetString("project_id", "")
-		args := []string{"security", "prowler", "gcp", "--project", projectId}
-		return executeShipCommand(args)
-	})
-
-	// Prowler scan Kubernetes tool
-	scanKubernetesTool := mcp.NewTool("prowler_scan_kubernetes",
-		mcp.WithDescription("Scan Kubernetes cluster for security issues using Prowler"),
-		mcp.WithString("kubeconfig_path",
-			mcp.Description("Path to kubeconfig file"),
-			mcp.Required(),
-		),
-	)
-	s.AddTool(scanKubernetesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		kubeconfigPath := request.GetString("kubeconfig_path", "")
-		args := []string{"security", "prowler", "kubernetes", "--kubeconfig", kubeconfigPath}
-		return executeShipCommand(args)
-	})
-
-	// Prowler scan with compliance tool
-	scanWithComplianceTool := mcp.NewTool("prowler_scan_compliance",
-		mcp.WithDescription("Scan with specific compliance framework using Prowler"),
-		mcp.WithString("provider",
-			mcp.Description("Cloud provider (aws, azure, gcp)"),
-			mcp.Required(),
-			mcp.Enum("aws", "azure", "gcp"),
-		),
-		mcp.WithString("compliance",
-			mcp.Description("Compliance framework (cis, pci, gdpr, hipaa, etc.)"),
-			mcp.Required(),
-		),
-		mcp.WithString("region",
-			mcp.Description("Cloud region to scan"),
-		),
-	)
-	s.AddTool(scanWithComplianceTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		provider := request.GetString("provider", "")
-		compliance := request.GetString("compliance", "")
-		args := []string{"security", "prowler", provider, "--compliance", compliance}
-		if region := request.GetString("region", ""); region != "" {
-			args = append(args, "--region", region)
-		}
-		return executeShipCommand(args)
-	})
-
-	// Prowler scan specific services tool
-	scanSpecificServicesTool := mcp.NewTool("prowler_scan_services",
-		mcp.WithDescription("Scan specific cloud services using Prowler"),
-		mcp.WithString("provider",
-			mcp.Description("Cloud provider (aws, azure, gcp)"),
-			mcp.Required(),
-			mcp.Enum("aws", "azure", "gcp"),
-		),
-		mcp.WithString("services",
-			mcp.Description("Comma-separated list of services to scan"),
-			mcp.Required(),
-		),
-		mcp.WithString("region",
-			mcp.Description("Cloud region to scan"),
-		),
-	)
-	s.AddTool(scanSpecificServicesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		provider := request.GetString("provider", "")
-		services := request.GetString("services", "")
-		args := []string{"security", "prowler", provider, "--services", services}
-		if region := request.GetString("region", ""); region != "" {
-			args = append(args, "--region", region)
-		}
-		return executeShipCommand(args)
-	})
-
-	// Prowler comprehensive security scan tool
-	comprehensiveSecurityScanTool := mcp.NewTool("prowler_comprehensive_security_scan",
-		mcp.WithDescription("Run comprehensive multi-cloud security scan with advanced options"),
-		mcp.WithString("accounts",
-			mcp.Description("Comma-separated list of cloud account IDs to scan"),
+	scanAWSTool := mcp.NewTool("prowler_aws",
+		mcp.WithDescription("Scan AWS account for security issues using real prowler CLI"),
+		mcp.WithString("profile",
+			mcp.Description("AWS CLI profile to use"),
 		),
 		mcp.WithString("regions",
-			mcp.Description("Comma-separated list of regions to scan (default: all)"),
+			mcp.Description("Comma-separated list of AWS regions to scan"),
 		),
-		mcp.WithString("severity",
-			mcp.Description("Severity levels to include"),
-			mcp.Enum("critical", "high", "medium", "low", "critical,high,medium", "critical,high"),
+		mcp.WithString("checks",
+			mcp.Description("Comma-separated list of specific checks to run"),
 		),
-		mcp.WithString("compliance_frameworks",
-			mcp.Description("Comma-separated compliance frameworks"),
-			mcp.Enum("cis_aws", "aws_foundational_security", "nist_800_53", "soc2", "pci_dss"),
+		mcp.WithString("services",
+			mcp.Description("Comma-separated list of AWS services to scan"),
+		),
+		mcp.WithString("compliance",
+			mcp.Description("Compliance framework to check against"),
 		),
 		mcp.WithString("output_formats",
-			mcp.Description("Comma-separated output formats"),
-			mcp.Enum("json", "html", "csv", "xlsx", "junit", "sarif"),
+			mcp.Description("Output formats (csv, json-asff, json-ocsf, html)"),
 		),
 		mcp.WithString("output_directory",
 			mcp.Description("Output directory for results"),
 		),
-		mcp.WithString("exclude_checks",
-			mcp.Description("Comma-separated check IDs to exclude"),
-		),
-		mcp.WithString("include_checks",
-			mcp.Description("Comma-separated specific check IDs to include"),
-		),
 	)
-	s.AddTool(comprehensiveSecurityScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "prowler", "aws", "--comprehensive"}
+	s.AddTool(scanAWSTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"prowler", "aws"}
 		
-		if accounts := request.GetString("accounts", ""); accounts != "" {
-			args = append(args, "--accounts", accounts)
+		if profile := request.GetString("profile", ""); profile != "" {
+			args = append(args, "--profile", profile)
 		}
 		if regions := request.GetString("regions", ""); regions != "" {
 			args = append(args, "--regions", regions)
 		}
-		if severity := request.GetString("severity", ""); severity != "" {
-			args = append(args, "--severity", severity)
+		if checks := request.GetString("checks", ""); checks != "" {
+			args = append(args, "--checks", checks)
 		}
-		if compliance := request.GetString("compliance_frameworks", ""); compliance != "" {
+		if services := request.GetString("services", ""); services != "" {
+			args = append(args, "--services", services)
+		}
+		if compliance := request.GetString("compliance", ""); compliance != "" {
 			args = append(args, "--compliance", compliance)
 		}
 		if outputFormats := request.GetString("output_formats", ""); outputFormats != "" {
 			args = append(args, "--output-formats", outputFormats)
 		}
-		if outputDir := request.GetString("output_directory", ""); outputDir != "" {
-			args = append(args, "--output-dir", outputDir)
+		if outputDirectory := request.GetString("output_directory", ""); outputDirectory != "" {
+			args = append(args, "--output-directory", outputDirectory)
 		}
-		if excludeChecks := request.GetString("exclude_checks", ""); excludeChecks != "" {
-			args = append(args, "--exclude-checks", excludeChecks)
+		
+		return executeShipCommand(args)
+	})
+
+	// Prowler scan Azure tool
+	scanAzureTool := mcp.NewTool("prowler_azure",
+		mcp.WithDescription("Scan Azure subscription for security issues using real prowler CLI"),
+		mcp.WithString("subscription_id",
+			mcp.Description("Azure subscription ID to scan"),
+		),
+		mcp.WithString("checks",
+			mcp.Description("Comma-separated list of specific checks to run"),
+		),
+		mcp.WithString("services",
+			mcp.Description("Comma-separated list of Azure services to scan"),
+		),
+		mcp.WithString("compliance",
+			mcp.Description("Compliance framework to check against"),
+		),
+		mcp.WithString("output_formats",
+			mcp.Description("Output formats (csv, json-asff, json-ocsf, html)"),
+		),
+		mcp.WithString("output_directory",
+			mcp.Description("Output directory for results"),
+		),
+	)
+	s.AddTool(scanAzureTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"prowler", "azure"}
+		
+		if subscriptionId := request.GetString("subscription_id", ""); subscriptionId != "" {
+			args = append(args, "--subscription-id", subscriptionId)
 		}
-		if includeChecks := request.GetString("include_checks", ""); includeChecks != "" {
-			args = append(args, "--include-checks", includeChecks)
+		if checks := request.GetString("checks", ""); checks != "" {
+			args = append(args, "--checks", checks)
+		}
+		if services := request.GetString("services", ""); services != "" {
+			args = append(args, "--services", services)
+		}
+		if compliance := request.GetString("compliance", ""); compliance != "" {
+			args = append(args, "--compliance", compliance)
+		}
+		if outputFormats := request.GetString("output_formats", ""); outputFormats != "" {
+			args = append(args, "--output-formats", outputFormats)
+		}
+		if outputDirectory := request.GetString("output_directory", ""); outputDirectory != "" {
+			args = append(args, "--output-directory", outputDirectory)
+		}
+		
+		return executeShipCommand(args)
+	})
+
+	// Prowler scan GCP tool
+	scanGCPTool := mcp.NewTool("prowler_gcp",
+		mcp.WithDescription("Scan GCP project for security issues using real prowler CLI"),
+		mcp.WithString("project_id",
+			mcp.Description("GCP project ID to scan"),
+		),
+		mcp.WithString("checks",
+			mcp.Description("Comma-separated list of specific checks to run"),
+		),
+		mcp.WithString("services",
+			mcp.Description("Comma-separated list of GCP services to scan"),
+		),
+		mcp.WithString("compliance",
+			mcp.Description("Compliance framework to check against"),
+		),
+		mcp.WithString("output_formats",
+			mcp.Description("Output formats (csv, json-asff, json-ocsf, html)"),
+		),
+		mcp.WithString("output_directory",
+			mcp.Description("Output directory for results"),
+		),
+	)
+	s.AddTool(scanGCPTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"prowler", "gcp"}
+		
+		if projectId := request.GetString("project_id", ""); projectId != "" {
+			args = append(args, "--project-id", projectId)
+		}
+		if checks := request.GetString("checks", ""); checks != "" {
+			args = append(args, "--checks", checks)
+		}
+		if services := request.GetString("services", ""); services != "" {
+			args = append(args, "--services", services)
+		}
+		if compliance := request.GetString("compliance", ""); compliance != "" {
+			args = append(args, "--compliance", compliance)
+		}
+		if outputFormats := request.GetString("output_formats", ""); outputFormats != "" {
+			args = append(args, "--output-formats", outputFormats)
+		}
+		if outputDirectory := request.GetString("output_directory", ""); outputDirectory != "" {
+			args = append(args, "--output-directory", outputDirectory)
+		}
+		
+		return executeShipCommand(args)
+	})
+
+	// Prowler scan Kubernetes tool
+	scanKubernetesTool := mcp.NewTool("prowler_kubernetes",
+		mcp.WithDescription("Scan Kubernetes cluster for security issues using real prowler CLI"),
+		mcp.WithString("kubeconfig_path",
+			mcp.Description("Path to kubeconfig file"),
+		),
+		mcp.WithString("context",
+			mcp.Description("Kubernetes context to use"),
+		),
+		mcp.WithString("checks",
+			mcp.Description("Comma-separated list of specific checks to run"),
+		),
+		mcp.WithString("compliance",
+			mcp.Description("Compliance framework to check against"),
+		),
+		mcp.WithString("output_formats",
+			mcp.Description("Output formats (csv, json-asff, json-ocsf, html)"),
+		),
+		mcp.WithString("output_directory",
+			mcp.Description("Output directory for results"),
+		),
+	)
+	s.AddTool(scanKubernetesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"prowler", "kubernetes"}
+		
+		if kubeconfigPath := request.GetString("kubeconfig_path", ""); kubeconfigPath != "" {
+			args = append(args, "--kubeconfig", kubeconfigPath)
+		}
+		if context := request.GetString("context", ""); context != "" {
+			args = append(args, "--context", context)
+		}
+		if checks := request.GetString("checks", ""); checks != "" {
+			args = append(args, "--checks", checks)
+		}
+		if compliance := request.GetString("compliance", ""); compliance != "" {
+			args = append(args, "--compliance", compliance)
+		}
+		if outputFormats := request.GetString("output_formats", ""); outputFormats != "" {
+			args = append(args, "--output-formats", outputFormats)
+		}
+		if outputDirectory := request.GetString("output_directory", ""); outputDirectory != "" {
+			args = append(args, "--output-directory", outputDirectory)
 		}
 		
 		return executeShipCommand(args)
@@ -183,9 +205,9 @@ func AddProwlerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 
 	// Prowler list checks tool
 	listChecksTool := mcp.NewTool("prowler_list_checks",
-		mcp.WithDescription("List all available Prowler security checks"),
+		mcp.WithDescription("List available security checks using real prowler CLI"),
 		mcp.WithString("provider",
-			mcp.Description("Cloud provider to list checks for"),
+			mcp.Description("Cloud provider (aws, azure, gcp, kubernetes)"),
 			mcp.Enum("aws", "azure", "gcp", "kubernetes"),
 		),
 		mcp.WithString("service",
@@ -194,42 +216,85 @@ func AddProwlerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		mcp.WithString("compliance",
 			mcp.Description("Filter by compliance framework"),
 		),
-		mcp.WithString("severity",
-			mcp.Description("Filter by severity level"),
-			mcp.Enum("critical", "high", "medium", "low"),
-		),
 	)
 	s.AddTool(listChecksTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "prowler", "--list-checks"}
+		args := []string{"prowler"}
 		
 		if provider := request.GetString("provider", ""); provider != "" {
-			args = append(args, "--provider", provider)
+			args = append(args, provider)
 		}
+		
+		args = append(args, "--list-checks")
+		
 		if service := request.GetString("service", ""); service != "" {
 			args = append(args, "--service", service)
 		}
 		if compliance := request.GetString("compliance", ""); compliance != "" {
 			args = append(args, "--compliance", compliance)
 		}
-		if severity := request.GetString("severity", ""); severity != "" {
-			args = append(args, "--severity", severity)
+		
+		return executeShipCommand(args)
+	})
+
+	// Prowler list services tool
+	listServicesTool := mcp.NewTool("prowler_list_services",
+		mcp.WithDescription("List available services using real prowler CLI"),
+		mcp.WithString("provider",
+			mcp.Description("Cloud provider (aws, azure, gcp, kubernetes)"),
+			mcp.Enum("aws", "azure", "gcp", "kubernetes"),
+		),
+	)
+	s.AddTool(listServicesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"prowler"}
+		
+		if provider := request.GetString("provider", ""); provider != "" {
+			args = append(args, provider)
+		}
+		
+		args = append(args, "--list-services")
+		return executeShipCommand(args)
+	})
+
+	// Prowler list compliance tool
+	listComplianceTool := mcp.NewTool("prowler_list_compliance",
+		mcp.WithDescription("List available compliance frameworks using real prowler CLI"),
+		mcp.WithString("provider",
+			mcp.Description("Cloud provider (aws, azure, gcp, kubernetes)"),
+			mcp.Enum("aws", "azure", "gcp", "kubernetes"),
+		),
+	)
+	s.AddTool(listComplianceTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"prowler"}
+		
+		if provider := request.GetString("provider", ""); provider != "" {
+			args = append(args, provider)
+		}
+		
+		args = append(args, "--list-compliance")
+		return executeShipCommand(args)
+	})
+
+	// Prowler dashboard tool
+	dashboardTool := mcp.NewTool("prowler_dashboard",
+		mcp.WithDescription("Launch Prowler dashboard using real prowler CLI"),
+		mcp.WithString("port",
+			mcp.Description("Port to run dashboard on (default: 11666)"),
+		),
+		mcp.WithString("host",
+			mcp.Description("Host to bind dashboard to (default: 127.0.0.1)"),
+		),
+	)
+	s.AddTool(dashboardTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"prowler", "dashboard"}
+		
+		if port := request.GetString("port", ""); port != "" {
+			args = append(args, "--port", port)
+		}
+		if host := request.GetString("host", ""); host != "" {
+			args = append(args, "--host", host)
 		}
 		
 		return executeShipCommand(args)
 	})
 
-	// Prowler get version tool
-	getVersionTool := mcp.NewTool("prowler_get_version",
-		mcp.WithDescription("Get Prowler version and capability information"),
-		mcp.WithBoolean("detailed",
-			mcp.Description("Include detailed capability information"),
-		),
-	)
-	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "prowler", "--version"}
-		if request.GetBool("detailed", false) {
-			args = append(args, "--verbose")
-		}
-		return executeShipCommand(args)
-	})
 }

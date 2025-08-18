@@ -17,8 +17,7 @@ func AddOSSFScorecardTools(s *server.MCPServer, executeShipCommand ExecuteShipCo
 			mcp.Required(),
 		),
 		mcp.WithString("github_token",
-			mcp.Description("GitHub token for API access"),
-			mcp.Required(),
+			mcp.Description("GitHub token for API access (optional if using environment variable)"),
 		),
 		mcp.WithString("format",
 			mcp.Description("Output format"),
@@ -28,7 +27,10 @@ func AddOSSFScorecardTools(s *server.MCPServer, executeShipCommand ExecuteShipCo
 	s.AddTool(scoreRepositoryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		repoURL := request.GetString("repo_url", "")
 		githubToken := request.GetString("github_token", "")
-		args := []string{"security", "ossf-scorecard", "--repo", repoURL, "--token", githubToken}
+		args := []string{"scorecard", "--repo=" + repoURL}
+		if githubToken != "" {
+			args = append(args, "--token", githubToken)
+		}
 		if format := request.GetString("format", ""); format != "" {
 			args = append(args, "--format", format)
 		}
@@ -47,15 +49,17 @@ func AddOSSFScorecardTools(s *server.MCPServer, executeShipCommand ExecuteShipCo
 			mcp.Required(),
 		),
 		mcp.WithString("github_token",
-			mcp.Description("GitHub token for API access"),
-			mcp.Required(),
+			mcp.Description("GitHub token for API access (optional if using environment variable)"),
 		),
 	)
 	s.AddTool(scoreWithChecksTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		repoURL := request.GetString("repo_url", "")
 		checks := request.GetString("checks", "")
 		githubToken := request.GetString("github_token", "")
-		args := []string{"security", "ossf-scorecard", "--repo", repoURL, "--checks", checks, "--token", githubToken}
+		args := []string{"scorecard", "--repo=" + repoURL, "--checks", checks}
+		if githubToken != "" {
+			args = append(args, "--token", githubToken)
+		}
 		return executeShipCommand(args)
 	})
 
@@ -64,7 +68,7 @@ func AddOSSFScorecardTools(s *server.MCPServer, executeShipCommand ExecuteShipCo
 		mcp.WithDescription("List all available OSSF Scorecard security checks"),
 	)
 	s.AddTool(listChecksTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "ossf-scorecard", "--list-checks"}
+		args := []string{"scorecard", "--help"}
 		return executeShipCommand(args)
 	})
 
@@ -73,7 +77,7 @@ func AddOSSFScorecardTools(s *server.MCPServer, executeShipCommand ExecuteShipCo
 		mcp.WithDescription("Get OSSF Scorecard version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "ossf-scorecard", "--version"}
+		args := []string{"scorecard", "--version"}
 		return executeShipCommand(args)
 	})
 }

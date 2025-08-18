@@ -109,3 +109,186 @@ func (m *LitmusModule) GetVersion(ctx context.Context) (string, error) {
 
 	return output, nil
 }
+
+// Install installs Litmus using Helm
+func (m *LitmusModule) Install(ctx context.Context, namespace string, releaseName string, createNamespace bool) (string, error) {
+	if namespace == "" {
+		namespace = "litmus"
+	}
+	if releaseName == "" {
+		releaseName = "chaos"
+	}
+
+	container := m.client.Container().
+		From("alpine/helm:latest")
+
+	// Add Litmus Helm repository
+	container = container.WithExec([]string{"helm", "repo", "add", "litmuschaos", "https://litmuschaos.github.io/litmus-helm/"}).
+		WithExec([]string{"helm", "repo", "update"})
+
+	// Install Litmus
+	args := []string{"helm", "install", releaseName, "litmuschaos/litmus", "--namespace", namespace}
+	if createNamespace {
+		args = append(args, "--create-namespace")
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to install litmus: %w", err)
+	}
+
+	return output, nil
+}
+
+// ConnectChaosInfra connects chaos infrastructure using litmusctl
+func (m *LitmusModule) ConnectChaosInfra(ctx context.Context, projectID string) (string, error) {
+	container := m.client.Container().
+		From("litmuschaos/litmusctl:latest")
+
+	args := []string{"litmusctl", "connect", "chaos-infra"}
+	if projectID != "" {
+		args = append(args, "--project-id", projectID)
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to connect chaos infrastructure: %w", err)
+	}
+
+	return output, nil
+}
+
+// CreateProject creates a new project using litmusctl
+func (m *LitmusModule) CreateProject(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("litmuschaos/litmusctl:latest").
+		WithExec([]string{"litmusctl", "create", "project"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to create litmus project: %w", err)
+	}
+
+	return output, nil
+}
+
+// CreateChaosExperiment creates chaos experiment using litmusctl
+func (m *LitmusModule) CreateChaosExperiment(ctx context.Context, manifestFile string, projectID string, chaosInfraID string) (string, error) {
+	container := m.client.Container().
+		From("litmuschaos/litmusctl:latest").
+		WithFile("/manifest.yaml", m.client.Host().File(manifestFile))
+
+	args := []string{"litmusctl", "create", "chaos-experiment", "-f", "/manifest.yaml"}
+	if projectID != "" {
+		args = append(args, "--project-id", projectID)
+	}
+	if chaosInfraID != "" {
+		args = append(args, "--chaos-infra-id", chaosInfraID)
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to create chaos experiment: %w", err)
+	}
+
+	return output, nil
+}
+
+// RunChaosExperiment runs chaos experiment using litmusctl
+func (m *LitmusModule) RunChaosExperiment(ctx context.Context, experimentID string, projectID string) (string, error) {
+	container := m.client.Container().
+		From("litmuschaos/litmusctl:latest")
+
+	args := []string{"litmusctl", "run", "chaos-experiment", experimentID}
+	if projectID != "" {
+		args = append(args, "--project-id", projectID)
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to run chaos experiment: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetProjects lists projects using litmusctl
+func (m *LitmusModule) GetProjects(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("litmuschaos/litmusctl:latest").
+		WithExec([]string{"litmusctl", "get", "projects"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get litmus projects: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetChaosInfra lists chaos infrastructure using litmusctl
+func (m *LitmusModule) GetChaosInfra(ctx context.Context, projectID string) (string, error) {
+	container := m.client.Container().
+		From("litmuschaos/litmusctl:latest")
+
+	args := []string{"litmusctl", "get", "chaos-infra"}
+	if projectID != "" {
+		args = append(args, "--project-id", projectID)
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get chaos infrastructure: %w", err)
+	}
+
+	return output, nil
+}
+
+// ConfigSetAccount setup ChaosCenter account configuration using litmusctl
+func (m *LitmusModule) ConfigSetAccount(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("litmuschaos/litmusctl:latest").
+		WithExec([]string{"litmusctl", "config", "set-account"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to configure litmus account: %w", err)
+	}
+
+	return output, nil
+}
+
+// ApplyChaosExperiment applies chaos experiment manifest using kubectl
+func (m *LitmusModule) ApplyChaosExperiment(ctx context.Context, manifestFile string, namespace string, kubeconfig string) (string, error) {
+	container := m.client.Container().
+		From("bitnami/kubectl:latest").
+		WithFile("/manifest.yaml", m.client.Host().File(manifestFile))
+
+	if kubeconfig != "" {
+		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
+	}
+
+	args := []string{"kubectl", "apply", "-f", "/manifest.yaml"}
+	if namespace != "" {
+		args = append(args, "-n", namespace)
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to apply chaos experiment: %w", err)
+	}
+
+	return output, nil
+}

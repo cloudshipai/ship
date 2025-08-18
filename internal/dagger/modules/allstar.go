@@ -7,7 +7,7 @@ import (
 	"dagger.io/dagger"
 )
 
-// AllstarModule runs Allstar for GitHub security policy enforcement
+// AllstarModule provides information about Allstar (GitHub App, not a CLI tool)
 type AllstarModule struct {
 	client *dagger.Client
 	name   string
@@ -21,58 +21,18 @@ func NewAllstarModule(client *dagger.Client) *AllstarModule {
 	}
 }
 
-// ScanRepository scans a GitHub repository for security policies
-func (m *AllstarModule) ScanRepository(ctx context.Context, repoURL string, configPath string) (string, error) {
+// GetInfo provides information about Allstar since it's a GitHub App, not a CLI tool
+func (m *AllstarModule) GetInfo(ctx context.Context) (string, error) {
 	container := m.client.Container().
-		From("ghcr.io/ossf/allstar:latest")
-
-	if configPath != "" {
-		container = container.WithDirectory("/config", m.client.Host().Directory(configPath))
-	}
-
-	container = container.WithExec([]string{
-		"allstar",
-		"--repo", repoURL,
-		"--config", "/config",
-		"--output", "json",
-	})
-
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to run allstar scan: %w", err)
-	}
-
-	return output, nil
-}
-
-// ValidateConfig validates Allstar configuration
-func (m *AllstarModule) ValidateConfig(ctx context.Context, configPath string) (string, error) {
-	container := m.client.Container().
-		From("ghcr.io/ossf/allstar:latest").
-		WithDirectory("/config", m.client.Host().Directory(configPath)).
+		From("alpine:latest").
 		WithExec([]string{
-			"allstar",
-			"--validate-config", "/config",
-			"--output", "json",
+			"echo", 
+			"IMPORTANT: Allstar is a GitHub App (not a CLI tool). Install from https://github.com/apps/allstar and configure via .allstar/ repository.",
 		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to validate allstar config: %w", err)
-	}
-
-	return output, nil
-}
-
-// GetVersion returns the version of Allstar
-func (m *AllstarModule) GetVersion(ctx context.Context) (string, error) {
-	container := m.client.Container().
-		From("ghcr.io/ossf/allstar:latest").
-		WithExec([]string{"allstar", "--version"})
-
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get allstar version: %w", err)
+		return "", fmt.Errorf("failed to get allstar info: %w", err)
 	}
 
 	return output, nil

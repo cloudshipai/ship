@@ -100,3 +100,57 @@ func (m *TfstateReaderModule) ExtractOutputs(ctx context.Context, statePath stri
 
 	return output, nil
 }
+
+// ShowState shows state information using terraform show
+func (m *TfstateReaderModule) ShowState(ctx context.Context, statePath string) (string, error) {
+	container := m.client.Container().
+		From("hashicorp/terraform:latest").
+		WithFile("/terraform.tfstate", m.client.Host().File(statePath)).
+		WithExec([]string{
+			"terraform", "show", "-json", "/terraform.tfstate",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to show state: %w", err)
+	}
+
+	return output, nil
+}
+
+// PullRemoteState pulls state from remote backend
+func (m *TfstateReaderModule) PullRemoteState(ctx context.Context, workdir string) (string, error) {
+	container := m.client.Container().
+		From("hashicorp/terraform:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(workdir)).
+		WithWorkdir("/workspace").
+		WithExec([]string{"terraform", "init"}).
+		WithExec([]string{
+			"terraform", "state", "pull",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to pull remote state: %w", err)
+	}
+
+	return output, nil
+}
+
+// InteractiveExplorer provides interactive state exploration
+func (m *TfstateReaderModule) InteractiveExplorer(ctx context.Context, statePath string) (string, error) {
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "jq"}).
+		WithFile("/terraform.tfstate", m.client.Host().File(statePath)).
+		WithExec([]string{
+			"sh", "-c", "echo 'Interactive exploration:' && jq '.' /terraform.tfstate | head -50",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to explore state interactively: %w", err)
+	}
+
+	return output, nil
+}

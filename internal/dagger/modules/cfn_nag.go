@@ -89,11 +89,111 @@ func (m *CfnNagModule) ScanWithRules(ctx context.Context, templatePath string, r
 	return "", fmt.Errorf("failed to run cfn-nag with rules: no output received")
 }
 
+// ScanWithProfile scans with specific rule profile
+func (m *CfnNagModule) ScanWithProfile(ctx context.Context, templatePath string, profilePath string, denyListPath string) (string, error) {
+	args := []string{"cfn_nag_scan", "--input-path", "/workspace/template.yaml"}
+	if profilePath != "" {
+		args = append(args, "--profile-path", "/workspace/profile.yml")
+	}
+	if denyListPath != "" {
+		args = append(args, "--deny-list-path", "/workspace/denylist.yml")
+	}
+
+	container := m.client.Container().
+		From("stelligent/cfn_nag:latest").
+		WithFile("/workspace/template.yaml", m.client.Host().File(templatePath))
+
+	if profilePath != "" {
+		container = container.WithFile("/workspace/profile.yml", m.client.Host().File(profilePath))
+	}
+	if denyListPath != "" {
+		container = container.WithFile("/workspace/denylist.yml", m.client.Host().File(denyListPath))
+	}
+
+	container = container.WithWorkdir("/workspace").WithExec(args, dagger.ContainerWithExecOpts{Expect: "ANY"})
+
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
+	}
+
+	return "", fmt.Errorf("failed to run cfn-nag with profile: no output received")
+}
+
+// ScanWithParameters scans with parameter values
+func (m *CfnNagModule) ScanWithParameters(ctx context.Context, templatePath string, parameterValuesPath string, conditionValuesPath string, ruleArguments string) (string, error) {
+	args := []string{"cfn_nag_scan", "--input-path", "/workspace/template.yaml"}
+	if parameterValuesPath != "" {
+		args = append(args, "--parameter-values-path", "/workspace/parameters.json")
+	}
+	if conditionValuesPath != "" {
+		args = append(args, "--condition-values-path", "/workspace/conditions.json")
+	}
+	if ruleArguments != "" {
+		args = append(args, "--rule-arguments", ruleArguments)
+	}
+
+	container := m.client.Container().
+		From("stelligent/cfn_nag:latest").
+		WithFile("/workspace/template.yaml", m.client.Host().File(templatePath))
+
+	if parameterValuesPath != "" {
+		container = container.WithFile("/workspace/parameters.json", m.client.Host().File(parameterValuesPath))
+	}
+	if conditionValuesPath != "" {
+		container = container.WithFile("/workspace/conditions.json", m.client.Host().File(conditionValuesPath))
+	}
+
+	container = container.WithWorkdir("/workspace").WithExec(args, dagger.ContainerWithExecOpts{Expect: "ANY"})
+
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
+	}
+
+	return "", fmt.Errorf("failed to run cfn-nag with parameters: no output received")
+}
+
+// ListRules lists all available CFN Nag rules
+func (m *CfnNagModule) ListRules(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("stelligent/cfn_nag:latest").
+		WithExec([]string{"cfn_nag_rules"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to list cfn-nag rules: %w", err)
+	}
+
+	return output, nil
+}
+
+// SPCMScan generates Stelligent Policy Complexity Metrics report
+func (m *CfnNagModule) SPCMScan(ctx context.Context, templatePath string, outputFormat string) (string, error) {
+	args := []string{"spcm_scan", "--input-path", "/workspace/template.yaml"}
+	if outputFormat != "" {
+		args = append(args, "--output-format", outputFormat)
+	}
+
+	container := m.client.Container().
+		From("stelligent/cfn_nag:latest").
+		WithFile("/workspace/template.yaml", m.client.Host().File(templatePath)).
+		WithWorkdir("/workspace").
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to run spcm scan: %w", err)
+	}
+
+	return output, nil
+}
+
 // GetVersion returns the version of cfn-nag
 func (m *CfnNagModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("stelligent/cfn_nag:latest").
-		WithExec([]string{"cfn_nag", "--version"})
+		WithExec([]string{"cfn_nag_scan", "--version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

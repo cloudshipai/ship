@@ -7,11 +7,11 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddScoutSuiteTools adds Scout Suite (multi-cloud security auditing) MCP tool implementations
+// AddScoutSuiteTools adds Scout Suite MCP tool implementations using real scout CLI commands
 func AddScoutSuiteTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
 	// Scout Suite scan AWS tool
 	scanAWSTool := mcp.NewTool("scout_suite_scan_aws",
-		mcp.WithDescription("Scan AWS environment for security issues using Scout Suite"),
+		mcp.WithDescription("Scan AWS environment for security issues using real scout CLI"),
 		mcp.WithString("profile",
 			mcp.Description("AWS profile to use for scanning"),
 		),
@@ -21,9 +21,16 @@ func AddScoutSuiteTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		mcp.WithString("services",
 			mcp.Description("Comma-separated list of AWS services to scan"),
 		),
+		mcp.WithString("report_dir",
+			mcp.Description("Directory to save the report"),
+		),
+		mcp.WithString("exceptions",
+			mcp.Description("Path to exceptions file"),
+		),
 	)
 	s.AddTool(scanAWSTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "scout-suite", "scan", "--provider", "aws"}
+		args := []string{"scout", "aws"}
+		
 		if profile := request.GetString("profile", ""); profile != "" {
 			args = append(args, "--profile", profile)
 		}
@@ -33,146 +40,170 @@ func AddScoutSuiteTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		if services := request.GetString("services", ""); services != "" {
 			args = append(args, "--services", services)
 		}
+		if reportDir := request.GetString("report_dir", ""); reportDir != "" {
+			args = append(args, "--report-dir", reportDir)
+		}
+		if exceptions := request.GetString("exceptions", ""); exceptions != "" {
+			args = append(args, "--exceptions", exceptions)
+		}
+		
 		return executeShipCommand(args)
 	})
 
 	// Scout Suite scan Azure tool
 	scanAzureTool := mcp.NewTool("scout_suite_scan_azure",
-		mcp.WithDescription("Scan Azure environment for security issues using Scout Suite"),
-		mcp.WithString("subscription_id",
-			mcp.Description("Azure subscription ID to scan"),
+		mcp.WithDescription("Scan Azure environment for security issues using real scout CLI"),
+		mcp.WithString("subscriptions",
+			mcp.Description("Azure subscription IDs to scan (space-separated)"),
 		),
 		mcp.WithString("tenant_id",
 			mcp.Description("Azure tenant ID"),
 		),
+		mcp.WithString("username",
+			mcp.Description("Azure username"),
+		),
+		mcp.WithString("password",
+			mcp.Description("Azure password"),
+		),
+		mcp.WithBoolean("cli",
+			mcp.Description("Use Azure CLI for authentication"),
+		),
+		mcp.WithBoolean("service_principal",
+			mcp.Description("Use service principal authentication"),
+		),
+		mcp.WithString("report_dir",
+			mcp.Description("Directory to save the report"),
+		),
 	)
 	s.AddTool(scanAzureTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "scout-suite", "scan", "--provider", "azure"}
-		if subscriptionID := request.GetString("subscription_id", ""); subscriptionID != "" {
-			args = append(args, "--subscription", subscriptionID)
+		args := []string{"scout", "azure"}
+		
+		if subscriptions := request.GetString("subscriptions", ""); subscriptions != "" {
+			args = append(args, "--subscriptions", subscriptions)
 		}
 		if tenantID := request.GetString("tenant_id", ""); tenantID != "" {
-			args = append(args, "--tenant", tenantID)
+			args = append(args, "--tenant-id", tenantID)
 		}
+		if username := request.GetString("username", ""); username != "" {
+			args = append(args, "--username", username)
+		}
+		if password := request.GetString("password", ""); password != "" {
+			args = append(args, "--password", password)
+		}
+		if request.GetBool("cli", false) {
+			args = append(args, "--cli")
+		}
+		if request.GetBool("service_principal", false) {
+			args = append(args, "--service-principal")
+		}
+		if reportDir := request.GetString("report_dir", ""); reportDir != "" {
+			args = append(args, "--report-dir", reportDir)
+		}
+		
 		return executeShipCommand(args)
 	})
 
 	// Scout Suite scan GCP tool
 	scanGCPTool := mcp.NewTool("scout_suite_scan_gcp",
-		mcp.WithDescription("Scan Google Cloud Platform for security issues using Scout Suite"),
+		mcp.WithDescription("Scan Google Cloud Platform for security issues using real scout CLI"),
 		mcp.WithString("project_id",
 			mcp.Description("GCP project ID to scan"),
-			mcp.Required(),
 		),
-		mcp.WithString("credentials_file",
-			mcp.Description("Path to GCP service account credentials file"),
+		mcp.WithString("folder_id",
+			mcp.Description("GCP folder ID to scan"),
+		),
+		mcp.WithString("organization_id",
+			mcp.Description("GCP organization ID to scan"),
+		),
+		mcp.WithString("service_account",
+			mcp.Description("Path to GCP service account key file"),
+		),
+		mcp.WithBoolean("user_account",
+			mcp.Description("Use user account for authentication"),
+		),
+		mcp.WithBoolean("all_projects",
+			mcp.Description("Scan all accessible projects"),
+		),
+		mcp.WithString("report_dir",
+			mcp.Description("Directory to save the report"),
 		),
 	)
 	s.AddTool(scanGCPTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		projectID := request.GetString("project_id", "")
-		args := []string{"security", "scout-suite", "scan", "--provider", "gcp", "--project", projectID}
-		if credentialsFile := request.GetString("credentials_file", ""); credentialsFile != "" {
-			args = append(args, "--credentials", credentialsFile)
+		args := []string{"scout", "gcp"}
+		
+		if projectID := request.GetString("project_id", ""); projectID != "" {
+			args = append(args, "--project-id", projectID)
 		}
+		if folderID := request.GetString("folder_id", ""); folderID != "" {
+			args = append(args, "--folder-id", folderID)
+		}
+		if orgID := request.GetString("organization_id", ""); orgID != "" {
+			args = append(args, "--organization-id", orgID)
+		}
+		if serviceAccount := request.GetString("service_account", ""); serviceAccount != "" {
+			args = append(args, "--service-account", serviceAccount)
+		}
+		if request.GetBool("user_account", false) {
+			args = append(args, "--user-account")
+		}
+		if request.GetBool("all_projects", false) {
+			args = append(args, "--all-projects")
+		}
+		if reportDir := request.GetString("report_dir", ""); reportDir != "" {
+			args = append(args, "--report-dir", reportDir)
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// Scout Suite generate report tool
-	generateReportTool := mcp.NewTool("scout_suite_generate_report",
-		mcp.WithDescription("Generate comprehensive security report from Scout Suite scan"),
-		mcp.WithString("scan_results",
-			mcp.Description("Path to Scout Suite scan results"),
-			mcp.Required(),
-		),
-		mcp.WithString("report_format",
-			mcp.Description("Report format (html, json, csv)"),
-		),
-		mcp.WithString("output_dir",
-			mcp.Description("Output directory for the report"),
-		),
-	)
-	s.AddTool(generateReportTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		scanResults := request.GetString("scan_results", "")
-		args := []string{"security", "scout-suite", "report", scanResults}
-		if reportFormat := request.GetString("report_format", ""); reportFormat != "" {
-			args = append(args, "--format", reportFormat)
-		}
-		if outputDir := request.GetString("output_dir", ""); outputDir != "" {
-			args = append(args, "--output", outputDir)
-		}
-		return executeShipCommand(args)
-	})
-
-	// Scout Suite list rules tool
-	listRulesTool := mcp.NewTool("scout_suite_list_rules",
-		mcp.WithDescription("List available Scout Suite security rules"),
+	// Scout Suite serve report tool
+	serveReportTool := mcp.NewTool("scout_suite_serve_report",
+		mcp.WithDescription("Serve Scout Suite report using real scout CLI"),
 		mcp.WithString("provider",
 			mcp.Description("Cloud provider (aws, azure, gcp)"),
 			mcp.Required(),
 		),
-		mcp.WithString("service",
-			mcp.Description("Specific service to list rules for"),
+		mcp.WithString("report_name",
+			mcp.Description("Name of report to serve"),
+		),
+		mcp.WithString("host",
+			mcp.Description("Host to bind server to (default 127.0.0.1)"),
+		),
+		mcp.WithString("port",
+			mcp.Description("Port to bind server to (default 8080)"),
 		),
 	)
-	s.AddTool(listRulesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	s.AddTool(serveReportTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		provider := request.GetString("provider", "")
-		args := []string{"security", "scout-suite", "list-rules", "--provider", provider}
-		if service := request.GetString("service", ""); service != "" {
-			args = append(args, "--service", service)
+		args := []string{"scout", provider, "--serve"}
+		
+		if reportName := request.GetString("report_name", ""); reportName != "" {
+			args = append(args, reportName)
 		}
+		if host := request.GetString("host", ""); host != "" {
+			args = append(args, "--host", host)
+		}
+		if port := request.GetString("port", ""); port != "" {
+			args = append(args, "--port", port)
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// Scout Suite validate rules tool
-	validateRulesTool := mcp.NewTool("scout_suite_validate_rules",
-		mcp.WithDescription("Validate custom Scout Suite rules"),
-		mcp.WithString("rules_path",
-			mcp.Description("Path to custom rules directory"),
-			mcp.Required(),
-		),
+	// Scout Suite help tool
+	helpTool := mcp.NewTool("scout_suite_help",
+		mcp.WithDescription("Get Scout Suite help information using real scout CLI"),
 		mcp.WithString("provider",
-			mcp.Description("Cloud provider for rule validation (aws, azure, gcp)"),
-			mcp.Required(),
+			mcp.Description("Get help for specific provider (aws, azure, gcp)"),
 		),
 	)
-	s.AddTool(validateRulesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		rulesPath := request.GetString("rules_path", "")
-		provider := request.GetString("provider", "")
-		args := []string{"security", "scout-suite", "validate-rules", rulesPath, "--provider", provider}
-		return executeShipCommand(args)
-	})
-
-	// Scout Suite compare scans tool
-	compareScansTool := mcp.NewTool("scout_suite_compare_scans",
-		mcp.WithDescription("Compare two Scout Suite scan results"),
-		mcp.WithString("baseline_scan",
-			mcp.Description("Path to baseline scan results"),
-			mcp.Required(),
-		),
-		mcp.WithString("current_scan",
-			mcp.Description("Path to current scan results"),
-			mcp.Required(),
-		),
-		mcp.WithString("output_file",
-			mcp.Description("Output file for comparison report"),
-		),
-	)
-	s.AddTool(compareScansTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		baselineScan := request.GetString("baseline_scan", "")
-		currentScan := request.GetString("current_scan", "")
-		args := []string{"security", "scout-suite", "compare", baselineScan, currentScan}
-		if outputFile := request.GetString("output_file", ""); outputFile != "" {
-			args = append(args, "--output", outputFile)
+	s.AddTool(helpTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"scout", "--help"}
+		
+		if provider := request.GetString("provider", ""); provider != "" {
+			args = []string{"scout", provider, "--help"}
 		}
-		return executeShipCommand(args)
-	})
-
-	// Scout Suite get version tool
-	getVersionTool := mcp.NewTool("scout_suite_get_version",
-		mcp.WithDescription("Get Scout Suite version information"),
-	)
-	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "scout-suite", "--version"}
+		
 		return executeShipCommand(args)
 	})
 }

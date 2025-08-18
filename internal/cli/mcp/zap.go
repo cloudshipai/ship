@@ -23,9 +23,16 @@ func AddZapTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc)
 	)
 	s.AddTool(passiveScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		target := request.GetString("target", "")
-		args := []string{"security", "zap", target, "--scan-type", "passive"}
+		args := []string{"zap-baseline.py", "-t", target}
 		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
+			switch format {
+			case "json":
+				args = append(args, "-J", "/tmp/zap-report.json")
+			case "xml":
+				args = append(args, "-x", "/tmp/zap-report.xml")
+			case "html":
+				args = append(args, "-r", "/tmp/zap-report.html")
+			}
 		}
 		return executeShipCommand(args)
 	})
@@ -44,9 +51,16 @@ func AddZapTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc)
 	)
 	s.AddTool(activeScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		target := request.GetString("target", "")
-		args := []string{"security", "zap", target, "--scan-type", "active"}
+		args := []string{"zap-full-scan.py", "-t", target}
 		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
+			switch format {
+			case "json":
+				args = append(args, "-J", "/tmp/zap-report.json")
+			case "xml":
+				args = append(args, "-x", "/tmp/zap-report.xml")
+			case "html":
+				args = append(args, "-r", "/tmp/zap-report.html")
+			}
 		}
 		return executeShipCommand(args)
 	})
@@ -68,12 +82,19 @@ func AddZapTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc)
 	)
 	s.AddTool(spiderScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		target := request.GetString("target", "")
-		args := []string{"security", "zap", target, "--scan-type", "spider"}
+		args := []string{"zap.sh", "-cmd", "-quickurl", target, "-quickout", "/tmp/zap-spider.html"}
 		if maxDepth := request.GetInt("max_depth", 0); maxDepth > 0 {
-			args = append(args, "--max-depth", string(rune(maxDepth)))
+			args = append(args, "-quickout", "/tmp/zap-spider-depth-"+string(rune(maxDepth))+".html")
 		}
 		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
+			switch format {
+			case "json":
+				args = append(args, "-J", "/tmp/zap-report.json")
+			case "xml":
+				args = append(args, "-x", "/tmp/zap-report.xml")
+			case "html":
+				args = append(args, "-r", "/tmp/zap-report.html")
+			}
 		}
 		return executeShipCommand(args)
 	})
@@ -95,12 +116,19 @@ func AddZapTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc)
 	)
 	s.AddTool(fullScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		target := request.GetString("target", "")
-		args := []string{"security", "zap", target, "--scan-type", "full"}
+		args := []string{"zap-full-scan.py", "-t", target}
 		if maxDuration := request.GetInt("max_duration", 0); maxDuration > 0 {
-			args = append(args, "--max-duration", string(rune(maxDuration)))
+			args = append(args, "-m", string(rune(maxDuration)))
 		}
 		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
+			switch format {
+			case "json":
+				args = append(args, "-J", "/tmp/zap-report.json")
+			case "xml":
+				args = append(args, "-x", "/tmp/zap-report.xml")
+			case "html":
+				args = append(args, "-r", "/tmp/zap-report.html")
+			}
 		}
 		return executeShipCommand(args)
 	})
@@ -119,9 +147,16 @@ func AddZapTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc)
 	)
 	s.AddTool(baselineScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		target := request.GetString("target", "")
-		args := []string{"security", "zap", target, "--scan-type", "baseline"}
+		args := []string{"zap-baseline.py", "-t", target}
 		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
+			switch format {
+			case "json":
+				args = append(args, "-J", "/tmp/zap-report.json")
+			case "xml":
+				args = append(args, "-x", "/tmp/zap-report.xml")
+			case "html":
+				args = append(args, "-r", "/tmp/zap-report.html")
+			}
 		}
 		return executeShipCommand(args)
 	})
@@ -131,7 +166,7 @@ func AddZapTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc)
 		mcp.WithDescription("Get OWASP ZAP version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "zap", "--version"}
+		args := []string{"zap.sh", "-version"}
 		return executeShipCommand(args)
 	})
 }

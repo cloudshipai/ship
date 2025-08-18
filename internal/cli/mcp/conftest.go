@@ -10,68 +10,121 @@ import (
 // AddConftestTools adds Conftest (OPA policy testing) MCP tool implementations
 func AddConftestTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
 	// Conftest test policies tool
-	testPolicesTool := mcp.NewTool("conftest_test_policies",
-		mcp.WithDescription("Test configuration files against OPA policies using Conftest"),
-		mcp.WithString("input_path",
+	testTool := mcp.NewTool("conftest_test",
+		mcp.WithDescription("Test configuration files against OPA policies"),
+		mcp.WithString("input_file",
 			mcp.Description("Path to configuration file or directory to test"),
 			mcp.Required(),
 		),
-		mcp.WithString("policy_path",
-			mcp.Description("Path to OPA policy files"),
+		mcp.WithString("policy",
+			mcp.Description("Path to policy directory (default: policy)"),
 		),
-		mcp.WithString("output_format",
+		mcp.WithString("namespace",
+			mcp.Description("Override default namespace"),
+		),
+		mcp.WithBoolean("all_namespaces",
+			mcp.Description("Look in all namespaces"),
+		),
+		mcp.WithString("output",
 			mcp.Description("Output format"),
-			mcp.Enum("json", "table", "tap", "junit"),
+			mcp.Enum("json", "table", "tap", "junit", "github"),
+		),
+		mcp.WithString("parser",
+			mcp.Description("Parser to use for input files"),
+			mcp.Enum("yaml", "json", "toml", "hcl1", "hcl2", "dockerfile"),
 		),
 	)
-	s.AddTool(testPolicesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		inputPath := request.GetString("input_path", "")
-		args := []string{"security", "conftest", "test", inputPath}
-		if policyPath := request.GetString("policy_path", ""); policyPath != "" {
-			args = append(args, "--policy", policyPath)
+	s.AddTool(testTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		inputFile := request.GetString("input_file", "")
+		args := []string{"conftest", "test", inputFile}
+		
+		if policy := request.GetString("policy", ""); policy != "" {
+			args = append(args, "--policy", policy)
 		}
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
+		if namespace := request.GetString("namespace", ""); namespace != "" {
+			args = append(args, "--namespace", namespace)
 		}
+		if request.GetBool("all_namespaces", false) {
+			args = append(args, "--all-namespaces")
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		if parser := request.GetString("parser", ""); parser != "" {
+			args = append(args, "--parser", parser)
+		}
+		
 		return executeShipCommand(args)
 	})
 
 	// Conftest verify policies tool
-	verifyPolicesTool := mcp.NewTool("conftest_verify_policies",
-		mcp.WithDescription("Verify OPA policies against test data"),
-		mcp.WithString("policy_path",
-			mcp.Description("Path to OPA policy files"),
-			mcp.Required(),
+	verifyTool := mcp.NewTool("conftest_verify",
+		mcp.WithDescription("Run policy unit tests"),
+		mcp.WithString("policy",
+			mcp.Description("Path to policy directory"),
 		),
-		mcp.WithString("data_path",
-			mcp.Description("Path to test data files"),
+		mcp.WithBoolean("show_builtin_errors",
+			mcp.Description("Show parsing errors (recommended)"),
 		),
 	)
-	s.AddTool(verifyPolicesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		policyPath := request.GetString("policy_path", "")
-		args := []string{"security", "conftest", "verify", "--policy", policyPath}
-		if dataPath := request.GetString("data_path", ""); dataPath != "" {
-			args = append(args, "--data", dataPath)
+	s.AddTool(verifyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"conftest", "verify"}
+		
+		if policy := request.GetString("policy", ""); policy != "" {
+			args = append(args, "--policy", policy)
 		}
+		if request.GetBool("show_builtin_errors", false) {
+			args = append(args, "--show-builtin-errors")
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// Conftest push policies tool
-	pushPolicesTool := mcp.NewTool("conftest_push_policies",
-		mcp.WithDescription("Push OPA policies to OCI registry"),
-		mcp.WithString("policy_path",
-			mcp.Description("Path to policy files to push"),
+	// Conftest parse configuration files tool
+	parseTool := mcp.NewTool("conftest_parse",
+		mcp.WithDescription("Parse and print structured data from input files"),
+		mcp.WithString("input_file",
+			mcp.Description("Path to configuration file to parse"),
 			mcp.Required(),
 		),
+		mcp.WithString("parser",
+			mcp.Description("Parser to use for input files"),
+			mcp.Enum("yaml", "json", "toml", "hcl1", "hcl2", "dockerfile"),
+		),
+	)
+	s.AddTool(parseTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		inputFile := request.GetString("input_file", "")
+		args := []string{"conftest", "parse", inputFile}
+		
+		if parser := request.GetString("parser", ""); parser != "" {
+			args = append(args, "--parser", parser)
+		}
+		
+		return executeShipCommand(args)
+	})
+
+	// Conftest push policies to OCI registry
+	pushTool := mcp.NewTool("conftest_push",
+		mcp.WithDescription("Push OPA policy bundles to OCI registry"),
 		mcp.WithString("registry_url",
 			mcp.Description("OCI registry URL to push policies to"),
 			mcp.Required(),
 		),
+		mcp.WithString("policy_dir",
+			mcp.Description("Policy directory to push (optional)"),
+		),
+		mcp.WithString("tag",
+			mcp.Description("Tag for the policy bundle (optional)"),
+		),
 	)
-	s.AddTool(pushPolicesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		policyPath := request.GetString("policy_path", "")
+	s.AddTool(pushTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		registryURL := request.GetString("registry_url", "")
-		args := []string{"security", "conftest", "push", registryURL, "--policy", policyPath}
+		args := []string{"conftest", "push", registryURL}
+		
+		if policyDir := request.GetString("policy_dir", ""); policyDir != "" {
+			args = append(args, policyDir)
+		}
+		
 		return executeShipCommand(args)
 	})
 
@@ -80,7 +133,7 @@ func AddConftestTools(s *server.MCPServer, executeShipCommand ExecuteShipCommand
 		mcp.WithDescription("Get Conftest version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "conftest", "--version"}
+		args := []string{"conftest", "--version"}
 		return executeShipCommand(args)
 	})
 }

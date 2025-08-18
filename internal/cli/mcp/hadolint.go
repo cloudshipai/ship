@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -18,12 +19,12 @@ func AddHadolintTools(s *server.MCPServer, executeShipCommand ExecuteShipCommand
 		),
 		mcp.WithString("format",
 			mcp.Description("Output format"),
-			mcp.Enum("json", "text", "checkstyle", "codeclimate", "gitlab_codeclimate"),
+			mcp.Enum("tty", "json", "checkstyle", "codeclimate", "gitlab_codeclimate", "gnu", "codacy", "sonarqube", "sarif"),
 		),
 	)
 	s.AddTool(scanDockerfileTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		dockerfilePath := request.GetString("dockerfile_path", "")
-		args := []string{"security", "hadolint", dockerfilePath}
+		args := []string{"hadolint", dockerfilePath}
 		if format := request.GetString("format", ""); format != "" {
 			args = append(args, "--format", format)
 		}
@@ -39,14 +40,16 @@ func AddHadolintTools(s *server.MCPServer, executeShipCommand ExecuteShipCommand
 		),
 		mcp.WithString("format",
 			mcp.Description("Output format"),
-			mcp.Enum("json", "text", "checkstyle", "codeclimate", "gitlab_codeclimate"),
+			mcp.Enum("tty", "json", "checkstyle", "codeclimate", "gitlab_codeclimate", "gnu", "codacy", "sonarqube", "sarif"),
 		),
 	)
 	s.AddTool(scanDirectoryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		directory := request.GetString("directory", "")
-		args := []string{"security", "hadolint", directory}
+		// Hadolint doesn't support directory scanning directly - scan individual Dockerfiles
+		args := []string{"sh", "-c", "find " + directory + " -name 'Dockerfile*' -exec hadolint {} +"}
 		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--format", format)
+			// Add format to find command
+			args = []string{"sh", "-c", "find " + directory + " -name 'Dockerfile*' -exec hadolint --format " + format + " {} +"}
 		}
 		return executeShipCommand(args)
 	})
@@ -64,16 +67,49 @@ func AddHadolintTools(s *server.MCPServer, executeShipCommand ExecuteShipCommand
 		),
 		mcp.WithString("format",
 			mcp.Description("Output format"),
-			mcp.Enum("json", "text", "checkstyle", "codeclimate", "gitlab_codeclimate"),
+			mcp.Enum("tty", "json", "checkstyle", "codeclimate", "gitlab_codeclimate", "gnu", "codacy", "sonarqube", "sarif"),
 		),
 	)
 	s.AddTool(scanWithConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		dockerfilePath := request.GetString("dockerfile_path", "")
 		configFile := request.GetString("config_file", "")
-		args := []string{"security", "hadolint", dockerfilePath, "--config", configFile}
+		args := []string{"hadolint", "--config", configFile, dockerfilePath}
 		if format := request.GetString("format", ""); format != "" {
 			args = append(args, "--format", format)
 		}
+		return executeShipCommand(args)
+	})
+
+	// Hadolint scan with ignore rules tool
+	scanIgnoreRulesTool := mcp.NewTool("hadolint_scan_ignore_rules",
+		mcp.WithDescription("Scan Dockerfile while ignoring specific rules"),
+		mcp.WithString("dockerfile_path",
+			mcp.Description("Path to Dockerfile to scan"),
+			mcp.Required(),
+		),
+		mcp.WithString("ignore_rules",
+			mcp.Description("Comma-separated list of rules to ignore (e.g., DL3003,DL3006)"),
+		),
+		mcp.WithString("format",
+			mcp.Description("Output format"),
+			mcp.Enum("tty", "json", "checkstyle", "codeclimate", "gitlab_codeclimate", "gnu", "codacy", "sonarqube", "sarif"),
+		),
+	)
+	s.AddTool(scanIgnoreRulesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		dockerfilePath := request.GetString("dockerfile_path", "")
+		args := []string{"hadolint", dockerfilePath}
+		
+		if ignoreRules := request.GetString("ignore_rules", ""); ignoreRules != "" {
+			// Split comma-separated rules and add each as --ignore flag
+			rules := strings.Split(ignoreRules, ",")
+			for _, rule := range rules {
+				args = append(args, "--ignore", strings.TrimSpace(rule))
+			}
+		}
+		if format := request.GetString("format", ""); format != "" {
+			args = append(args, "--format", format)
+		}
+		
 		return executeShipCommand(args)
 	})
 
@@ -82,7 +118,7 @@ func AddHadolintTools(s *server.MCPServer, executeShipCommand ExecuteShipCommand
 		mcp.WithDescription("Get Hadolint version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "hadolint", "--version"}
+		args := []string{"hadolint", "--version"}
 		return executeShipCommand(args)
 	})
 }

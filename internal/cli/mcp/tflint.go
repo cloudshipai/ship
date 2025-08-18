@@ -7,170 +7,102 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddTfLintTools adds TFLint (Terraform linting) MCP tool implementations
+// AddTfLintTools adds TFLint MCP tool implementations using real tflint CLI commands
 func AddTfLintTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// TFLint lint directory tool
-	lintDirectoryTool := mcp.NewTool("tflint_lint_directory",
-		mcp.WithDescription("Lint all Terraform files in a directory using TFLint"),
-		mcp.WithString("directory",
-			mcp.Description("Directory containing Terraform files to lint"),
-			mcp.Required(),
+	// TFLint basic lint tool
+	lintTool := mcp.NewTool("tflint_lint",
+		mcp.WithDescription("Lint Terraform files using real tflint CLI"),
+		mcp.WithString("chdir",
+			mcp.Description("Change working directory before linting"),
 		),
 		mcp.WithString("format",
 			mcp.Description("Output format"),
-			mcp.Enum("json", "compact", "checkstyle"),
+			mcp.Enum("default", "json", "checkstyle", "junit", "compact", "sarif"),
 		),
-	)
-	s.AddTool(lintDirectoryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		directory := request.GetString("directory", "")
-		args := []string{"terraform-tools", "tflint", directory}
-		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--format", format)
-		}
-		return executeShipCommand(args)
-	})
-
-	// TFLint lint specific file tool
-	lintFileTool := mcp.NewTool("tflint_lint_file",
-		mcp.WithDescription("Lint a specific Terraform file using TFLint"),
-		mcp.WithString("file_path",
-			mcp.Description("Path to Terraform file to lint"),
-			mcp.Required(),
-		),
-		mcp.WithString("format",
-			mcp.Description("Output format"),
-			mcp.Enum("json", "compact", "checkstyle"),
-		),
-	)
-	s.AddTool(lintFileTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		filePath := request.GetString("file_path", "")
-		args := []string{"terraform-tools", "tflint", "--file", filePath}
-		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--format", format)
-		}
-		return executeShipCommand(args)
-	})
-
-	// TFLint lint with custom config tool
-	lintWithConfigTool := mcp.NewTool("tflint_lint_with_config",
-		mcp.WithDescription("Lint Terraform files using custom TFLint configuration"),
-		mcp.WithString("directory",
-			mcp.Description("Directory containing Terraform files"),
-			mcp.Required(),
-		),
-		mcp.WithString("config_file",
+		mcp.WithString("config",
 			mcp.Description("Path to TFLint configuration file"),
-			mcp.Required(),
 		),
-		mcp.WithString("format",
-			mcp.Description("Output format"),
-			mcp.Enum("json", "compact", "checkstyle"),
+		mcp.WithBoolean("recursive",
+			mcp.Description("Run command in each directory recursively"),
 		),
 	)
-	s.AddTool(lintWithConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		directory := request.GetString("directory", "")
-		configFile := request.GetString("config_file", "")
-		args := []string{"terraform-tools", "tflint", directory, "--config", configFile}
-		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--format", format)
+	s.AddTool(lintTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"tflint"}
+		
+		if chdir := request.GetString("chdir", ""); chdir != "" {
+			args = append(args, "--chdir="+chdir)
 		}
+		if format := request.GetString("format", ""); format != "" {
+			args = append(args, "--format="+format)
+		}
+		if config := request.GetString("config", ""); config != "" {
+			args = append(args, "--config="+config)
+		}
+		if request.GetBool("recursive", false) {
+			args = append(args, "--recursive")
+		}
+		
 		return executeShipCommand(args)
 	})
 
 	// TFLint lint with rules tool
 	lintWithRulesTool := mcp.NewTool("tflint_lint_with_rules",
-		mcp.WithDescription("Lint Terraform files with specific rules enabled/disabled"),
-		mcp.WithString("directory",
-			mcp.Description("Directory containing Terraform files"),
-			mcp.Required(),
+		mcp.WithDescription("Lint Terraform files with specific rules enabled/disabled using real tflint CLI"),
+		mcp.WithString("chdir",
+			mcp.Description("Change working directory before linting"),
 		),
-		mcp.WithString("enable_rules",
-			mcp.Description("Comma-separated list of rules to enable"),
+		mcp.WithString("enable_rule",
+			mcp.Description("Enable specific rule"),
 		),
-		mcp.WithString("disable_rules",
-			mcp.Description("Comma-separated list of rules to disable"),
+		mcp.WithString("disable_rule",
+			mcp.Description("Disable specific rule"),
 		),
 		mcp.WithString("format",
 			mcp.Description("Output format"),
-			mcp.Enum("json", "compact", "checkstyle"),
+			mcp.Enum("default", "json", "checkstyle", "junit", "compact", "sarif"),
 		),
 	)
 	s.AddTool(lintWithRulesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		directory := request.GetString("directory", "")
-		args := []string{"terraform-tools", "tflint", directory}
-		if enableRules := request.GetString("enable_rules", ""); enableRules != "" {
-			args = append(args, "--enable-rules", enableRules)
+		args := []string{"tflint"}
+		
+		if chdir := request.GetString("chdir", ""); chdir != "" {
+			args = append(args, "--chdir="+chdir)
 		}
-		if disableRules := request.GetString("disable_rules", ""); disableRules != "" {
-			args = append(args, "--disable-rules", disableRules)
+		if enableRule := request.GetString("enable_rule", ""); enableRule != "" {
+			args = append(args, "--enable-rule="+enableRule)
+		}
+		if disableRule := request.GetString("disable_rule", ""); disableRule != "" {
+			args = append(args, "--disable-rule="+disableRule)
 		}
 		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--format", format)
+			args = append(args, "--format="+format)
 		}
+		
 		return executeShipCommand(args)
 	})
 
 	// TFLint init plugins tool
-	initPluginsTool := mcp.NewTool("tflint_init_plugins",
-		mcp.WithDescription("Initialize TFLint plugins for a Terraform project"),
-		mcp.WithString("directory",
-			mcp.Description("Directory containing Terraform files"),
-			mcp.Required(),
+	initTool := mcp.NewTool("tflint_init",
+		mcp.WithDescription("Initialize TFLint plugins using real tflint CLI"),
+		mcp.WithString("chdir",
+			mcp.Description("Change working directory before initializing"),
 		),
 	)
-	s.AddTool(initPluginsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		directory := request.GetString("directory", "")
-		args := []string{"terraform-tools", "tflint", directory, "--init"}
-		return executeShipCommand(args)
-	})
-
-	// TFLint validate format tool
-	validateFormatTool := mcp.NewTool("tflint_validate_format",
-		mcp.WithDescription("Validate Terraform format and syntax using TFLint"),
-		mcp.WithString("directory",
-			mcp.Description("Directory containing Terraform files"),
-			mcp.Required(),
-		),
-		mcp.WithBoolean("recursive",
-			mcp.Description("Recursively lint subdirectories"),
-		),
-	)
-	s.AddTool(validateFormatTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		directory := request.GetString("directory", "")
-		args := []string{"terraform-tools", "tflint", directory, "--validate"}
-		if request.GetBool("recursive", false) {
-			args = append(args, "--recursive")
+	s.AddTool(initTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"tflint", "--init"}
+		
+		if chdir := request.GetString("chdir", ""); chdir != "" {
+			args = append(args, "--chdir="+chdir)
 		}
+		
 		return executeShipCommand(args)
 	})
 
-	// TFLint fix issues tool
-	fixIssuesTool := mcp.NewTool("tflint_fix_issues",
-		mcp.WithDescription("Automatically fix TFLint issues where possible"),
-		mcp.WithString("directory",
-			mcp.Description("Directory containing Terraform files"),
-			mcp.Required(),
-		),
-		mcp.WithString("format",
-			mcp.Description("Output format"),
-			mcp.Enum("json", "compact", "checkstyle"),
-		),
-	)
-	s.AddTool(fixIssuesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		directory := request.GetString("directory", "")
-		args := []string{"terraform-tools", "tflint", directory, "--fix"}
-		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--format", format)
-		}
-		return executeShipCommand(args)
-	})
-
-	// TFLint with var file tool
+	// TFLint with variable file tool
 	lintWithVarFileTool := mcp.NewTool("tflint_lint_with_var_file",
-		mcp.WithDescription("Lint Terraform files with variable files"),
-		mcp.WithString("directory",
-			mcp.Description("Directory containing Terraform files"),
-			mcp.Required(),
+		mcp.WithDescription("Lint Terraform files with variable files using real tflint CLI"),
+		mcp.WithString("chdir",
+			mcp.Description("Change working directory before linting"),
 		),
 		mcp.WithString("var_file",
 			mcp.Description("Path to Terraform variable file"),
@@ -178,72 +110,58 @@ func AddTfLintTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 		mcp.WithString("format",
 			mcp.Description("Output format"),
-			mcp.Enum("json", "compact", "checkstyle"),
+			mcp.Enum("default", "json", "checkstyle", "junit", "compact", "sarif"),
 		),
 	)
 	s.AddTool(lintWithVarFileTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		directory := request.GetString("directory", "")
 		varFile := request.GetString("var_file", "")
-		args := []string{"terraform-tools", "tflint", directory, "--var-file", varFile}
-		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--format", format)
+		args := []string{"tflint", "--var-file=" + varFile}
+		
+		if chdir := request.GetString("chdir", ""); chdir != "" {
+			args = append(args, "--chdir="+chdir)
 		}
+		if format := request.GetString("format", ""); format != "" {
+			args = append(args, "--format="+format)
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// TFLint with chdir tool
-	lintWithChdirTool := mcp.NewTool("tflint_lint_with_chdir",
-		mcp.WithDescription("Lint Terraform files after changing working directory"),
-		mcp.WithString("target_directory",
-			mcp.Description("Target directory to change to before linting"),
+	// TFLint with variables tool
+	lintWithVarTool := mcp.NewTool("tflint_lint_with_var",
+		mcp.WithDescription("Lint Terraform files with individual variables using real tflint CLI"),
+		mcp.WithString("chdir",
+			mcp.Description("Change working directory before linting"),
+		),
+		mcp.WithString("var",
+			mcp.Description("Set Terraform variable (format: 'key=value')"),
 			mcp.Required(),
 		),
 		mcp.WithString("format",
 			mcp.Description("Output format"),
-			mcp.Enum("json", "compact", "checkstyle"),
+			mcp.Enum("default", "json", "checkstyle", "junit", "compact", "sarif"),
 		),
 	)
-	s.AddTool(lintWithChdirTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		targetDir := request.GetString("target_directory", "")
-		args := []string{"terraform-tools", "tflint", "--chdir", targetDir}
-		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--format", format)
+	s.AddTool(lintWithVarTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		variable := request.GetString("var", "")
+		args := []string{"tflint", "--var=" + variable}
+		
+		if chdir := request.GetString("chdir", ""); chdir != "" {
+			args = append(args, "--chdir="+chdir)
 		}
+		if format := request.GetString("format", ""); format != "" {
+			args = append(args, "--format="+format)
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// TFLint only specific rule tool
-	lintOnlyRuleTool := mcp.NewTool("tflint_lint_only_rule",
-		mcp.WithDescription("Lint with only a specific rule enabled"),
-		mcp.WithString("directory",
-			mcp.Description("Directory containing Terraform files"),
-			mcp.Required(),
-		),
-		mcp.WithString("rule",
-			mcp.Description("Specific rule to enable"),
-			mcp.Required(),
-		),
-		mcp.WithString("format",
-			mcp.Description("Output format"),
-			mcp.Enum("json", "compact", "checkstyle"),
-		),
+	// TFLint version tool
+	versionTool := mcp.NewTool("tflint_version",
+		mcp.WithDescription("Get TFLint version information using real tflint CLI"),
 	)
-	s.AddTool(lintOnlyRuleTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		directory := request.GetString("directory", "")
-		rule := request.GetString("rule", "")
-		args := []string{"terraform-tools", "tflint", directory, "--only", rule}
-		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--format", format)
-		}
-		return executeShipCommand(args)
-	})
-
-	// TFLint print version tool
-	printVersionTool := mcp.NewTool("tflint_print_version",
-		mcp.WithDescription("Print TFLint version information"),
-	)
-	s.AddTool(printVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"terraform-tools", "tflint", "--version"}
+	s.AddTool(versionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"tflint", "--version"}
 		return executeShipCommand(args)
 	})
 }

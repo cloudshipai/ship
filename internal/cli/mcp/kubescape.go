@@ -14,108 +14,105 @@ func AddKubescapeTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		mcp.WithDescription("Scan Kubernetes cluster using Kubescape"),
 		mcp.WithString("framework",
 			mcp.Description("Security framework to use"),
-			mcp.Enum("nsa", "mitre", "cis", "all"),
+			mcp.Enum("nsa", "mitre", "cis"),
 		),
-		mcp.WithString("kubeconfig",
-			mcp.Description("Path to kubeconfig file"),
+		mcp.WithString("kube_context",
+			mcp.Description("Kubernetes context to use"),
+		),
+		mcp.WithString("output_format",
+			mcp.Description("Output format"),
+			mcp.Enum("json", "junit", "pdf", "html", "sarif"),
+		),
+		mcp.WithString("output_file",
+			mcp.Description("Output file path"),
+		),
+		mcp.WithBoolean("verbose",
+			mcp.Description("Enable verbose output"),
+		),
+		mcp.WithBoolean("submit",
+			mcp.Description("Submit results to Armo platform"),
+		),
+		mcp.WithBoolean("enable_host_scan",
+			mcp.Description("Enable host scanning"),
 		),
 	)
 	s.AddTool(scanClusterTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "kubescape", "cluster"}
+		args := []string{"kubescape", "scan"}
+		
 		if framework := request.GetString("framework", ""); framework != "" {
-			args = append(args, "--framework", framework)
+			args = append(args, "framework", framework)
 		}
-		if kubeconfig := request.GetString("kubeconfig", ""); kubeconfig != "" {
-			args = append(args, "--kubeconfig", kubeconfig)
+		if kubeContext := request.GetString("kube_context", ""); kubeContext != "" {
+			args = append(args, "--kube-context", kubeContext)
 		}
+		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
+			args = append(args, "--format", outputFormat)
+		}
+		if outputFile := request.GetString("output_file", ""); outputFile != "" {
+			args = append(args, "--output", outputFile)
+		}
+		if request.GetBool("verbose", false) {
+			args = append(args, "--verbose")
+		}
+		if request.GetBool("submit", false) {
+			args = append(args, "--submit")
+		}
+		if request.GetBool("enable_host_scan", false) {
+			args = append(args, "--enable-host-scan")
+		}
+		
 		return executeShipCommand(args)
 	})
 
 	// Kubescape scan manifests tool
 	scanManifestsTool := mcp.NewTool("kubescape_scan_manifests",
 		mcp.WithDescription("Scan Kubernetes manifests using Kubescape"),
-		mcp.WithString("manifests_dir",
-			mcp.Description("Directory containing Kubernetes manifests"),
+		mcp.WithString("manifests_path",
+			mcp.Description("Path to Kubernetes manifests (files or directory)"),
+			mcp.Required(),
 		),
 		mcp.WithString("framework",
 			mcp.Description("Security framework to use"),
-			mcp.Enum("nsa", "mitre", "cis", "all"),
+			mcp.Enum("nsa", "mitre", "cis"),
+		),
+		mcp.WithString("output_format",
+			mcp.Description("Output format"),
+			mcp.Enum("json", "junit", "pdf", "html", "sarif"),
+		),
+		mcp.WithString("output_file",
+			mcp.Description("Output file path"),
+		),
+		mcp.WithBoolean("verbose",
+			mcp.Description("Enable verbose output"),
 		),
 	)
 	s.AddTool(scanManifestsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "kubescape", "manifests"}
-		if manifestsDir := request.GetString("manifests_dir", ""); manifestsDir != "" {
-			args = append(args, manifestsDir)
-		}
+		manifestsPath := request.GetString("manifests_path", "")
+		args := []string{"kubescape", "scan", manifestsPath}
+		
 		if framework := request.GetString("framework", ""); framework != "" {
-			args = append(args, "--framework", framework)
+			args = append(args, "framework", framework)
 		}
+		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
+			args = append(args, "--format", outputFormat)
+		}
+		if outputFile := request.GetString("output_file", ""); outputFile != "" {
+			args = append(args, "--output", outputFile)
+		}
+		if request.GetBool("verbose", false) {
+			args = append(args, "--verbose")
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// Kubescape scan Helm chart tool
-	scanHelmTool := mcp.NewTool("kubescape_scan_helm",
-		mcp.WithDescription("Scan Helm chart using Kubescape"),
-		mcp.WithString("chart_path",
-			mcp.Description("Path to Helm chart directory"),
-		),
-		mcp.WithString("framework",
-			mcp.Description("Security framework to use"),
-			mcp.Enum("nsa", "mitre", "cis", "all"),
-		),
+	// Kubescape get version tool
+	getVersionTool := mcp.NewTool("kubescape_get_version",
+		mcp.WithDescription("Get Kubescape version information"),
 	)
-	s.AddTool(scanHelmTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "kubescape", "helm"}
-		if chartPath := request.GetString("chart_path", ""); chartPath != "" {
-			args = append(args, chartPath)
-		}
-		if framework := request.GetString("framework", ""); framework != "" {
-			args = append(args, "--framework", framework)
-		}
+	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"kubescape", "version"}
 		return executeShipCommand(args)
 	})
 
-	// Kubescape scan repository tool
-	scanRepositoryTool := mcp.NewTool("kubescape_scan_repository",
-		mcp.WithDescription("Scan repository for Kubernetes security issues using Kubescape"),
-		mcp.WithString("repo_path",
-			mcp.Description("Path to repository directory"),
-		),
-		mcp.WithString("framework",
-			mcp.Description("Security framework to use"),
-			mcp.Enum("nsa", "mitre", "cis", "all"),
-		),
-	)
-	s.AddTool(scanRepositoryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "kubescape", "repo"}
-		if repoPath := request.GetString("repo_path", ""); repoPath != "" {
-			args = append(args, repoPath)
-		}
-		if framework := request.GetString("framework", ""); framework != "" {
-			args = append(args, "--framework", framework)
-		}
-		return executeShipCommand(args)
-	})
-
-	// Kubescape generate report tool
-	generateReportTool := mcp.NewTool("kubescape_generate_report",
-		mcp.WithDescription("Generate security report using Kubescape"),
-		mcp.WithString("input_path",
-			mcp.Description("Path to scan results or manifests"),
-		),
-		mcp.WithString("format",
-			mcp.Description("Report format"),
-			mcp.Enum("json", "junit", "pdf", "html"),
-		),
-	)
-	s.AddTool(generateReportTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "kubescape", "report"}
-		if inputPath := request.GetString("input_path", ""); inputPath != "" {
-			args = append(args, inputPath)
-		}
-		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--format", format)
-		}
-		return executeShipCommand(args)
-	})
 }

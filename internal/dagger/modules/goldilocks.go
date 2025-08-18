@@ -81,3 +81,78 @@ func (m *GoldilocksModule) GetVersion(ctx context.Context) (string, error) {
 
 	return output, nil
 }
+
+// InstallHelm installs Goldilocks using Helm
+func (m *GoldilocksModule) InstallHelm(ctx context.Context, namespace string, kubeconfig string) (string, error) {
+	if namespace == "" {
+		namespace = "goldilocks"
+	}
+
+	container := m.client.Container().
+		From("alpine/helm:latest")
+
+	if kubeconfig != "" {
+		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
+	}
+
+	container = container.WithExec([]string{
+		"helm", "repo", "add", "fairwinds-stable", "https://charts.fairwinds.com/stable",
+	}).WithExec([]string{
+		"helm", "install", "goldilocks", "fairwinds-stable/goldilocks",
+		"--namespace", namespace,
+		"--create-namespace",
+	})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to install goldilocks via helm: %w", err)
+	}
+
+	return output, nil
+}
+
+// EnableNamespace enables Goldilocks for a namespace
+func (m *GoldilocksModule) EnableNamespace(ctx context.Context, namespace string, kubeconfig string) (string, error) {
+	container := m.client.Container().
+		From("bitnami/kubectl:latest")
+
+	if kubeconfig != "" {
+		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
+	}
+
+	container = container.WithExec([]string{
+		"kubectl", "label", "ns", namespace, "goldilocks.fairwinds.com/enabled=true",
+	})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to enable namespace for goldilocks: %w", err)
+	}
+
+	return output, nil
+}
+
+// Uninstall removes Goldilocks using Helm
+func (m *GoldilocksModule) Uninstall(ctx context.Context, namespace string, kubeconfig string) (string, error) {
+	if namespace == "" {
+		namespace = "goldilocks"
+	}
+
+	container := m.client.Container().
+		From("alpine/helm:latest")
+
+	if kubeconfig != "" {
+		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
+	}
+
+	container = container.WithExec([]string{
+		"helm", "uninstall", "goldilocks", "--namespace", namespace,
+	})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to uninstall goldilocks: %w", err)
+	}
+
+	return output, nil
+}

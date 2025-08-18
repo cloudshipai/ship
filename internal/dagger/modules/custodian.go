@@ -76,3 +76,36 @@ func (m *CustodianModule) DryRun(ctx context.Context, policyPath string) (string
 
 	return output, nil
 }
+
+// Schema shows schema for a particular resource type
+func (m *CustodianModule) Schema(ctx context.Context, resourceType string) (string, error) {
+	args := []string{"custodian", "schema"}
+	if resourceType != "" {
+		args = append(args, resourceType)
+	}
+
+	container := m.client.Container().
+		From("cloudcustodian/c7n:latest").
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get custodian schema: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetVersion returns the version of Cloud Custodian
+func (m *CustodianModule) GetVersion(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("cloudcustodian/c7n:latest").
+		WithExec([]string{"custodian", "version"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get custodian version: %w", err)
+	}
+
+	return output, nil
+}

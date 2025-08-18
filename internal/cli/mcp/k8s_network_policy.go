@@ -7,119 +7,210 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddK8sNetworkPolicyTools adds Kubernetes network policy management MCP tool implementations
+// AddK8sNetworkPolicyTools adds Kubernetes network policy management MCP tool implementations using real CLI tools
 func AddK8sNetworkPolicyTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// K8s network policy create tool
-	createPolicyTool := mcp.NewTool("k8s_network_policy_create",
-		mcp.WithDescription("Create Kubernetes network policy"),
-		mcp.WithString("policy_name",
-			mcp.Description("Name of the network policy"),
+	// kubectl network policy management
+	kubectlNetworkPolicyTool := mcp.NewTool("k8s_network_policy_kubectl",
+		mcp.WithDescription("Manage network policies using kubectl"),
+		mcp.WithString("action",
+			mcp.Description("Action to perform"),
 			mcp.Required(),
+			mcp.Enum("get", "describe", "delete", "create", "apply"),
+		),
+		mcp.WithString("resource",
+			mcp.Description("Resource name or file path (for create/apply/describe/delete)"),
 		),
 		mcp.WithString("namespace",
 			mcp.Description("Kubernetes namespace"),
-			mcp.Required(),
 		),
-		mcp.WithString("pod_selector",
-			mcp.Description("Pod selector labels (key=value format)"),
+		mcp.WithString("output",
+			mcp.Description("Output format"),
+			mcp.Enum("json", "yaml", "wide", "name"),
 		),
 	)
-	s.AddTool(createPolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		policyName := request.GetString("policy_name", "")
-		namespace := request.GetString("namespace", "")
-		args := []string{"kubernetes", "network-policy", "create", policyName, "--namespace", namespace}
-		if podSelector := request.GetString("pod_selector", ""); podSelector != "" {
-			args = append(args, "--pod-selector", podSelector)
+	s.AddTool(kubectlNetworkPolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		action := request.GetString("action", "")
+		resource := request.GetString("resource", "")
+		
+		var args []string
+		switch action {
+		case "get":
+			args = []string{"kubectl", "get", "networkpolicy"}
+			if resource != "" {
+				args = append(args, resource)
+			}
+		case "describe":
+			args = []string{"kubectl", "describe", "networkpolicy"}
+			if resource != "" {
+				args = append(args, resource)
+			}
+		case "delete":
+			args = []string{"kubectl", "delete", "networkpolicy", resource}
+		case "create":
+			args = []string{"kubectl", "create", "-f", resource}
+		case "apply":
+			args = []string{"kubectl", "apply", "-f", resource}
 		}
+		
+		if namespace := request.GetString("namespace", ""); namespace != "" {
+			args = append(args, "-n", namespace)
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "-o", output)
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// K8s network policy validate tool
-	validatePolicyTool := mcp.NewTool("k8s_network_policy_validate",
-		mcp.WithDescription("Validate Kubernetes network policy configuration"),
-		mcp.WithString("policy_file",
-			mcp.Description("Path to network policy YAML file"),
-			mcp.Required(),
+	// Netfetch network policy scanner
+	netfetchScanTool := mcp.NewTool("k8s_network_policy_netfetch_scan",
+		mcp.WithDescription("Scan Kubernetes network policies using netfetch"),
+		mcp.WithString("namespace",
+			mcp.Description("Kubernetes namespace to scan (omit for entire cluster)"),
+		),
+		mcp.WithBoolean("dryrun",
+			mcp.Description("Run scan without applying changes"),
+		),
+		mcp.WithBoolean("cilium",
+			mcp.Description("Scan Cilium network policies"),
+		),
+		mcp.WithString("target",
+			mcp.Description("Scan a specific policy by name"),
+		),
+		mcp.WithString("kubeconfig",
+			mcp.Description("Path to kubeconfig file"),
 		),
 	)
-	s.AddTool(validatePolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		policyFile := request.GetString("policy_file", "")
-		args := []string{"kubernetes", "network-policy", "validate", policyFile}
+	s.AddTool(netfetchScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"netfetch", "scan"}
+		
+		if namespace := request.GetString("namespace", ""); namespace != "" {
+			args = append(args, namespace)
+		}
+		if request.GetBool("dryrun", false) {
+			args = append(args, "--dryrun")
+		}
+		if request.GetBool("cilium", false) {
+			args = append(args, "--cilium")
+		}
+		if target := request.GetString("target", ""); target != "" {
+			args = append(args, "--target", target)
+		}
+		if kubeconfig := request.GetString("kubeconfig", ""); kubeconfig != "" {
+			args = append(args, "--kubeconfig", kubeconfig)
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// K8s network policy test tool
-	testPolicyTool := mcp.NewTool("k8s_network_policy_test",
-		mcp.WithDescription("Test network connectivity with current policies"),
-		mcp.WithString("source_pod",
+	// Netfetch dashboard
+	netfetchDashTool := mcp.NewTool("k8s_network_policy_netfetch_dash",
+		mcp.WithDescription("Launch netfetch dashboard for network policy visualization"),
+		mcp.WithString("port",
+			mcp.Description("Port number for dashboard (default: 8080)"),
+		),
+	)
+	s.AddTool(netfetchDashTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"netfetch", "dash"}
+		
+		if port := request.GetString("port", ""); port != "" {
+			args = append(args, "--port", port)
+		}
+		
+		return executeShipCommand(args)
+	})
+
+	// Netpol-analyzer evaluation
+	netpolAnalyzerEvalTool := mcp.NewTool("k8s_network_policy_netpol_eval",
+		mcp.WithDescription("Evaluate network connectivity using netpol-analyzer"),
+		mcp.WithString("dirpath",
+			mcp.Description("Directory path containing Kubernetes resources"),
+			mcp.Required(),
+		),
+		mcp.WithString("source",
 			mcp.Description("Source pod name"),
 			mcp.Required(),
 		),
-		mcp.WithString("target_pod",
-			mcp.Description("Target pod name"),
+		mcp.WithString("destination",
+			mcp.Description("Destination pod name"),
 			mcp.Required(),
 		),
-		mcp.WithString("namespace",
-			mcp.Description("Kubernetes namespace"),
+		mcp.WithString("port",
+			mcp.Description("Port number"),
+		),
+		mcp.WithBoolean("verbose",
+			mcp.Description("Enable verbose output"),
 		),
 	)
-	s.AddTool(testPolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		sourcePod := request.GetString("source_pod", "")
-		targetPod := request.GetString("target_pod", "")
-		args := []string{"kubernetes", "network-policy", "test", sourcePod, targetPod}
-		if namespace := request.GetString("namespace", ""); namespace != "" {
-			args = append(args, "--namespace", namespace)
+	s.AddTool(netpolAnalyzerEvalTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		dirpath := request.GetString("dirpath", "")
+		source := request.GetString("source", "")
+		destination := request.GetString("destination", "")
+		
+		args := []string{"netpol-analyzer", "eval", "--dirpath", dirpath, "-s", source, "-d", destination}
+		
+		if port := request.GetString("port", ""); port != "" {
+			args = append(args, "-p", port)
 		}
+		if request.GetBool("verbose", false) {
+			args = append(args, "-v")
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// K8s network policy analyze tool
-	analyzePolicyTool := mcp.NewTool("k8s_network_policy_analyze",
-		mcp.WithDescription("Analyze network policies for gaps and conflicts"),
-		mcp.WithString("namespace",
-			mcp.Description("Kubernetes namespace to analyze"),
-		),
-		mcp.WithString("output_format",
-			mcp.Description("Output format (json, yaml, table)"),
-		),
-	)
-	s.AddTool(analyzePolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"kubernetes", "network-policy", "analyze"}
-		if namespace := request.GetString("namespace", ""); namespace != "" {
-			args = append(args, "--namespace", namespace)
-		}
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--format", format)
-		}
-		return executeShipCommand(args)
-	})
-
-	// K8s network policy generate tool
-	generatePolicyTool := mcp.NewTool("k8s_network_policy_generate",
-		mcp.WithDescription("Generate network policy from observed traffic"),
-		mcp.WithString("namespace",
-			mcp.Description("Kubernetes namespace"),
+	// Netpol-analyzer list connections
+	netpolAnalyzerListTool := mcp.NewTool("k8s_network_policy_netpol_list",
+		mcp.WithDescription("List all allowed connections using netpol-analyzer"),
+		mcp.WithString("dirpath",
+			mcp.Description("Directory path containing Kubernetes resources"),
 			mcp.Required(),
 		),
-		mcp.WithString("duration",
-			mcp.Description("Observation duration (e.g., 5m, 1h)"),
+		mcp.WithBoolean("verbose",
+			mcp.Description("Enable verbose output"),
+		),
+		mcp.WithBoolean("quiet",
+			mcp.Description("Enable quiet mode"),
 		),
 	)
-	s.AddTool(generatePolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		namespace := request.GetString("namespace", "")
-		args := []string{"kubernetes", "network-policy", "generate", "--namespace", namespace}
-		if duration := request.GetString("duration", ""); duration != "" {
-			args = append(args, "--duration", duration)
+	s.AddTool(netpolAnalyzerListTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		dirpath := request.GetString("dirpath", "")
+		args := []string{"netpol-analyzer", "list", "--dirpath", dirpath}
+		
+		if request.GetBool("verbose", false) {
+			args = append(args, "-v")
 		}
+		if request.GetBool("quiet", false) {
+			args = append(args, "-q")
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// K8s network policy get version tool
-	getVersionTool := mcp.NewTool("k8s_network_policy_get_version",
-		mcp.WithDescription("Get Kubernetes network policy tool version information"),
+	// Netpol-analyzer diff
+	netpolAnalyzerDiffTool := mcp.NewTool("k8s_network_policy_netpol_diff",
+		mcp.WithDescription("Compare network policies between two directories using netpol-analyzer"),
+		mcp.WithString("dir1",
+			mcp.Description("First directory containing Kubernetes resources"),
+			mcp.Required(),
+		),
+		mcp.WithString("dir2",
+			mcp.Description("Second directory containing Kubernetes resources"),
+			mcp.Required(),
+		),
+		mcp.WithBoolean("verbose",
+			mcp.Description("Enable verbose output"),
+		),
 	)
-	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"kubernetes", "network-policy", "--version"}
+	s.AddTool(netpolAnalyzerDiffTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		dir1 := request.GetString("dir1", "")
+		dir2 := request.GetString("dir2", "")
+		args := []string{"netpol-analyzer", "diff", "--dir1", dir1, "--dir2", dir2}
+		
+		if request.GetBool("verbose", false) {
+			args = append(args, "-v")
+		}
+		
 		return executeShipCommand(args)
 	})
 }

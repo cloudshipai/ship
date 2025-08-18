@@ -7,133 +7,176 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddGitleaksTools adds Gitleaks MCP tool implementations
+// AddGitleaksTools adds Gitleaks (secret detection in code and git history) MCP tool implementations using real gitleaks CLI commands
 func AddGitleaksTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// Gitleaks scan directory tool
-	scanDirTool := mcp.NewTool("gitleaks_scan_directory",
-		mcp.WithDescription("Scan a directory for secrets using Gitleaks"),
-		mcp.WithString("directory",
-			mcp.Description("Directory to scan (default: current directory)"),
-		),
-	)
-	s.AddTool(scanDirTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "gitleaks"}
-		if dir := request.GetString("directory", ""); dir != "" {
-			args = append(args, dir)
-		}
-		return executeShipCommand(args)
-	})
-
-	// Gitleaks scan file tool
-	scanFileTool := mcp.NewTool("gitleaks_scan_file",
-		mcp.WithDescription("Scan a specific file for secrets using Gitleaks"),
-		mcp.WithString("file_path",
-			mcp.Description("Path to the file to scan"),
-			mcp.Required(),
-		),
-	)
-	s.AddTool(scanFileTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		filePath := request.GetString("file_path", "")
-		args := []string{"security", "gitleaks", "--file", filePath}
-		return executeShipCommand(args)
-	})
-
-	// Gitleaks scan git repository tool
-	scanGitTool := mcp.NewTool("gitleaks_scan_git_repo",
-		mcp.WithDescription("Scan a git repository for secrets using Gitleaks"),
-		mcp.WithString("repository",
+	// Gitleaks scan git repository for secrets
+	gitScanTool := mcp.NewTool("gitleaks_git",
+		mcp.WithDescription("Scan git repositories for secrets"),
+		mcp.WithString("path",
 			mcp.Description("Path to git repository (default: current directory)"),
 		),
-	)
-	s.AddTool(scanGitTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "gitleaks"}
-		if repo := request.GetString("repository", ""); repo != "" {
-			args = append(args, repo)
-		}
-		args = append(args, "--git")
-		return executeShipCommand(args)
-	})
-
-	// Gitleaks scan with config tool
-	scanConfigTool := mcp.NewTool("gitleaks_scan_with_config",
-		mcp.WithDescription("Scan using custom Gitleaks configuration"),
-		mcp.WithString("directory",
-			mcp.Description("Directory to scan (default: current directory)"),
-		),
 		mcp.WithString("config",
-			mcp.Description("Path to Gitleaks configuration file"),
-			mcp.Required(),
-		),
-	)
-	s.AddTool(scanConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "gitleaks"}
-		if dir := request.GetString("directory", ""); dir != "" {
-			args = append(args, dir)
-		}
-		config := request.GetString("config", "")
-		args = append(args, "--config", config)
-		return executeShipCommand(args)
-	})
-
-	// Gitleaks scan from stdin tool
-	scanStdinTool := mcp.NewTool("gitleaks_scan_stdin",
-		mcp.WithDescription("Scan input from standard input using Gitleaks"),
-		mcp.WithString("input_data",
-			mcp.Description("Data to scan for secrets"),
-			mcp.Required(),
-		),
-		mcp.WithString("report_format",
-			mcp.Description("Output format for the report"),
-			mcp.Enum("json", "csv", "junit", "sarif"),
-		),
-	)
-	s.AddTool(scanStdinTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "gitleaks", "stdin"}
-		if format := request.GetString("report_format", ""); format != "" {
-			args = append(args, "--report-format", format)
-		}
-		return executeShipCommand(args)
-	})
-
-	// Gitleaks scan with baseline tool
-	scanWithBaselineTool := mcp.NewTool("gitleaks_scan_with_baseline",
-		mcp.WithDescription("Scan with baseline file to ignore known issues"),
-		mcp.WithString("directory",
-			mcp.Description("Directory to scan (default: current directory)"),
+			mcp.Description("Config file path"),
 		),
 		mcp.WithString("baseline_path",
-			mcp.Description("Path to baseline file with ignorable issues"),
-			mcp.Required(),
+			mcp.Description("Path to baseline with issues that can be ignored"),
+		),
+		mcp.WithString("report_format",
+			mcp.Description("Output format"),
+			mcp.Enum("json", "csv", "junit", "sarif", "template"),
+		),
+		mcp.WithString("report_path",
+			mcp.Description("Report file destination"),
+		),
+		mcp.WithString("log_opts",
+			mcp.Description("Git log options for commit range (e.g., --all commitA..commitB)"),
+		),
+		mcp.WithBoolean("verbose",
+			mcp.Description("Show verbose output"),
+		),
+		mcp.WithString("exit_code",
+			mcp.Description("Exit code when leaks are found (default 1)"),
 		),
 	)
-	s.AddTool(scanWithBaselineTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "gitleaks"}
-		if dir := request.GetString("directory", ""); dir != "" {
-			args = append(args, dir)
+	s.AddTool(gitScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"gitleaks", "git"}
+		
+		if config := request.GetString("config", ""); config != "" {
+			args = append(args, "-c", config)
 		}
-		baseline := request.GetString("baseline_path", "")
-		args = append(args, "--baseline-path", baseline)
+		if baselinePath := request.GetString("baseline_path", ""); baselinePath != "" {
+			args = append(args, "-b", baselinePath)
+		}
+		if reportFormat := request.GetString("report_format", ""); reportFormat != "" {
+			args = append(args, "-f", reportFormat)
+		}
+		if reportPath := request.GetString("report_path", ""); reportPath != "" {
+			args = append(args, "-r", reportPath)
+		}
+		if logOpts := request.GetString("log_opts", ""); logOpts != "" {
+			args = append(args, "--log-opts", logOpts)
+		}
+		if request.GetBool("verbose", false) {
+			args = append(args, "-v")
+		}
+		if exitCode := request.GetString("exit_code", ""); exitCode != "" {
+			args = append(args, "--exit-code", exitCode)
+		}
+		if path := request.GetString("path", ""); path != "" {
+			args = append(args, path)
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// Gitleaks scan with rules tool
-	scanWithRulesTool := mcp.NewTool("gitleaks_scan_with_rules",
-		mcp.WithDescription("Scan with specific rules enabled"),
-		mcp.WithString("directory",
-			mcp.Description("Directory to scan (default: current directory)"),
+	// Gitleaks scan directories or files for secrets
+	dirScanTool := mcp.NewTool("gitleaks_dir",
+		mcp.WithDescription("Scan directories or files for secrets"),
+		mcp.WithString("path",
+			mcp.Description("Path to directory or file to scan (default: current directory)"),
 		),
-		mcp.WithString("enable_rule",
-			mcp.Description("Rule ID to enable specifically"),
-			mcp.Required(),
+		mcp.WithString("config",
+			mcp.Description("Config file path"),
+		),
+		mcp.WithString("baseline_path",
+			mcp.Description("Path to baseline with issues that can be ignored"),
+		),
+		mcp.WithString("report_format",
+			mcp.Description("Output format"),
+			mcp.Enum("json", "csv", "junit", "sarif", "template"),
+		),
+		mcp.WithString("report_path",
+			mcp.Description("Report file destination"),
+		),
+		mcp.WithBoolean("verbose",
+			mcp.Description("Show verbose output"),
+		),
+		mcp.WithString("exit_code",
+			mcp.Description("Exit code when leaks are found (default 1)"),
 		),
 	)
-	s.AddTool(scanWithRulesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "gitleaks"}
-		if dir := request.GetString("directory", ""); dir != "" {
-			args = append(args, dir)
+	s.AddTool(dirScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"gitleaks", "dir"}
+		
+		if config := request.GetString("config", ""); config != "" {
+			args = append(args, "-c", config)
 		}
-		rule := request.GetString("enable_rule", "")
-		args = append(args, "--enable-rule", rule)
+		if baselinePath := request.GetString("baseline_path", ""); baselinePath != "" {
+			args = append(args, "-b", baselinePath)
+		}
+		if reportFormat := request.GetString("report_format", ""); reportFormat != "" {
+			args = append(args, "-f", reportFormat)
+		}
+		if reportPath := request.GetString("report_path", ""); reportPath != "" {
+			args = append(args, "-r", reportPath)
+		}
+		if request.GetBool("verbose", false) {
+			args = append(args, "-v")
+		}
+		if exitCode := request.GetString("exit_code", ""); exitCode != "" {
+			args = append(args, "--exit-code", exitCode)
+		}
+		if path := request.GetString("path", ""); path != "" {
+			args = append(args, path)
+		}
+		
+		return executeShipCommand(args)
+	})
+
+	// Gitleaks detect secrets from stdin
+	stdinScanTool := mcp.NewTool("gitleaks_stdin",
+		mcp.WithDescription("Detect secrets from standard input"),
+		mcp.WithString("config",
+			mcp.Description("Config file path"),
+		),
+		mcp.WithString("baseline_path",
+			mcp.Description("Path to baseline with issues that can be ignored"),
+		),
+		mcp.WithString("report_format",
+			mcp.Description("Output format"),
+			mcp.Enum("json", "csv", "junit", "sarif", "template"),
+		),
+		mcp.WithString("report_path",
+			mcp.Description("Report file destination"),
+		),
+		mcp.WithBoolean("verbose",
+			mcp.Description("Show verbose output"),
+		),
+		mcp.WithString("exit_code",
+			mcp.Description("Exit code when leaks are found (default 1)"),
+		),
+	)
+	s.AddTool(stdinScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"gitleaks", "stdin"}
+		
+		if config := request.GetString("config", ""); config != "" {
+			args = append(args, "-c", config)
+		}
+		if baselinePath := request.GetString("baseline_path", ""); baselinePath != "" {
+			args = append(args, "-b", baselinePath)
+		}
+		if reportFormat := request.GetString("report_format", ""); reportFormat != "" {
+			args = append(args, "-f", reportFormat)
+		}
+		if reportPath := request.GetString("report_path", ""); reportPath != "" {
+			args = append(args, "-r", reportPath)
+		}
+		if request.GetBool("verbose", false) {
+			args = append(args, "-v")
+		}
+		if exitCode := request.GetString("exit_code", ""); exitCode != "" {
+			args = append(args, "--exit-code", exitCode)
+		}
+		
+		return executeShipCommand(args)
+	})
+
+	// Gitleaks version information
+	versionTool := mcp.NewTool("gitleaks_version",
+		mcp.WithDescription("Display Gitleaks version"),
+	)
+	s.AddTool(versionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"gitleaks", "version"}
 		return executeShipCommand(args)
 	})
 }

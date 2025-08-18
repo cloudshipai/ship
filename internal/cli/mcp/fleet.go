@@ -7,109 +7,106 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddFleetTools adds Fleet GitOps MCP tool implementations
+// AddFleetTools adds Fleet GitOps MCP tool implementations using kubectl
 func AddFleetTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// Fleet deploy tool
-	deployTool := mcp.NewTool("fleet_deploy",
-		mcp.WithDescription("Deploy applications using Fleet GitOps"),
-		mcp.WithString("git_repo",
-			mcp.Description("Git repository URL containing Fleet configuration"),
+	// Fleet apply GitRepo tool
+	applyGitRepoTool := mcp.NewTool("fleet_apply_gitrepo",
+		mcp.WithDescription("Apply Fleet GitRepo configuration using kubectl"),
+		mcp.WithString("gitrepo_file",
+			mcp.Description("Path to GitRepo YAML file"),
 			mcp.Required(),
 		),
 		mcp.WithString("namespace",
-			mcp.Description("Target Kubernetes namespace"),
-		),
-		mcp.WithString("cluster",
-			mcp.Description("Target cluster name"),
+			mcp.Description("Target Kubernetes namespace (default: fleet-local)"),
 		),
 	)
-	s.AddTool(deployTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		gitRepo := request.GetString("git_repo", "")
-		args := []string{"kubernetes", "fleet", "deploy", gitRepo}
+	s.AddTool(applyGitRepoTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		gitrepoFile := request.GetString("gitrepo_file", "")
+		args := []string{"kubectl", "apply", "-f", gitrepoFile}
 		if namespace := request.GetString("namespace", ""); namespace != "" {
-			args = append(args, "--namespace", namespace)
-		}
-		if cluster := request.GetString("cluster", ""); cluster != "" {
-			args = append(args, "--cluster", cluster)
+			args = append(args, "-n", namespace)
 		}
 		return executeShipCommand(args)
 	})
 
-	// Fleet status tool
-	statusTool := mcp.NewTool("fleet_status",
-		mcp.WithDescription("Check Fleet deployment status"),
+	// Fleet get GitRepos status tool
+	getGitReposTool := mcp.NewTool("fleet_get_gitrepos",
+		mcp.WithDescription("Get Fleet GitRepos status using kubectl"),
 		mcp.WithString("namespace",
-			mcp.Description("Kubernetes namespace to check"),
+			mcp.Description("Kubernetes namespace (default: fleet-local)"),
 		),
 	)
-	s.AddTool(statusTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"kubernetes", "fleet", "status"}
-		if namespace := request.GetString("namespace", ""); namespace != "" {
-			args = append(args, "--namespace", namespace)
-		}
+	s.AddTool(getGitReposTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		namespace := request.GetString("namespace", "fleet-local")
+		args := []string{"kubectl", "get", "gitrepo", "-n", namespace}
 		return executeShipCommand(args)
 	})
 
-	// Fleet sync tool
-	syncTool := mcp.NewTool("fleet_sync",
-		mcp.WithDescription("Force synchronization of Fleet managed resources"),
-		mcp.WithString("app_name",
-			mcp.Description("Application name to sync"),
-			mcp.Required(),
-		),
+	// Fleet get bundles tool
+	getBundlesTool := mcp.NewTool("fleet_get_bundles",
+		mcp.WithDescription("Get Fleet Bundles status using kubectl"),
 		mcp.WithString("namespace",
 			mcp.Description("Kubernetes namespace"),
 		),
 	)
-	s.AddTool(syncTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		appName := request.GetString("app_name", "")
-		args := []string{"kubernetes", "fleet", "sync", appName}
+	s.AddTool(getBundlesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"kubectl", "get", "bundles"}
 		if namespace := request.GetString("namespace", ""); namespace != "" {
-			args = append(args, "--namespace", namespace)
+			args = append(args, "-n", namespace)
+		} else {
+			args = append(args, "--all-namespaces")
 		}
 		return executeShipCommand(args)
 	})
 
-	// Fleet rollback tool
-	rollbackTool := mcp.NewTool("fleet_rollback",
-		mcp.WithDescription("Rollback Fleet deployment to previous version"),
-		mcp.WithString("app_name",
-			mcp.Description("Application name to rollback"),
-			mcp.Required(),
-		),
-		mcp.WithString("revision",
-			mcp.Description("Target revision for rollback"),
+	// Fleet get bundle deployments tool
+	getBundleDeploymentsTool := mcp.NewTool("fleet_get_bundledeployments",
+		mcp.WithDescription("Get Fleet BundleDeployments status using kubectl"),
+		mcp.WithString("namespace",
+			mcp.Description("Kubernetes namespace"),
 		),
 	)
-	s.AddTool(rollbackTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		appName := request.GetString("app_name", "")
-		args := []string{"kubernetes", "fleet", "rollback", appName}
-		if revision := request.GetString("revision", ""); revision != "" {
-			args = append(args, "--revision", revision)
+	s.AddTool(getBundleDeploymentsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"kubectl", "get", "bundledeployments"}
+		if namespace := request.GetString("namespace", ""); namespace != "" {
+			args = append(args, "-n", namespace)
+		} else {
+			args = append(args, "--all-namespaces")
 		}
 		return executeShipCommand(args)
 	})
 
-	// Fleet validate tool
-	validateTool := mcp.NewTool("fleet_validate",
-		mcp.WithDescription("Validate Fleet configuration and manifests"),
-		mcp.WithString("config_path",
-			mcp.Description("Path to Fleet configuration"),
+	// Fleet describe GitRepo tool
+	describeGitRepoTool := mcp.NewTool("fleet_describe_gitrepo",
+		mcp.WithDescription("Describe Fleet GitRepo using kubectl"),
+		mcp.WithString("gitrepo_name",
+			mcp.Description("GitRepo name to describe"),
 			mcp.Required(),
 		),
+		mcp.WithString("namespace",
+			mcp.Description("Kubernetes namespace (default: fleet-local)"),
+		),
 	)
-	s.AddTool(validateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		configPath := request.GetString("config_path", "")
-		args := []string{"kubernetes", "fleet", "validate", configPath}
+	s.AddTool(describeGitRepoTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		gitrepoName := request.GetString("gitrepo_name", "")
+		namespace := request.GetString("namespace", "fleet-local")
+		args := []string{"kubectl", "describe", "gitrepo", gitrepoName, "-n", namespace}
 		return executeShipCommand(args)
 	})
 
-	// Fleet get version tool
-	getVersionTool := mcp.NewTool("fleet_get_version",
-		mcp.WithDescription("Get Fleet version information"),
+	// Fleet install tool (using Helm)
+	installTool := mcp.NewTool("fleet_install",
+		mcp.WithDescription("Install Fleet using Helm"),
+		mcp.WithString("version",
+			mcp.Description("Fleet version to install (e.g., v0.13.0)"),
+		),
 	)
-	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"kubernetes", "fleet", "--version"}
+	s.AddTool(installTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		version := request.GetString("version", "v0.13.0")
+		
+		// Install Fleet CRD first
+		args := []string{"helm", "-n", "cattle-fleet-system", "install", "--create-namespace", "--wait",
+			"fleet-crd", "https://github.com/rancher/fleet/releases/download/" + version + "/fleet-crd-" + version[1:] + ".tgz"}
 		return executeShipCommand(args)
 	})
 }

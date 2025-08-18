@@ -7,81 +7,97 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddOpenInfraQuoteTools adds OpenInfraQuote (infrastructure cost estimation) MCP tool implementations
+// AddOpenInfraQuoteTools adds OpenInfraQuote (infrastructure cost estimation) MCP tool implementations using real oiq CLI
 func AddOpenInfraQuoteTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// OpenInfraQuote estimate tool
-	estimateTool := mcp.NewTool("openinfraquote_estimate",
-		mcp.WithDescription("Estimate infrastructure costs using OpenInfraQuote"),
-		mcp.WithString("terraform_dir",
-			mcp.Description("Directory containing Terraform files"),
+	// OpenInfraQuote match tool
+	matchTool := mcp.NewTool("openinfraquote_match",
+		mcp.WithDescription("Match Terraform resources to pricing using real oiq CLI"),
+		mcp.WithString("pricesheet",
+			mcp.Description("Path to pricing CSV file"),
 			mcp.Required(),
 		),
-		mcp.WithString("region",
-			mcp.Description("AWS region for pricing"),
-		),
-		mcp.WithString("output_format",
-			mcp.Description("Output format"),
-			mcp.Enum("json", "table", "csv"),
+		mcp.WithString("tfplan_json",
+			mcp.Description("Path to Terraform plan JSON file"),
+			mcp.Required(),
 		),
 	)
-	s.AddTool(estimateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		terraformDir := request.GetString("terraform_dir", "")
-		args := []string{"terraform", "openinfraquote", "estimate", terraformDir}
+	s.AddTool(matchTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		pricesheet := request.GetString("pricesheet", "")
+		tfplanJson := request.GetString("tfplan_json", "")
+		args := []string{"oiq", "match", "--pricesheet", pricesheet, tfplanJson}
+		return executeShipCommand(args)
+	})
+
+	// OpenInfraQuote price tool
+	priceTool := mcp.NewTool("openinfraquote_price",
+		mcp.WithDescription("Calculate prices from matched resources using real oiq CLI"),
+		mcp.WithString("region",
+			mcp.Description("AWS region for pricing (e.g., us-east-1)"),
+		),
+		mcp.WithString("input_file",
+			mcp.Description("Input file with matched resources (or use stdin)"),
+		),
+	)
+	s.AddTool(priceTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"oiq", "price"}
+		
 		if region := request.GetString("region", ""); region != "" {
 			args = append(args, "--region", region)
 		}
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
+		if inputFile := request.GetString("input_file", ""); inputFile != "" {
+			args = append(args, inputFile)
 		}
+		
 		return executeShipCommand(args)
 	})
 
-	// OpenInfraQuote breakdown tool
-	breakdownTool := mcp.NewTool("openinfraquote_breakdown",
-		mcp.WithDescription("Get detailed cost breakdown by resource"),
-		mcp.WithString("terraform_dir",
-			mcp.Description("Directory containing Terraform files"),
-			mcp.Required(),
-		),
-		mcp.WithString("group_by",
-			mcp.Description("Group costs by resource type or service"),
-			mcp.Enum("resource", "service"),
+	// OpenInfraQuote download prices tool
+	downloadPricesTool := mcp.NewTool("openinfraquote_download_prices",
+		mcp.WithDescription("Download AWS pricing data using curl and gunzip"),
+		mcp.WithString("output_file",
+			mcp.Description("Output file for pricing CSV (default: prices.csv)"),
 		),
 	)
-	s.AddTool(breakdownTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		terraformDir := request.GetString("terraform_dir", "")
-		args := []string{"terraform", "openinfraquote", "breakdown", terraformDir}
-		if groupBy := request.GetString("group_by", ""); groupBy != "" {
-			args = append(args, "--group-by", groupBy)
-		}
+	s.AddTool(downloadPricesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		outputFile := request.GetString("output_file", "prices.csv")
+		// Using curl and gunzip to download pricing data
+		args := []string{"sh", "-c", "curl -s https://oiq.terrateam.io/prices.csv.gz | gunzip > " + outputFile}
 		return executeShipCommand(args)
 	})
 
-	// OpenInfraQuote compare tool
-	compareTool := mcp.NewTool("openinfraquote_compare",
-		mcp.WithDescription("Compare costs between different Terraform configurations"),
-		mcp.WithString("baseline_dir",
-			mcp.Description("Baseline Terraform directory"),
-			mcp.Required(),
-		),
-		mcp.WithString("comparison_dir",
-			mcp.Description("Comparison Terraform directory"),
-			mcp.Required(),
-		),
+	// OpenInfraQuote help tool
+	helpTool := mcp.NewTool("openinfraquote_help",
+		mcp.WithDescription("Get OpenInfraQuote help information using real oiq CLI"),
 	)
-	s.AddTool(compareTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		baselineDir := request.GetString("baseline_dir", "")
-		comparisonDir := request.GetString("comparison_dir", "")
-		args := []string{"terraform", "openinfraquote", "compare", baselineDir, comparisonDir}
+	s.AddTool(helpTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"oiq", "--help"}
 		return executeShipCommand(args)
 	})
-
-	// OpenInfraQuote get version tool
-	getVersionTool := mcp.NewTool("openinfraquote_get_version",
-		mcp.WithDescription("Get OpenInfraQuote version information"),
+	
+	// OpenInfraQuote full pipeline tool
+	fullPipelineTool := mcp.NewTool("openinfraquote_full_pipeline",
+		mcp.WithDescription("Run full cost estimation pipeline using real oiq CLI"),
+		mcp.WithString("tfplan_json",
+			mcp.Description("Path to Terraform plan JSON file"),
+			mcp.Required(),
+		),
+		mcp.WithString("pricesheet",
+			mcp.Description("Path to pricing CSV file"),
+			mcp.Required(),
+		),
+		mcp.WithString("region",
+			mcp.Description("AWS region for pricing (e.g., us-east-1)"),
+			mcp.Required(),
+		),
 	)
-	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"terraform", "openinfraquote", "--version"}
+	s.AddTool(fullPipelineTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		tfplanJson := request.GetString("tfplan_json", "")
+		pricesheet := request.GetString("pricesheet", "")
+		region := request.GetString("region", "")
+		
+		// Running the full pipeline: match | price
+		args := []string{"sh", "-c", 
+			"oiq match --pricesheet " + pricesheet + " " + tfplanJson + " | oiq price --region " + region}
 		return executeShipCommand(args)
 	})
 }

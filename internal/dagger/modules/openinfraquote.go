@@ -135,3 +135,59 @@ func (m *OpenInfraQuoteModule) GetVersion(ctx context.Context) (string, error) {
 
 	return output, nil
 }
+
+// CompareRegions compares costs across multiple regions
+func (m *OpenInfraQuoteModule) CompareRegions(ctx context.Context, planFile string, regions []string) (string, error) {
+	dir := filepath.Dir(planFile)
+	filename := filepath.Base(planFile)
+
+	// Prepare workspace with pricing sheet
+	utilContainer := m.client.Container().
+		From("alpine:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(dir)).
+		WithWorkdir("/workspace").
+		WithExec([]string{"sh", "-c", "apk add --no-cache curl && curl -s https://oiq.terrateam.io/prices.csv.gz | gunzip > prices.csv"})
+
+	_, err := utilContainer.Directory("/workspace").Export(ctx, dir+"_temp")
+	if err != nil {
+		return "", fmt.Errorf("failed to prepare workspace: %w", err)
+	}
+	defer func() {
+		m.client.Host().Directory(dir + "_temp")
+	}()
+
+	// Get match output once
+	matchContainer := m.client.Container().
+		From("ghcr.io/terrateamio/openinfraquote:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(dir+"_temp")).
+		WithWorkdir("/workspace").
+		WithExec([]string{"oiq", "match", "--pricesheet", "prices.csv", filename})
+
+	matchOutput, err := matchContainer.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to run oiq match: %w", err)
+	}
+
+	// Compare costs across regions
+	results := "{"
+	for i, region := range regions {
+		priceContainer := m.client.Container().
+			From("ghcr.io/terrateamio/openinfraquote:latest").
+			WithExec([]string{"oiq", "price", "--region", region, "--format", "json"}, dagger.ContainerWithExecOpts{
+				Stdin: matchOutput,
+			})
+
+		regionOutput, err := priceContainer.Stdout(ctx)
+		if err != nil {
+			return "", fmt.Errorf("failed to get pricing for region %s: %w", region, err)
+		}
+
+		if i > 0 {
+			results += ","
+		}
+		results += fmt.Sprintf(`"%s": %s`, region, regionOutput)
+	}
+	results += "}"
+
+	return results, nil
+}

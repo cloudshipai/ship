@@ -95,3 +95,92 @@ func (m *KyvernoMultitenantModule) ValidateMultitenantSetup(ctx context.Context,
 
 	return output, nil
 }
+
+// CreateTenantNamespace creates a namespace for a tenant
+func (m *KyvernoMultitenantModule) CreateTenantNamespace(ctx context.Context, namespace string, kubeconfig string) (string, error) {
+	container := m.client.Container().
+		From("bitnami/kubectl:latest")
+
+	if kubeconfig != "" {
+		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
+	}
+
+	container = container.WithExec([]string{"kubectl", "create", "namespace", namespace})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to create tenant namespace: %w", err)
+	}
+
+	return output, nil
+}
+
+// CreateResourceQuota creates resource quota for a tenant
+func (m *KyvernoMultitenantModule) CreateResourceQuota(ctx context.Context, namespace string, cpuLimit string, memoryLimit string, kubeconfig string) (string, error) {
+	quotaYaml := fmt.Sprintf(`apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: tenant-quota
+  namespace: %s
+spec:
+  hard:
+    requests.cpu: %s
+    requests.memory: %s
+    limits.cpu: %s
+    limits.memory: %s`, namespace, cpuLimit, memoryLimit, cpuLimit, memoryLimit)
+
+	container := m.client.Container().
+		From("bitnami/kubectl:latest").
+		WithNewFile("/tmp/quota.yaml", quotaYaml)
+
+	if kubeconfig != "" {
+		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
+	}
+
+	container = container.WithExec([]string{"kubectl", "apply", "-f", "/tmp/quota.yaml"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to create resource quota: %w", err)
+	}
+
+	return output, nil
+}
+
+// ListTenantNamespaces lists namespaces with tenant labels
+func (m *KyvernoMultitenantModule) ListTenantNamespaces(ctx context.Context, kubeconfig string) (string, error) {
+	container := m.client.Container().
+		From("bitnami/kubectl:latest")
+
+	if kubeconfig != "" {
+		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
+	}
+
+	container = container.WithExec([]string{"kubectl", "get", "namespaces", "-l", "tenant", "-o", "json"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to list tenant namespaces: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetTenantPolicies gets policies for a specific tenant
+func (m *KyvernoMultitenantModule) GetTenantPolicies(ctx context.Context, namespace string, kubeconfig string) (string, error) {
+	container := m.client.Container().
+		From("bitnami/kubectl:latest")
+
+	if kubeconfig != "" {
+		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
+	}
+
+	container = container.WithExec([]string{"kubectl", "get", "policies", "-n", namespace, "-o", "json"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get tenant policies: %w", err)
+	}
+
+	return output, nil
+}

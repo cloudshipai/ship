@@ -7,31 +7,29 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddGitHubPackagesTools adds GitHub Packages security MCP tool implementations
+// AddGitHubPackagesTools adds GitHub Packages management MCP tool implementations using gh CLI
 func AddGitHubPackagesTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// GitHub packages scan vulnerabilities tool
-	scanVulnerabilitiesTool := mcp.NewTool("github_packages_scan_vulnerabilities",
-		mcp.WithDescription("Scan GitHub Packages for security vulnerabilities"),
+	// GitHub packages list packages in organization
+	listPackagesTool := mcp.NewTool("github_packages_list_packages",
+		mcp.WithDescription("List GitHub Packages in organization using gh API"),
 		mcp.WithString("organization",
 			mcp.Description("GitHub organization name"),
 			mcp.Required(),
 		),
 		mcp.WithString("package_type",
-			mcp.Description("Package type (npm, docker, maven, nuget)"),
-		),
-		mcp.WithString("package_name",
-			mcp.Description("Specific package name to scan (optional)"),
+			mcp.Description("Package type filter"),
+			mcp.Enum("npm", "docker", "maven", "nuget", "rubygems"),
 		),
 	)
-	s.AddTool(scanVulnerabilitiesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	s.AddTool(listPackagesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		organization := request.GetString("organization", "")
-		args := []string{"security", "github-packages", "scan-vulnerabilities", organization}
+		endpoint := "orgs/" + organization + "/packages"
+		args := []string{"gh", "api", endpoint}
+		
 		if packageType := request.GetString("package_type", ""); packageType != "" {
-			args = append(args, "--type", packageType)
+			args = append(args, "--field", "package_type=" + packageType)
 		}
-		if packageName := request.GetString("package_name", ""); packageName != "" {
-			args = append(args, "--package", packageName)
-		}
+		
 		return executeShipCommand(args)
 	})
 
@@ -51,12 +49,9 @@ func AddGitHubPackagesTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(auditDependenciesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		organization := request.GetString("organization", "")
-		packageName := request.GetString("package_name", "")
-		args := []string{"security", "github-packages", "audit-dependencies", organization, packageName}
-		if version := request.GetString("version", ""); version != "" {
-			args = append(args, "--version", version)
-		}
+		// GitHub doesn't have a dedicated dependency audit API for packages
+		// This provides informational message about using GitHub's security features
+		args := []string{"echo", "GitHub Packages dependency auditing is available through GitHub's security tab in the web interface and dependabot alerts. Use gh security commands or check the repository's security tab for vulnerability information."}
 		return executeShipCommand(args)
 	})
 
@@ -77,10 +72,8 @@ func AddGitHubPackagesTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(checkSignaturesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		organization := request.GetString("organization", "")
-		packageName := request.GetString("package_name", "")
-		version := request.GetString("version", "")
-		args := []string{"security", "github-packages", "check-signatures", organization, packageName, version}
+		// GitHub uses sigstore/cosign for package signing - provide guidance
+		args := []string{"echo", "GitHub Packages signature verification uses cosign. To verify signatures: 1) Get package manifest, 2) Use cosign verify with appropriate keys/certificates. See cosign documentation for details."}
 		return executeShipCommand(args)
 	})
 
@@ -97,9 +90,8 @@ func AddGitHubPackagesTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(enforcePolicesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		organization := request.GetString("organization", "")
-		policyFile := request.GetString("policy_file", "")
-		args := []string{"security", "github-packages", "enforce-policies", organization, "--policy-file", policyFile}
+		// GitHub package policies are managed through organization settings
+		args := []string{"echo", "GitHub Packages policies are configured through organization settings in the web interface. Go to Organization Settings > Packages to configure package visibility, access, and deletion policies."}
 		return executeShipCommand(args)
 	})
 
@@ -119,12 +111,9 @@ func AddGitHubPackagesTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(generateSBOMTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		organization := request.GetString("organization", "")
-		packageName := request.GetString("package_name", "")
-		args := []string{"security", "github-packages", "generate-sbom", organization, packageName}
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--format", format)
-		}
+		// SBOM generation is not directly available through GitHub Packages API
+		// Suggest using external SBOM tools like syft or cyclonedx
+		args := []string{"echo", "GitHub Packages doesn't provide direct SBOM generation. Use tools like syft, cyclonedx-cli, or other SBOM generators to create SBOMs from package artifacts."}
 		return executeShipCommand(args)
 	})
 
@@ -133,7 +122,7 @@ func AddGitHubPackagesTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		mcp.WithDescription("Get GitHub Packages security tool version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "github-packages", "--version"}
+		args := []string{"gh", "--version"}
 		return executeShipCommand(args)
 	})
 }

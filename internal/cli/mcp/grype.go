@@ -2,237 +2,158 @@ package mcp
 
 import (
 	"context"
-	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddGrypeTools adds Grype (container vulnerability scanner) MCP tool implementations
+// AddGrypeTools adds Grype (vulnerability scanner for container images and filesystems) MCP tool implementations
 func AddGrypeTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// Grype scan directory tool
-	scanDirTool := mcp.NewTool("grype_scan_directory",
-		mcp.WithDescription("Scan a directory for vulnerabilities using Grype"),
-		mcp.WithString("directory",
-			mcp.Description("Directory to scan (default: current directory)"),
-		),
-		mcp.WithString("output_format",
-			mcp.Description("Output format"),
-			mcp.Enum("json", "table", "cyclonedx", "sarif"),
-		),
-	)
-	s.AddTool(scanDirTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "grype"}
-		if dir := request.GetString("directory", ""); dir != "" {
-			args = append(args, dir)
-		}
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
-		}
-		return executeShipCommand(args)
-	})
-
-	// Grype scan image tool
-	scanImageTool := mcp.NewTool("grype_scan_image",
-		mcp.WithDescription("Scan a container image for vulnerabilities using Grype"),
-		mcp.WithString("image_name",
-			mcp.Description("Container image name to scan"),
-			mcp.Required(),
-		),
-		mcp.WithString("output_format",
-			mcp.Description("Output format"),
-			mcp.Enum("json", "table", "cyclonedx", "sarif"),
-		),
-	)
-	s.AddTool(scanImageTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		imageName := request.GetString("image_name", "")
-		args := []string{"security", "grype", imageName}
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
-		}
-		return executeShipCommand(args)
-	})
-
-	// Grype scan SBOM tool
-	scanSBOMTool := mcp.NewTool("grype_scan_sbom",
-		mcp.WithDescription("Scan SBOM file for vulnerabilities using Grype"),
-		mcp.WithString("sbom_path",
-			mcp.Description("Path to SBOM file"),
-			mcp.Required(),
-		),
-		mcp.WithString("output_format",
-			mcp.Description("Output format"),
-			mcp.Enum("json", "table", "cyclonedx", "sarif"),
-		),
-	)
-	s.AddTool(scanSBOMTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		sbomPath := request.GetString("sbom_path", "")
-		args := []string{"security", "grype", "sbom:" + sbomPath}
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
-		}
-		return executeShipCommand(args)
-	})
-
-	// Grype scan with severity filter tool
-	scanWithSeverityTool := mcp.NewTool("grype_scan_severity",
-		mcp.WithDescription("Scan with severity threshold using Grype"),
+	// Grype scan target for vulnerabilities
+	scanTool := mcp.NewTool("grype_scan",
+		mcp.WithDescription("Scan target for vulnerabilities (image, directory, archive, SBOM)"),
 		mcp.WithString("target",
-			mcp.Description("Target to scan (directory, image, or SBOM)"),
+			mcp.Description("Target to scan (container image, directory, archive, or SBOM)"),
 			mcp.Required(),
 		),
-		mcp.WithString("severity",
-			mcp.Description("Minimum severity level"),
-			mcp.Required(),
+		mcp.WithString("output",
+			mcp.Description("Report output format"),
+			mcp.Enum("table", "json", "cyclonedx", "sarif", "template"),
+		),
+		mcp.WithString("fail_on",
+			mcp.Description("Exit with error on specified severity or higher"),
 			mcp.Enum("negligible", "low", "medium", "high", "critical"),
 		),
-	)
-	s.AddTool(scanWithSeverityTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		target := request.GetString("target", "")
-		severity := request.GetString("severity", "")
-		args := []string{"security", "grype", target, "--fail-on", severity}
-		return executeShipCommand(args)
-	})
-
-	// Grype scan with exclusions tool
-	scanWithExclusionsTool := mcp.NewTool("grype_scan_with_exclusions",
-		mcp.WithDescription("Scan with package or vulnerability exclusions using Grype"),
-		mcp.WithString("target",
-			mcp.Description("Target to scan (directory, image, or SBOM)"),
-			mcp.Required(),
+		mcp.WithBoolean("only_fixed",
+			mcp.Description("Show only vulnerabilities with confirmed fixes"),
 		),
-		mcp.WithString("exclude_patterns",
-			mcp.Description("Comma-separated exclusion patterns (package names or CVE IDs)"),
-			mcp.Required(),
+		mcp.WithBoolean("only_notfixed",
+			mcp.Description("Show only vulnerabilities without confirmed fixes"),
 		),
-		mcp.WithString("output_format",
-			mcp.Description("Output format"),
-			mcp.Enum("json", "table", "cyclonedx", "sarif"),
-		),
-	)
-	s.AddTool(scanWithExclusionsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		target := request.GetString("target", "")
-		excludePatterns := request.GetString("exclude_patterns", "")
-		args := []string{"security", "grype", target}
-		
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
-		}
-		
-		// Add exclusions
-		for _, pattern := range strings.Split(excludePatterns, ",") {
-			if strings.TrimSpace(pattern) != "" {
-				args = append(args, "--exclude", strings.TrimSpace(pattern))
-			}
-		}
-		return executeShipCommand(args)
-	})
-
-	// Grype scan only fixed vulnerabilities tool
-	scanOnlyFixedTool := mcp.NewTool("grype_scan_only_fixed",
-		mcp.WithDescription("Scan and report only vulnerabilities with available fixes"),
-		mcp.WithString("target",
-			mcp.Description("Target to scan (directory, image, or SBOM)"),
-			mcp.Required(),
-		),
-		mcp.WithString("output_format",
-			mcp.Description("Output format"),
-			mcp.Enum("json", "table", "cyclonedx", "sarif"),
-		),
-	)
-	s.AddTool(scanOnlyFixedTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		target := request.GetString("target", "")
-		args := []string{"security", "grype", target, "--only-fixed"}
-		
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
-		}
-		return executeShipCommand(args)
-	})
-
-	// Grype scan with platform specification tool
-	scanWithPlatformTool := mcp.NewTool("grype_scan_with_platform",
-		mcp.WithDescription("Scan multi-platform container image with specific platform"),
-		mcp.WithString("image_name",
-			mcp.Description("Container image name to scan"),
-			mcp.Required(),
-		),
-		mcp.WithString("platform",
-			mcp.Description("Platform specification (e.g., linux/amd64, linux/arm64)"),
-			mcp.Required(),
+		mcp.WithString("exclude",
+			mcp.Description("Exclude specific file path from scanning"),
 		),
 		mcp.WithString("scope",
-			mcp.Description("Search scope for vulnerability detection"),
-			mcp.Enum("Squashed", "AllLayers"),
+			mcp.Description("Scope for image layer scanning"),
+			mcp.Enum("all-layers", "squashed"),
 		),
-		mcp.WithString("output_format",
-			mcp.Description("Output format"),
-			mcp.Enum("json", "table", "cyclonedx", "sarif"),
+		mcp.WithBoolean("add_cpes_if_none",
+			mcp.Description("Generate CPE information if missing from SBOM"),
+		),
+		mcp.WithString("distro",
+			mcp.Description("Specify distribution (format: <distro>:<version>)"),
 		),
 	)
-	s.AddTool(scanWithPlatformTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		imageName := request.GetString("image_name", "")
-		platform := request.GetString("platform", "")
-		args := []string{"security", "grype", imageName, "--platform", platform}
+	s.AddTool(scanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		target := request.GetString("target", "")
+		args := []string{"grype", target}
 		
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "-o", output)
+		}
+		if failOn := request.GetString("fail_on", ""); failOn != "" {
+			args = append(args, "--fail-on", failOn)
+		}
+		if request.GetBool("only_fixed", false) {
+			args = append(args, "--only-fixed")
+		}
+		if request.GetBool("only_notfixed", false) {
+			args = append(args, "--only-notfixed")
+		}
+		if exclude := request.GetString("exclude", ""); exclude != "" {
+			args = append(args, "--exclude", exclude)
+		}
 		if scope := request.GetString("scope", ""); scope != "" {
 			args = append(args, "--scope", scope)
 		}
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
+		if request.GetBool("add_cpes_if_none", false) {
+			args = append(args, "--add-cpes-if-none")
 		}
+		if distro := request.GetString("distro", ""); distro != "" {
+			args = append(args, "--distro", distro)
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// Grype generate comprehensive report tool
-	generateReportTool := mcp.NewTool("grype_generate_report",
-		mcp.WithDescription("Generate comprehensive vulnerability report with analysis"),
-		mcp.WithString("target",
-			mcp.Description("Target to scan and report on"),
+	// Grype database status
+	dbStatusTool := mcp.NewTool("grype_db_status",
+		mcp.WithDescription("Report current status of Grype's vulnerability database"),
+	)
+	s.AddTool(dbStatusTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"grype", "db", "status"}
+		return executeShipCommand(args)
+	})
+
+	// Grype database check
+	dbCheckTool := mcp.NewTool("grype_db_check",
+		mcp.WithDescription("Check if updates are available for the vulnerability database"),
+	)
+	s.AddTool(dbCheckTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"grype", "db", "check"}
+		return executeShipCommand(args)
+	})
+
+	// Grype database update
+	dbUpdateTool := mcp.NewTool("grype_db_update",
+		mcp.WithDescription("Update the vulnerability database to the latest version"),
+	)
+	s.AddTool(dbUpdateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"grype", "db", "update"}
+		return executeShipCommand(args)
+	})
+
+	// Grype database list
+	dbListTool := mcp.NewTool("grype_db_list",
+		mcp.WithDescription("Show databases available for download"),
+	)
+	s.AddTool(dbListTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"grype", "db", "list"}
+		return executeShipCommand(args)
+	})
+
+	// Grype database import
+	dbImportTool := mcp.NewTool("grype_db_import",
+		mcp.WithDescription("Import a vulnerability database archive"),
+		mcp.WithString("archive_path",
+			mcp.Description("Path to database archive file"),
 			mcp.Required(),
 		),
-		mcp.WithString("report_type",
-			mcp.Description("Type of report to generate"),
-			mcp.Enum("executive", "technical", "compliance", "security-team"),
-		),
-		mcp.WithString("severity_threshold",
-			mcp.Description("Minimum severity to include in report"),
-			mcp.Enum("negligible", "low", "medium", "high", "critical"),
-		),
-		mcp.WithBoolean("include_fixed",
-			mcp.Description("Include vulnerabilities with available fixes"),
-		),
 	)
-	s.AddTool(generateReportTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		target := request.GetString("target", "")
-		args := []string{"security", "grype", target, "--output", "json"}
-		
-		if severityThreshold := request.GetString("severity_threshold", ""); severityThreshold != "" {
-			args = append(args, "--fail-on", severityThreshold)
-		}
-		if request.GetBool("include_fixed", false) {
-			args = append(args, "--only-fixed")
-		}
-		
-		// Add report-specific formatting
-		reportType := request.GetString("report_type", "technical")
-		args = append(args, "--report-type", reportType)
-		
+	s.AddTool(dbImportTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		archivePath := request.GetString("archive_path", "")
+		args := []string{"grype", "db", "import", archivePath}
 		return executeShipCommand(args)
 	})
 
-	// Grype get version tool
-	getVersionTool := mcp.NewTool("grype_get_version",
-		mcp.WithDescription("Get Grype version and database information"),
-		mcp.WithBoolean("show_db_info",
-			mcp.Description("Include vulnerability database information"),
+	// Grype explain CVE
+	explainTool := mcp.NewTool("grype_explain",
+		mcp.WithDescription("Get detailed information about a specific CVE from previous scan results"),
+		mcp.WithString("cve_id",
+			mcp.Description("CVE ID to explain (e.g., CVE-2023-36632)"),
+			mcp.Required(),
+		),
+		mcp.WithString("scan_results",
+			mcp.Description("JSON output from previous Grype scan"),
+			mcp.Required(),
 		),
 	)
-	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "grype", "--version"}
-		if request.GetBool("show_db_info", false) {
-			args = append(args, "--db-status")
-		}
+	s.AddTool(explainTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		cveId := request.GetString("cve_id", "")
+		// Note: This would typically pipe JSON results to grype explain
+		// For Ship CLI integration, we'll just show the command structure
+		// Grype explain requires piping scan results and is not a standalone command
+		// Providing guidance on how to use explain feature
+		args := []string{"echo", "To explain a CVE, pipe scan results to grype explain: echo '<scan-json>' | grype explain --id " + cveId}
+		return executeShipCommand(args)
+	})
+
+	// Grype version
+	versionTool := mcp.NewTool("grype_version",
+		mcp.WithDescription("Display Grype version information"),
+	)
+	s.AddTool(versionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"grype", "--version"}
 		return executeShipCommand(args)
 	})
 }

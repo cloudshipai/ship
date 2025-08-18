@@ -35,9 +35,9 @@ func (m *CloudsplainingModule) ScanAccountAuthorization(ctx context.Context, pro
 			WithEnvVariable("AWS_REGION", os.Getenv("AWS_REGION"))
 	}
 
+	// First download, then scan
 	container = container.WithExec([]string{
-		"cloudsplaining", "scan-account-authorization-details",
-		"--output", "/workspace/results.json",
+		"sh", "-c", "cloudsplaining download --profile " + profile + " && cloudsplaining scan --input-file default.json --output /workspace/results.json",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -113,13 +113,44 @@ func (m *CloudsplainingModule) ScanWithMinimization(ctx context.Context, profile
 			WithEnvVariable("AWS_REGION", os.Getenv("AWS_REGION"))
 	}
 
-	args := []string{
-		"cloudsplaining", "scan-account-authorization-details",
-		"--output", "/workspace/results.json",
+	// Build the command with optional parameters
+	cmd := "cloudsplaining download --profile " + profile + " && cloudsplaining scan --input-file default.json --output /workspace/results.json"
+	if minimizeStatementId != "" {
+		cmd = "cloudsplaining download --profile " + profile + " && cloudsplaining scan --input-file default.json --minimize-statement-id " + minimizeStatementId + " --output /workspace/results.json"
 	}
 
-	if minimizeStatementId != "" {
-		args = append(args, "--minimize-statement-id", minimizeStatementId)
+	container = container.WithExec([]string{"sh", "-c", cmd})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed to scan with minimization: %w", err)
+	}
+
+	return output, nil
+}
+
+// Download downloads AWS account authorization data
+func (m *CloudsplainingModule) Download(ctx context.Context, profile string, includeNonDefaultPolicyVersions bool) (string, error) {
+	args := []string{"cloudsplaining", "download"}
+	if profile != "" {
+		args = append(args, "--profile", profile)
+	}
+	if includeNonDefaultPolicyVersions {
+		args = append(args, "--include-non-default-policy-versions")
+	}
+
+	container := m.client.Container().
+		From("cloudshipai/cloudsplaining:latest")
+
+	if os.Getenv("AWS_ACCESS_KEY_ID") != "" {
+		container = container.
+			WithEnvVariable("AWS_ACCESS_KEY_ID", os.Getenv("AWS_ACCESS_KEY_ID")).
+			WithEnvVariable("AWS_SECRET_ACCESS_KEY", os.Getenv("AWS_SECRET_ACCESS_KEY")).
+			WithEnvVariable("AWS_REGION", os.Getenv("AWS_REGION"))
 	}
 
 	container = container.WithExec(args)
@@ -130,7 +161,119 @@ func (m *CloudsplainingModule) ScanWithMinimization(ctx context.Context, profile
 		if stderr != "" {
 			return stderr, nil
 		}
-		return "", fmt.Errorf("failed to scan with minimization: %w", err)
+		return "", fmt.Errorf("failed to download account data: %w", err)
+	}
+
+	return output, nil
+}
+
+// ScanAccountData scans downloaded account authorization data
+func (m *CloudsplainingModule) ScanAccountData(ctx context.Context, inputFile string, exclusionsFile string, outputDir string) (string, error) {
+	args := []string{"cloudsplaining", "scan", "--input-file", "/workspace/input.json"}
+	if exclusionsFile != "" {
+		args = append(args, "--exclusions-file", "/workspace/exclusions.yml")
+	}
+	if outputDir != "" {
+		args = append(args, "--output", outputDir)
+	}
+
+	container := m.client.Container().
+		From("cloudshipai/cloudsplaining:latest").
+		WithFile("/workspace/input.json", m.client.Host().File(inputFile)).
+		WithWorkdir("/workspace")
+
+	if exclusionsFile != "" {
+		container = container.WithFile("/workspace/exclusions.yml", m.client.Host().File(exclusionsFile))
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed to scan account data: %w", err)
+	}
+
+	return output, nil
+}
+
+// CreateExclusionsFile creates exclusions file template
+func (m *CloudsplainingModule) CreateExclusionsFile(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("cloudshipai/cloudsplaining:latest").
+		WithExec([]string{"cloudsplaining", "create-exclusions-file"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed to create exclusions file: %w", err)
+	}
+
+	return output, nil
+}
+
+// CreateMultiAccountConfig creates multi-account configuration file
+func (m *CloudsplainingModule) CreateMultiAccountConfig(ctx context.Context, outputFile string) (string, error) {
+	container := m.client.Container().
+		From("cloudshipai/cloudsplaining:latest").
+		WithExec([]string{"cloudsplaining", "create-multi-account-config-file", "-o", "/workspace/config.yml"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed to create multi-account config: %w", err)
+	}
+
+	return output, nil
+}
+
+// ScanMultiAccount scans multiple AWS accounts
+func (m *CloudsplainingModule) ScanMultiAccount(ctx context.Context, configFile string, profile string, roleName string, outputBucket string, outputDirectory string) (string, error) {
+	args := []string{"cloudsplaining", "scan-multi-account", "-c", "/workspace/config.yml"}
+	
+	if profile != "" {
+		args = append(args, "--profile", profile)
+	}
+	if roleName != "" {
+		args = append(args, "--role-name", roleName)
+	}
+	if outputBucket != "" {
+		args = append(args, "--output-bucket", outputBucket)
+	}
+	if outputDirectory != "" {
+		args = append(args, "--output-directory", outputDirectory)
+	}
+
+	container := m.client.Container().
+		From("cloudshipai/cloudsplaining:latest").
+		WithFile("/workspace/config.yml", m.client.Host().File(configFile)).
+		WithWorkdir("/workspace")
+
+	if os.Getenv("AWS_ACCESS_KEY_ID") != "" {
+		container = container.
+			WithEnvVariable("AWS_ACCESS_KEY_ID", os.Getenv("AWS_ACCESS_KEY_ID")).
+			WithEnvVariable("AWS_SECRET_ACCESS_KEY", os.Getenv("AWS_SECRET_ACCESS_KEY")).
+			WithEnvVariable("AWS_REGION", os.Getenv("AWS_REGION"))
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed to scan multi-account: %w", err)
 	}
 
 	return output, nil

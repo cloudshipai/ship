@@ -7,122 +7,125 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddGitHubAdminTools adds GitHub administration MCP tool implementations
+// AddGitHubAdminTools adds GitHub administration MCP tool implementations using gh CLI
 func AddGitHubAdminTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// GitHub admin audit repositories tool
-	auditRepositoriesTool := mcp.NewTool("github_admin_audit_repositories",
-		mcp.WithDescription("Audit GitHub repositories for security and compliance"),
+	// GitHub list organization repositories
+	listOrgReposTool := mcp.NewTool("github_admin_list_org_repos",
+		mcp.WithDescription("List GitHub organization repositories using gh CLI"),
 		mcp.WithString("organization",
 			mcp.Description("GitHub organization name"),
 			mcp.Required(),
 		),
-		mcp.WithString("audit_type",
-			mcp.Description("Type of audit (security, compliance, permissions)"),
+		mcp.WithString("visibility",
+			mcp.Description("Repository visibility filter"),
+			mcp.Enum("public", "private", "internal"),
 		),
 	)
-	s.AddTool(auditRepositoriesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	s.AddTool(listOrgReposTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		organization := request.GetString("organization", "")
-		args := []string{"security", "github-admin", "audit-repos", organization}
-		if auditType := request.GetString("audit_type", ""); auditType != "" {
-			args = append(args, "--type", auditType)
+		args := []string{"gh", "repo", "list", organization}
+		if visibility := request.GetString("visibility", ""); visibility != "" {
+			args = append(args, "--visibility", visibility)
 		}
 		return executeShipCommand(args)
 	})
 
-	// GitHub admin manage branch protection tool
-	manageBranchProtectionTool := mcp.NewTool("github_admin_manage_branch_protection",
-		mcp.WithDescription("Manage branch protection rules across repositories"),
+	// GitHub create repository in organization
+	createOrgRepoTool := mcp.NewTool("github_admin_create_org_repo",
+		mcp.WithDescription("Create repository in GitHub organization"),
 		mcp.WithString("organization",
 			mcp.Description("GitHub organization name"),
 			mcp.Required(),
 		),
-		mcp.WithString("branch_pattern",
-			mcp.Description("Branch pattern to protect (e.g., main, master)"),
+		mcp.WithString("repo_name",
+			mcp.Description("Repository name"),
 			mcp.Required(),
 		),
-		mcp.WithString("protection_rules",
-			mcp.Description("Protection rules to apply (reviews, checks, etc.)"),
+		mcp.WithString("visibility",
+			mcp.Description("Repository visibility"),
+			mcp.Enum("public", "private", "internal"),
+		),
+		mcp.WithString("description",
+			mcp.Description("Repository description"),
 		),
 	)
-	s.AddTool(manageBranchProtectionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	s.AddTool(createOrgRepoTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		organization := request.GetString("organization", "")
-		branchPattern := request.GetString("branch_pattern", "")
-		args := []string{"security", "github-admin", "branch-protection", organization, branchPattern}
-		if rules := request.GetString("protection_rules", ""); rules != "" {
-			args = append(args, "--rules", rules)
+		repoName := request.GetString("repo_name", "")
+		args := []string{"gh", "repo", "create", organization + "/" + repoName}
+		
+		if visibility := request.GetString("visibility", ""); visibility != "" {
+			args = append(args, "--" + visibility)
+		}
+		if description := request.GetString("description", ""); description != "" {
+			args = append(args, "--description", description)
+		}
+		
+		return executeShipCommand(args)
+	})
+
+	// GitHub get repository information
+	getRepoInfoTool := mcp.NewTool("github_admin_get_repo_info",
+		mcp.WithDescription("Get GitHub repository information"),
+		mcp.WithString("repository",
+			mcp.Description("Repository in format owner/repo"),
+			mcp.Required(),
+		),
+	)
+	s.AddTool(getRepoInfoTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		repository := request.GetString("repository", "")
+		args := []string{"gh", "repo", "view", repository}
+		return executeShipCommand(args)
+	})
+
+	// GitHub list issues in organization
+	listOrgIssuesTool := mcp.NewTool("github_admin_list_org_issues",
+		mcp.WithDescription("List issues across organization repositories"),
+		mcp.WithString("organization",
+			mcp.Description("GitHub organization name"),
+			mcp.Required(),
+		),
+		mcp.WithString("state",
+			mcp.Description("Issue state filter"),
+			mcp.Enum("open", "closed", "all"),
+		),
+	)
+	s.AddTool(listOrgIssuesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		organization := request.GetString("organization", "")
+		args := []string{"gh", "issue", "list", "--search", "org:" + organization}
+		if state := request.GetString("state", ""); state != "" {
+			args = append(args, "--state", state)
 		}
 		return executeShipCommand(args)
 	})
 
-	// GitHub admin manage team permissions tool
-	manageTeamPermissionsTool := mcp.NewTool("github_admin_manage_team_permissions",
-		mcp.WithDescription("Manage team permissions across repositories"),
+	// GitHub list pull requests in organization
+	listOrgPRsTool := mcp.NewTool("github_admin_list_org_prs",
+		mcp.WithDescription("List pull requests across organization repositories"),
 		mcp.WithString("organization",
 			mcp.Description("GitHub organization name"),
 			mcp.Required(),
 		),
-		mcp.WithString("team_name",
-			mcp.Description("Team name to manage"),
-			mcp.Required(),
-		),
-		mcp.WithString("permission_level",
-			mcp.Description("Permission level (read, write, admin)"),
-			mcp.Required(),
+		mcp.WithString("state",
+			mcp.Description("PR state filter"),
+			mcp.Enum("open", "closed", "merged", "all"),
 		),
 	)
-	s.AddTool(manageTeamPermissionsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	s.AddTool(listOrgPRsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		organization := request.GetString("organization", "")
-		teamName := request.GetString("team_name", "")
-		permissionLevel := request.GetString("permission_level", "")
-		args := []string{"security", "github-admin", "team-permissions", organization, teamName, permissionLevel}
-		return executeShipCommand(args)
-	})
-
-	// GitHub admin enforce security policies tool
-	enforceSecurityPoliciesTool := mcp.NewTool("github_admin_enforce_security_policies",
-		mcp.WithDescription("Enforce organization-wide security policies"),
-		mcp.WithString("organization",
-			mcp.Description("GitHub organization name"),
-			mcp.Required(),
-		),
-		mcp.WithString("policy_set",
-			mcp.Description("Security policy set to enforce (basic, strict, enterprise)"),
-			mcp.Required(),
-		),
-	)
-	s.AddTool(enforceSecurityPoliciesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		organization := request.GetString("organization", "")
-		policySet := request.GetString("policy_set", "")
-		args := []string{"security", "github-admin", "enforce-policies", organization, "--policy-set", policySet}
-		return executeShipCommand(args)
-	})
-
-	// GitHub admin generate compliance report tool
-	generateComplianceReportTool := mcp.NewTool("github_admin_generate_compliance_report",
-		mcp.WithDescription("Generate compliance report for GitHub organization"),
-		mcp.WithString("organization",
-			mcp.Description("GitHub organization name"),
-			mcp.Required(),
-		),
-		mcp.WithString("report_format",
-			mcp.Description("Report format (json, csv, pdf)"),
-		),
-	)
-	s.AddTool(generateComplianceReportTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		organization := request.GetString("organization", "")
-		args := []string{"security", "github-admin", "compliance-report", organization}
-		if format := request.GetString("report_format", ""); format != "" {
-			args = append(args, "--format", format)
+		args := []string{"gh", "pr", "list", "--search", "org:" + organization}
+		if state := request.GetString("state", ""); state != "" {
+			args = append(args, "--state", state)
 		}
 		return executeShipCommand(args)
 	})
 
-	// GitHub admin get version tool
+	// GitHub CLI version
 	getVersionTool := mcp.NewTool("github_admin_get_version",
-		mcp.WithDescription("Get GitHub admin tool version information"),
+		mcp.WithDescription("Get GitHub CLI version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "github-admin", "--version"}
+		args := []string{"gh", "--version"}
 		return executeShipCommand(args)
 	})
 }

@@ -121,3 +121,76 @@ func (m *ProwlerModule) ScanSpecificServices(ctx context.Context, provider strin
 
 	return output, nil
 }
+
+// ListChecks lists available Prowler checks
+func (m *ProwlerModule) ListChecks(ctx context.Context, provider string) (string, error) {
+	args := []string{"prowler", "--list-checks"}
+	if provider != "" {
+		args = append(args, "--provider", provider)
+	}
+
+	container := m.client.Container().
+		From("toniblyx/prowler:latest").
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to list checks: %w", err)
+	}
+
+	return output, nil
+}
+
+// ListServices lists available services for a provider
+func (m *ProwlerModule) ListServices(ctx context.Context, provider string) (string, error) {
+	args := []string{"prowler", "--list-services"}
+	if provider != "" {
+		args = append(args, "--provider", provider)
+	}
+
+	container := m.client.Container().
+		From("toniblyx/prowler:latest").
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to list services: %w", err)
+	}
+
+	return output, nil
+}
+
+// ListCompliance lists available compliance frameworks
+func (m *ProwlerModule) ListCompliance(ctx context.Context, provider string) (string, error) {
+	args := []string{"prowler", "--list-compliance"}
+	if provider != "" {
+		args = append(args, "--provider", provider)
+	}
+
+	container := m.client.Container().
+		From("toniblyx/prowler:latest").
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to list compliance frameworks: %w", err)
+	}
+
+	return output, nil
+}
+
+// GenerateDashboard generates HTML dashboard from scan results
+func (m *ProwlerModule) GenerateDashboard(ctx context.Context, inputFile string, outputDir string) (string, error) {
+	container := m.client.Container().
+		From("toniblyx/prowler:latest").
+		WithFile("/workspace/input.json", m.client.Host().File(inputFile)).
+		WithWorkdir("/workspace").
+		WithExec([]string{"prowler", "dashboard", "--input", "input.json", "--output-dir", outputDir})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate dashboard: %w", err)
+	}
+
+	return output, nil
+}

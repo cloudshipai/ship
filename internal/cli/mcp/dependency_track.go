@@ -9,9 +9,9 @@ import (
 
 // AddDependencyTrackTools adds Dependency Track (software component analysis) MCP tool implementations
 func AddDependencyTrackTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// Dependency Track upload BOM tool
+	// Dependency Track upload BOM tool using dtrack-cli
 	uploadBOMTool := mcp.NewTool("dependency_track_upload_bom",
-		mcp.WithDescription("Upload Software Bill of Materials to Dependency Track"),
+		mcp.WithDescription("Upload Software Bill of Materials to Dependency Track using dtrack-cli"),
 		mcp.WithString("bom_path",
 			mcp.Description("Path to BOM file (CycloneDX or SPDX format)"),
 			mcp.Required(),
@@ -23,159 +23,124 @@ func AddDependencyTrackTools(s *server.MCPServer, executeShipCommand ExecuteShip
 		mcp.WithString("project_version",
 			mcp.Description("Project version"),
 		),
+		mcp.WithString("server_url",
+			mcp.Description("Dependency Track server URL"),
+		),
+		mcp.WithString("api_key",
+			mcp.Description("API key for authentication"),
+		),
 	)
 	s.AddTool(uploadBOMTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		bomPath := request.GetString("bom_path", "")
 		projectName := request.GetString("project_name", "")
-		args := []string{"security", "dependency-track", "upload", bomPath, "--project", projectName}
+		args := []string{"dtrack-cli", "--bom-path", bomPath, "--project-name", projectName}
+		
 		if projectVersion := request.GetString("project_version", ""); projectVersion != "" {
-			args = append(args, "--version", projectVersion)
+			args = append(args, "--project-version", projectVersion)
 		}
+		if serverUrl := request.GetString("server_url", ""); serverUrl != "" {
+			args = append(args, "--server", serverUrl)
+		}
+		if apiKey := request.GetString("api_key", ""); apiKey != "" {
+			args = append(args, "--api-key", apiKey)
+		}
+		
+		// Add auto-create by default for easier usage
+		args = append(args, "--auto-create", "true")
 		return executeShipCommand(args)
 	})
 
-	// Dependency Track scan vulnerabilities tool
-	scanVulnerabilitiesTool := mcp.NewTool("dependency_track_scan_vulnerabilities",
-		mcp.WithDescription("Scan project for vulnerabilities in Dependency Track"),
-		mcp.WithString("project_name",
-			mcp.Description("Project name to scan"),
+	// Dependency Track upload BOM via API (alternative using curl)
+	uploadBOMApiTool := mcp.NewTool("dependency_track_upload_bom_api",
+		mcp.WithDescription("Upload BOM to Dependency Track via REST API using curl"),
+		mcp.WithString("bom_path",
+			mcp.Description("Path to BOM file (CycloneDX or SPDX format)"),
 			mcp.Required(),
 		),
-		mcp.WithString("project_version",
-			mcp.Description("Project version to scan"),
-		),
-		mcp.WithString("severity",
-			mcp.Description("Minimum severity level (info, low, medium, high, critical)"),
-		),
-	)
-	s.AddTool(scanVulnerabilitiesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		projectName := request.GetString("project_name", "")
-		args := []string{"security", "dependency-track", "scan", projectName}
-		if projectVersion := request.GetString("project_version", ""); projectVersion != "" {
-			args = append(args, "--version", projectVersion)
-		}
-		if severity := request.GetString("severity", ""); severity != "" {
-			args = append(args, "--severity", severity)
-		}
-		return executeShipCommand(args)
-	})
-
-	// Dependency Track generate report tool
-	generateReportTool := mcp.NewTool("dependency_track_generate_report",
-		mcp.WithDescription("Generate vulnerability report for project"),
-		mcp.WithString("project_name",
-			mcp.Description("Project name"),
+		mcp.WithString("server_url",
+			mcp.Description("Dependency Track server URL"),
 			mcp.Required(),
+		),
+		mcp.WithString("api_key",
+			mcp.Description("API key for authentication"),
+			mcp.Required(),
+		),
+		mcp.WithString("project_name",
+			mcp.Description("Project name in Dependency Track"),
 		),
 		mcp.WithString("project_version",
 			mcp.Description("Project version"),
 		),
-		mcp.WithString("report_format",
-			mcp.Description("Report format (json, csv, xml, pdf)"),
+		mcp.WithBoolean("auto_create",
+			mcp.Description("Auto-create project if it doesn't exist"),
+		),
+	)
+	s.AddTool(uploadBOMApiTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		bomPath := request.GetString("bom_path", "")
+		serverUrl := request.GetString("server_url", "")
+		apiKey := request.GetString("api_key", "")
+		
+		args := []string{"curl", "-X", "POST", serverUrl + "/api/v1/bom",
+			"-H", "Content-Type: multipart/form-data",
+			"-H", "X-Api-Key: " + apiKey,
+			"-F", "bom=@" + bomPath}
+		
+		if projectName := request.GetString("project_name", ""); projectName != "" {
+			args = append(args, "-F", "projectName=" + projectName)
+		}
+		if projectVersion := request.GetString("project_version", ""); projectVersion != "" {
+			args = append(args, "-F", "projectVersion=" + projectVersion)
+		}
+		if request.GetBool("auto_create", false) {
+			args = append(args, "-F", "autoCreate=true")
+		}
+		
+		return executeShipCommand(args)
+	})
+
+	// Generate CycloneDX BOM using CycloneDX CLI tools
+	generateBOMTool := mcp.NewTool("dependency_track_generate_bom",
+		mcp.WithDescription("Generate CycloneDX BOM using cyclonedx-cli tools"),
+		mcp.WithString("project_type",
+			mcp.Description("Project type"),
+			mcp.Enum("npm", "maven", "gradle", "pip", "composer", "dotnet"),
+			mcp.Required(),
+		),
+		mcp.WithString("project_path",
+			mcp.Description("Path to project directory"),
 		),
 		mcp.WithString("output_file",
-			mcp.Description("Output file path for the report"),
+			mcp.Description("Output BOM file path"),
 		),
 	)
-	s.AddTool(generateReportTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		projectName := request.GetString("project_name", "")
-		args := []string{"security", "dependency-track", "report", projectName}
-		if projectVersion := request.GetString("project_version", ""); projectVersion != "" {
-			args = append(args, "--version", projectVersion)
+	s.AddTool(generateBOMTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		projectType := request.GetString("project_type", "")
+		
+		var args []string
+		switch projectType {
+		case "npm":
+			args = []string{"cyclonedx-npm"}
+		case "maven":
+			args = []string{"mvn", "org.cyclonedx:cyclonedx-maven-plugin:makeBom"}
+		case "gradle":
+			args = []string{"gradle", "cyclonedxBom"}
+		case "pip":
+			args = []string{"cyclonedx-py"}
+		case "composer":
+			args = []string{"cyclonedx-php", "composer"}
+		case "dotnet":
+			args = []string{"cyclonedx", "dotnet"}
+		default:
+			args = []string{"cyclonedx-npm"}
 		}
-		if reportFormat := request.GetString("report_format", ""); reportFormat != "" {
-			args = append(args, "--format", reportFormat)
+		
+		if projectPath := request.GetString("project_path", ""); projectPath != "" && projectType == "npm" {
+			args = append(args, "-o", projectPath)
 		}
-		if outputFile := request.GetString("output_file", ""); outputFile != "" {
-			args = append(args, "--output", outputFile)
+		if outputFile := request.GetString("output_file", ""); outputFile != "" && projectType == "npm" {
+			args = append(args, "-o", outputFile)
 		}
-		return executeShipCommand(args)
-	})
-
-	// Dependency Track list projects tool
-	listProjectsTool := mcp.NewTool("dependency_track_list_projects",
-		mcp.WithDescription("List all projects in Dependency Track"),
-		mcp.WithBoolean("show_metrics",
-			mcp.Description("Include project metrics in output"),
-		),
-	)
-	s.AddTool(listProjectsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "dependency-track", "list-projects"}
-		if request.GetBool("show_metrics", false) {
-			args = append(args, "--metrics")
-		}
-		return executeShipCommand(args)
-	})
-
-	// Dependency Track analyze components tool
-	analyzeComponentsTool := mcp.NewTool("dependency_track_analyze_components",
-		mcp.WithDescription("Analyze components for security issues and policy violations"),
-		mcp.WithString("project_name",
-			mcp.Description("Project name to analyze"),
-			mcp.Required(),
-		),
-		mcp.WithString("project_version",
-			mcp.Description("Project version"),
-		),
-		mcp.WithBoolean("include_policy_violations",
-			mcp.Description("Include policy violations in analysis"),
-		),
-	)
-	s.AddTool(analyzeComponentsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		projectName := request.GetString("project_name", "")
-		args := []string{"security", "dependency-track", "analyze", projectName}
-		if projectVersion := request.GetString("project_version", ""); projectVersion != "" {
-			args = append(args, "--version", projectVersion)
-		}
-		if request.GetBool("include_policy_violations", false) {
-			args = append(args, "--include-policy")
-		}
-		return executeShipCommand(args)
-	})
-
-	// Dependency Track create project tool
-	createProjectTool := mcp.NewTool("dependency_track_create_project",
-		mcp.WithDescription("Create new project in Dependency Track"),
-		mcp.WithString("project_name",
-			mcp.Description("Name for the new project"),
-			mcp.Required(),
-		),
-		mcp.WithString("project_version",
-			mcp.Description("Initial version for the project"),
-		),
-		mcp.WithString("description",
-			mcp.Description("Project description"),
-		),
-	)
-	s.AddTool(createProjectTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		projectName := request.GetString("project_name", "")
-		args := []string{"security", "dependency-track", "create-project", projectName}
-		if projectVersion := request.GetString("project_version", ""); projectVersion != "" {
-			args = append(args, "--version", projectVersion)
-		}
-		if description := request.GetString("description", ""); description != "" {
-			args = append(args, "--description", description)
-		}
-		return executeShipCommand(args)
-	})
-
-	// Dependency Track get project metrics tool
-	getMetricsTool := mcp.NewTool("dependency_track_get_metrics",
-		mcp.WithDescription("Get security metrics for a project"),
-		mcp.WithString("project_name",
-			mcp.Description("Project name"),
-			mcp.Required(),
-		),
-		mcp.WithString("project_version",
-			mcp.Description("Project version"),
-		),
-	)
-	s.AddTool(getMetricsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		projectName := request.GetString("project_name", "")
-		args := []string{"security", "dependency-track", "metrics", projectName}
-		if projectVersion := request.GetString("project_version", ""); projectVersion != "" {
-			args = append(args, "--version", projectVersion)
-		}
+		
 		return executeShipCommand(args)
 	})
 }

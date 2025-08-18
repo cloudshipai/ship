@@ -182,3 +182,121 @@ func (m *CosignModule) AttestSBOM(ctx context.Context, imageName string, sbomPat
 
 	return output, nil
 }
+
+// SignBlob signs arbitrary blob using Cosign
+func (m *CosignModule) SignBlob(ctx context.Context, blobPath string, keyPath string, outputSignature string) (string, error) {
+	args := []string{"cosign", "sign-blob"}
+	if keyPath != "" {
+		args = append(args, "--key", "/tmp/private.key")
+	}
+	if outputSignature != "" {
+		args = append(args, "--output-signature", outputSignature)
+	}
+	args = append(args, "/tmp/blob")
+
+	container := m.client.Container().
+		From("gcr.io/projectsigstore/cosign:latest").
+		WithFile("/tmp/blob", m.client.Host().File(blobPath))
+
+	if keyPath != "" {
+		container = container.WithFile("/tmp/private.key", m.client.Host().File(keyPath))
+	}
+
+	if os.Getenv("COSIGN_PASSWORD") != "" {
+		container = container.WithEnvVariable("COSIGN_PASSWORD", os.Getenv("COSIGN_PASSWORD"))
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to sign blob: %w", err)
+	}
+
+	return output, nil
+}
+
+// VerifyBlob verifies blob signature using Cosign
+func (m *CosignModule) VerifyBlob(ctx context.Context, blobPath string, signaturePath string, keyPath string) (string, error) {
+	args := []string{"cosign", "verify-blob", "--signature", "/tmp/signature"}
+	if keyPath != "" {
+		args = append(args, "--key", "/tmp/public.key")
+	}
+	args = append(args, "/tmp/blob")
+
+	container := m.client.Container().
+		From("gcr.io/projectsigstore/cosign:latest").
+		WithFile("/tmp/blob", m.client.Host().File(blobPath)).
+		WithFile("/tmp/signature", m.client.Host().File(signaturePath))
+
+	if keyPath != "" {
+		container = container.WithFile("/tmp/public.key", m.client.Host().File(keyPath))
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to verify blob: %w", err)
+	}
+
+	return output, nil
+}
+
+// UploadBlob uploads generic artifact as a blob to registry
+func (m *CosignModule) UploadBlob(ctx context.Context, blobPath string, registryURL string) (string, error) {
+	container := m.client.Container().
+		From("gcr.io/projectsigstore/cosign:latest").
+		WithFile("/tmp/blob", m.client.Host().File(blobPath)).
+		WithExec([]string{"cosign", "upload", "blob", "-f", "/tmp/blob", registryURL})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to upload blob: %w", err)
+	}
+
+	return output, nil
+}
+
+// UploadWasm uploads WebAssembly module to registry
+func (m *CosignModule) UploadWasm(ctx context.Context, wasmPath string, registryURL string) (string, error) {
+	container := m.client.Container().
+		From("gcr.io/projectsigstore/cosign:latest").
+		WithFile("/tmp/wasm", m.client.Host().File(wasmPath)).
+		WithExec([]string{"cosign", "upload", "wasm", "-f", "/tmp/wasm", registryURL})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to upload wasm: %w", err)
+	}
+
+	return output, nil
+}
+
+// CopyImage copies images between registries
+func (m *CosignModule) CopyImage(ctx context.Context, sourceImage string, destinationImage string) (string, error) {
+	container := m.client.Container().
+		From("gcr.io/projectsigstore/cosign:latest").
+		WithExec([]string{"cosign", "copy", sourceImage, destinationImage})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to copy image: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetVersion returns the version of Cosign
+func (m *CosignModule) GetVersion(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("gcr.io/projectsigstore/cosign:latest").
+		WithExec([]string{"cosign", "version"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get cosign version: %w", err)
+	}
+
+	return output, nil
+}

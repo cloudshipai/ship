@@ -235,3 +235,21 @@ func getLocationFromRegion(region string) string {
 	}
 	return "US East (N. Virginia)" // Default fallback
 }
+
+// GetAttributeValues gets available attribute values for AWS service pricing filters
+func (m *AWSPricingModule) GetAttributeValues(ctx context.Context, serviceCode, attributeName string) (string, error) {
+	container := m.client.Container().
+		From("amazon/aws-cli:latest").
+		WithExec([]string{"aws", "pricing", "get-attribute-values",
+			"--service-code", serviceCode,
+			"--attribute-name", attributeName,
+			"--region", "us-east-1", // Pricing API is only available in us-east-1
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get attribute values: %w", err)
+	}
+
+	return output, nil
+}

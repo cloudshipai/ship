@@ -25,13 +25,11 @@ func AddCosignTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 	)
 	s.AddTool(signImageTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		imageName := request.GetString("image_name", "")
-		args := []string{"security", "cosign", "--sign", imageName}
+		args := []string{"cosign", "sign"}
 		if keyPath := request.GetString("key_path", ""); keyPath != "" {
 			args = append(args, "--key", keyPath)
 		}
-		if request.GetBool("keyless", false) {
-			args = append(args, "--keyless")
-		}
+		args = append(args, imageName)
 		return executeShipCommand(args)
 	})
 
@@ -51,13 +49,11 @@ func AddCosignTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 	)
 	s.AddTool(verifyImageTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		imageName := request.GetString("image_name", "")
-		args := []string{"security", "cosign", "--verify", imageName}
+		args := []string{"cosign", "verify"}
 		if keyPath := request.GetString("key_path", ""); keyPath != "" {
 			args = append(args, "--key", keyPath)
 		}
-		if request.GetBool("keyless", false) {
-			args = append(args, "--keyless")
-		}
+		args = append(args, imageName)
 		return executeShipCommand(args)
 	})
 
@@ -69,10 +65,7 @@ func AddCosignTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(generateKeyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "cosign", "--generate-key"}
-		if outputPath := request.GetString("output_path", ""); outputPath != "" {
-			args = append(args, "--output", outputPath)
-		}
+		args := []string{"cosign", "generate-key-pair"}
 		return executeShipCommand(args)
 	})
 
@@ -94,10 +87,11 @@ func AddCosignTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 	s.AddTool(attestTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		imageName := request.GetString("image_name", "")
 		predicatePath := request.GetString("predicate_path", "")
-		args := []string{"security", "cosign", "--attest", imageName, "--predicate", predicatePath}
+		args := []string{"cosign", "attest", "--predicate", predicatePath}
 		if keyPath := request.GetString("key_path", ""); keyPath != "" {
 			args = append(args, "--key", keyPath)
 		}
+		args = append(args, imageName)
 		return executeShipCommand(args)
 	})
 
@@ -117,13 +111,14 @@ func AddCosignTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 	)
 	s.AddTool(verifyAttestationTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		imageName := request.GetString("image_name", "")
-		args := []string{"security", "cosign", "--verify-attestation", imageName}
+		args := []string{"cosign", "verify-attestation"}
 		if keyPath := request.GetString("key_path", ""); keyPath != "" {
 			args = append(args, "--key", keyPath)
 		}
 		if policyPath := request.GetString("policy_path", ""); policyPath != "" {
 			args = append(args, "--policy", policyPath)
 		}
+		args = append(args, imageName)
 		return executeShipCommand(args)
 	})
 
@@ -143,13 +138,14 @@ func AddCosignTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 	)
 	s.AddTool(signBlobTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		blobPath := request.GetString("blob_path", "")
-		args := []string{"security", "cosign", "--sign-blob", blobPath}
+		args := []string{"cosign", "sign-blob"}
 		if keyPath := request.GetString("key_path", ""); keyPath != "" {
 			args = append(args, "--key", keyPath)
 		}
 		if outputSig := request.GetString("output_signature", ""); outputSig != "" {
 			args = append(args, "--output-signature", outputSig)
 		}
+		args = append(args, blobPath)
 		return executeShipCommand(args)
 	})
 
@@ -171,10 +167,11 @@ func AddCosignTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 	s.AddTool(verifyBlobTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		blobPath := request.GetString("blob_path", "")
 		signaturePath := request.GetString("signature_path", "")
-		args := []string{"security", "cosign", "--verify-blob", blobPath, "--signature", signaturePath}
+		args := []string{"cosign", "verify-blob", "--signature", signaturePath}
 		if keyPath := request.GetString("key_path", ""); keyPath != "" {
 			args = append(args, "--key", keyPath)
 		}
+		args = append(args, blobPath)
 		return executeShipCommand(args)
 	})
 
@@ -193,7 +190,7 @@ func AddCosignTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 	s.AddTool(uploadBlobTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		blobPath := request.GetString("blob_path", "")
 		registryURL := request.GetString("registry_url", "")
-		args := []string{"security", "cosign", "upload", "blob", "--f", blobPath, registryURL}
+		args := []string{"cosign", "upload", "blob", "-f", blobPath, registryURL}
 		return executeShipCommand(args)
 	})
 
@@ -212,26 +209,26 @@ func AddCosignTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 	s.AddTool(uploadWasmTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		wasmPath := request.GetString("wasm_path", "")
 		registryURL := request.GetString("registry_url", "")
-		args := []string{"security", "cosign", "upload", "wasm", "--f", wasmPath, registryURL}
+		args := []string{"cosign", "upload", "wasm", "-f", wasmPath, registryURL}
 		return executeShipCommand(args)
 	})
 
-	// Cosign save image tool
-	saveImageTool := mcp.NewTool("cosign_save_image",
-		mcp.WithDescription("Save image locally for offline verification"),
-		mcp.WithString("image_name",
-			mcp.Description("Container image name to save"),
+	// Cosign download/copy image tool (using copy command)
+	copyImageTool := mcp.NewTool("cosign_copy_image",
+		mcp.WithDescription("Copy images between registries"),
+		mcp.WithString("source_image",
+			mcp.Description("Source image reference"),
 			mcp.Required(),
 		),
-		mcp.WithString("output_dir",
-			mcp.Description("Directory to save image to"),
+		mcp.WithString("destination_image",
+			mcp.Description("Destination image reference"),
 			mcp.Required(),
 		),
 	)
-	s.AddTool(saveImageTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		imageName := request.GetString("image_name", "")
-		outputDir := request.GetString("output_dir", "")
-		args := []string{"security", "cosign", "save", imageName, "--dir", outputDir}
+	s.AddTool(copyImageTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		sourceImage := request.GetString("source_image", "")
+		destinationImage := request.GetString("destination_image", "")
+		args := []string{"cosign", "copy", sourceImage, destinationImage}
 		return executeShipCommand(args)
 	})
 
@@ -251,13 +248,11 @@ func AddCosignTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 	)
 	s.AddTool(signWasmTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		wasmArtifact := request.GetString("wasm_artifact", "")
-		args := []string{"security", "cosign", "sign", wasmArtifact}
+		args := []string{"cosign", "sign"}
 		if keyPath := request.GetString("key_path", ""); keyPath != "" {
 			args = append(args, "--key", keyPath)
 		}
-		if request.GetBool("keyless", false) {
-			args = append(args, "--keyless")
-		}
+		args = append(args, wasmArtifact)
 		return executeShipCommand(args)
 	})
 
@@ -266,7 +261,7 @@ func AddCosignTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		mcp.WithDescription("Get Cosign version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "cosign", "--version"}
+		args := []string{"cosign", "version"}
 		return executeShipCommand(args)
 	})
 }

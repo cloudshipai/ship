@@ -147,3 +147,142 @@ func (m *ParliamentModule) LintWithSeverityFilter(ctx context.Context, policyPat
 
 	return output, nil
 }
+
+// LintAWSManagedPolicies lints AWS managed policies
+func (m *ParliamentModule) LintAWSManagedPolicies(ctx context.Context, config string, jsonOutput bool) (string, error) {
+	container := m.client.Container().
+		From("cloudshipai/parliament:latest")
+
+	args := []string{"parliament", "--aws-managed-policies"}
+	if config != "" {
+		container = container.WithFile("/workspace/config.yaml", m.client.Host().File(config))
+		args = append(args, "--config", "/workspace/config.yaml")
+	}
+	if jsonOutput {
+		args = append(args, "--json")
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return output, nil
+	}
+
+	return output, nil
+}
+
+// LintAuthDetailsFile lints AWS IAM authorization details file
+func (m *ParliamentModule) LintAuthDetailsFile(ctx context.Context, authDetailsFile string, config string, jsonOutput bool) (string, error) {
+	container := m.client.Container().
+		From("cloudshipai/parliament:latest").
+		WithFile("/workspace/auth_details.json", m.client.Host().File(authDetailsFile))
+
+	args := []string{"parliament", "--auth-details-file", "/workspace/auth_details.json"}
+	if config != "" {
+		container = container.WithFile("/workspace/config.yaml", m.client.Host().File(config))
+		args = append(args, "--config", "/workspace/config.yaml")
+	}
+	if jsonOutput {
+		args = append(args, "--json")
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return output, nil
+	}
+
+	return output, nil
+}
+
+// ComprehensiveAnalysis performs comprehensive IAM policy analysis with all auditors
+func (m *ParliamentModule) ComprehensiveAnalysis(ctx context.Context, policyPath string, privateAuditors string, config string, jsonOutput bool) (string, error) {
+	container := m.client.Container().
+		From("cloudshipai/parliament:latest").
+		WithFile("/workspace/policy.json", m.client.Host().File(policyPath))
+
+	if privateAuditors != "" {
+		container = container.WithDirectory("/workspace/auditors", m.client.Host().Directory(privateAuditors))
+	}
+	if config != "" {
+		container = container.WithFile("/workspace/config.yaml", m.client.Host().File(config))
+	}
+
+	args := []string{"parliament", "--file", "/workspace/policy.json", "--include-community-auditors"}
+	if privateAuditors != "" {
+		args = append(args, "--private_auditors", "/workspace/auditors")
+	}
+	if config != "" {
+		args = append(args, "--config", "/workspace/config.yaml")
+	}
+	if jsonOutput {
+		args = append(args, "--json")
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return output, nil
+	}
+
+	return output, nil
+}
+
+// BatchDirectoryAnalysis performs batch analysis of multiple policy directories
+func (m *ParliamentModule) BatchDirectoryAnalysis(ctx context.Context, baseDirectory string, config string, privateAuditors string, jsonOutput bool, includeExtension string, excludePattern string) (string, error) {
+	container := m.client.Container().
+		From("cloudshipai/parliament:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(baseDirectory))
+
+	if privateAuditors != "" {
+		container = container.WithDirectory("/workspace/auditors", m.client.Host().Directory(privateAuditors))
+	}
+	if config != "" {
+		container = container.WithFile("/workspace/config.yaml", m.client.Host().File(config))
+	}
+
+	args := []string{"parliament", "--directory", "/workspace", "--include-community-auditors"}
+	if privateAuditors != "" {
+		args = append(args, "--private_auditors", "/workspace/auditors")
+	}
+	if config != "" {
+		args = append(args, "--config", "/workspace/config.yaml")
+	}
+	if jsonOutput {
+		args = append(args, "--json")
+	}
+	if includeExtension != "" {
+		args = append(args, "--include_policy_extension", includeExtension)
+	}
+	if excludePattern != "" {
+		args = append(args, "--exclude_pattern", excludePattern)
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return output, nil
+	}
+
+	return output, nil
+}

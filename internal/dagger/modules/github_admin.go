@@ -84,3 +84,123 @@ func (m *GitHubAdminModule) AuditOrgSecurity(ctx context.Context, org string, to
 
 	return output, nil
 }
+
+// ListOrgRepos lists repositories in an organization
+func (m *GitHubAdminModule) ListOrgRepos(ctx context.Context, org string, visibility string, token string) (string, error) {
+	args := []string{"gh", "repo", "list", org}
+	if visibility != "" {
+		args = append(args, "--visibility", visibility)
+	}
+	args = append(args, "--json", "name,visibility,isPrivate,createdAt")
+
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "github-cli"}).
+		WithEnvVariable("GITHUB_TOKEN", token).
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to list org repos: %w", err)
+	}
+
+	return output, nil
+}
+
+// CreateOrgRepo creates a repository in an organization
+func (m *GitHubAdminModule) CreateOrgRepo(ctx context.Context, org string, repoName string, isPrivate bool, token string) (string, error) {
+	args := []string{"gh", "repo", "create", org + "/" + repoName}
+	if isPrivate {
+		args = append(args, "--private")
+	} else {
+		args = append(args, "--public")
+	}
+
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "github-cli"}).
+		WithEnvVariable("GITHUB_TOKEN", token).
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to create org repo: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetRepoInfoDetailed gets detailed repository information
+func (m *GitHubAdminModule) GetRepoInfoDetailed(ctx context.Context, owner string, repo string, token string) (string, error) {
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "github-cli"}).
+		WithEnvVariable("GITHUB_TOKEN", token).
+		WithExec([]string{"gh", "repo", "view", owner + "/" + repo, "--json", "name,owner,visibility,createdAt,updatedAt,stargazerCount,forkCount"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get repo info: %w", err)
+	}
+
+	return output, nil
+}
+
+// ListOrgIssues lists issues across organization repositories
+func (m *GitHubAdminModule) ListOrgIssues(ctx context.Context, org string, state string, token string) (string, error) {
+	args := []string{"gh", "issue", "list", "--search", "org:" + org}
+	if state != "" {
+		args = append(args, "--state", state)
+	}
+	args = append(args, "--json", "number,title,state,createdAt,repository")
+
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "github-cli"}).
+		WithEnvVariable("GITHUB_TOKEN", token).
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to list org issues: %w", err)
+	}
+
+	return output, nil
+}
+
+// ListOrgPRs lists pull requests across organization repositories
+func (m *GitHubAdminModule) ListOrgPRs(ctx context.Context, org string, state string, token string) (string, error) {
+	args := []string{"gh", "pr", "list", "--search", "org:" + org}
+	if state != "" {
+		args = append(args, "--state", state)
+	}
+	args = append(args, "--json", "number,title,state,createdAt,repository")
+
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "github-cli"}).
+		WithEnvVariable("GITHUB_TOKEN", token).
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to list org PRs: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetVersion returns GitHub CLI version
+func (m *GitHubAdminModule) GetVersion(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "github-cli"}).
+		WithExec([]string{"gh", "version"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get GitHub CLI version: %w", err)
+	}
+
+	return output, nil
+}

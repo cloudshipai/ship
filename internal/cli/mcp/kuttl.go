@@ -7,114 +7,134 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddKuttlTools adds KUTTL (Kubernetes testing framework) MCP tool implementations
+// AddKuttlTools adds KUTTL (Kubernetes testing framework) MCP tool implementations using real CLI commands
 func AddKuttlTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
 	// KUTTL test tool
 	testTool := mcp.NewTool("kuttl_test",
-		mcp.WithDescription("Run Kubernetes tests using KUTTL framework"),
+		mcp.WithDescription("Run Kubernetes tests using kubectl kuttl test"),
 		mcp.WithString("test_suite",
 			mcp.Description("Path to KUTTL test suite directory"),
 			mcp.Required(),
 		),
-		mcp.WithString("namespace",
-			mcp.Description("Kubernetes namespace for tests"),
+		mcp.WithString("config",
+			mcp.Description("Path to test settings file"),
 		),
-		mcp.WithString("timeout",
-			mcp.Description("Test timeout duration (e.g., 5m, 10m)"),
+		mcp.WithString("artifacts_dir",
+			mcp.Description("Directory to output test artifacts and logs"),
+		),
+		mcp.WithString("crd_dir",
+			mcp.Description("Directory containing CustomResourceDefinitions to apply before tests"),
+		),
+		mcp.WithString("manifest_dir",
+			mcp.Description("Directory containing manifests to apply before tests"),
+		),
+		mcp.WithBoolean("start_kind",
+			mcp.Description("Start a KIND cluster for testing"),
+		),
+		mcp.WithBoolean("start_control_plane",
+			mcp.Description("Start a local Kubernetes control plane"),
+		),
+		mcp.WithString("parallel",
+			mcp.Description("Maximum number of concurrent tests (default 8)"),
+		),
+		mcp.WithString("verbosity",
+			mcp.Description("Logging verbosity level"),
+			mcp.Enum("1", "2"),
 		),
 	)
 	s.AddTool(testTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		testSuite := request.GetString("test_suite", "")
-		args := []string{"kubernetes", "kuttl", "test", testSuite}
-		if namespace := request.GetString("namespace", ""); namespace != "" {
-			args = append(args, "--namespace", namespace)
+		args := []string{"kubectl", "kuttl", "test", testSuite}
+		
+		if config := request.GetString("config", ""); config != "" {
+			args = append(args, "--config", config)
 		}
-		if timeout := request.GetString("timeout", ""); timeout != "" {
-			args = append(args, "--timeout", timeout)
+		if artifactsDir := request.GetString("artifacts_dir", ""); artifactsDir != "" {
+			args = append(args, "--artifacts-dir", artifactsDir)
 		}
+		if crdDir := request.GetString("crd_dir", ""); crdDir != "" {
+			args = append(args, "--crd-dir", crdDir)
+		}
+		if manifestDir := request.GetString("manifest_dir", ""); manifestDir != "" {
+			args = append(args, "--manifest-dir", manifestDir)
+		}
+		if request.GetBool("start_kind", false) {
+			args = append(args, "--start-kind")
+		}
+		if request.GetBool("start_control_plane", false) {
+			args = append(args, "--start-control-plane")
+		}
+		if parallel := request.GetString("parallel", ""); parallel != "" {
+			args = append(args, "--parallel", parallel)
+		}
+		if verbosity := request.GetString("verbosity", ""); verbosity != "" {
+			if verbosity == "1" {
+				args = append(args, "-v")
+			} else if verbosity == "2" {
+				args = append(args, "-vv")
+			}
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// KUTTL validate tool
-	validateTool := mcp.NewTool("kuttl_validate",
-		mcp.WithDescription("Validate KUTTL test configuration and manifests"),
+	// KUTTL test with KIND cluster
+	testKindTool := mcp.NewTool("kuttl_test_kind",
+		mcp.WithDescription("Run KUTTL tests with automated KIND cluster setup"),
 		mcp.WithString("test_suite",
 			mcp.Description("Path to KUTTL test suite directory"),
 			mcp.Required(),
 		),
+		mcp.WithString("config",
+			mcp.Description("Path to test settings file"),
+		),
+		mcp.WithString("artifacts_dir",
+			mcp.Description("Directory to output test artifacts and logs"),
+		),
+		mcp.WithString("parallel",
+			mcp.Description("Maximum number of concurrent tests"),
+		),
 	)
-	s.AddTool(validateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	s.AddTool(testKindTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		testSuite := request.GetString("test_suite", "")
-		args := []string{"kubernetes", "kuttl", "validate", testSuite}
-		return executeShipCommand(args)
-	})
-
-	// KUTTL init tool
-	initTool := mcp.NewTool("kuttl_init",
-		mcp.WithDescription("Initialize new KUTTL test suite"),
-		mcp.WithString("project_name",
-			mcp.Description("Name of the test project"),
-			mcp.Required(),
-		),
-		mcp.WithString("directory",
-			mcp.Description("Directory to create test suite in"),
-		),
-	)
-	s.AddTool(initTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		projectName := request.GetString("project_name", "")
-		args := []string{"kubernetes", "kuttl", "init", projectName}
-		if dir := request.GetString("directory", ""); dir != "" {
-			args = append(args, "--dir", dir)
+		args := []string{"kubectl", "kuttl", "test", "--start-kind", testSuite}
+		
+		if config := request.GetString("config", ""); config != "" {
+			args = append(args, "--config", config)
 		}
-		return executeShipCommand(args)
-	})
-
-	// KUTTL generate tool
-	generateTool := mcp.NewTool("kuttl_generate",
-		mcp.WithDescription("Generate KUTTL test cases from existing Kubernetes manifests"),
-		mcp.WithString("manifest_path",
-			mcp.Description("Path to Kubernetes manifest files"),
-			mcp.Required(),
-		),
-		mcp.WithString("output_dir",
-			mcp.Description("Output directory for generated tests"),
-		),
-	)
-	s.AddTool(generateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		manifestPath := request.GetString("manifest_path", "")
-		args := []string{"kubernetes", "kuttl", "generate", manifestPath}
-		if outputDir := request.GetString("output_dir", ""); outputDir != "" {
-			args = append(args, "--output", outputDir)
+		if artifactsDir := request.GetString("artifacts_dir", ""); artifactsDir != "" {
+			args = append(args, "--artifacts-dir", artifactsDir)
 		}
-		return executeShipCommand(args)
-	})
-
-	// KUTTL report tool
-	reportTool := mcp.NewTool("kuttl_report",
-		mcp.WithDescription("Generate test report from KUTTL test results"),
-		mcp.WithString("results_path",
-			mcp.Description("Path to KUTTL test results"),
-			mcp.Required(),
-		),
-		mcp.WithString("format",
-			mcp.Description("Report format (html, json, junit)"),
-		),
-	)
-	s.AddTool(reportTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		resultsPath := request.GetString("results_path", "")
-		args := []string{"kubernetes", "kuttl", "report", resultsPath}
-		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--format", format)
+		if parallel := request.GetString("parallel", ""); parallel != "" {
+			args = append(args, "--parallel", parallel)
 		}
+		
 		return executeShipCommand(args)
 	})
 
-	// KUTTL get version tool
-	getVersionTool := mcp.NewTool("kuttl_get_version",
-		mcp.WithDescription("Get KUTTL version information"),
+	// KUTTL version tool
+	versionTool := mcp.NewTool("kuttl_version",
+		mcp.WithDescription("Get KUTTL version information using kubectl kuttl version"),
 	)
-	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"kubernetes", "kuttl", "--version"}
+	s.AddTool(versionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"kubectl", "kuttl", "version"}
+		return executeShipCommand(args)
+	})
+
+	// KUTTL help tool
+	helpTool := mcp.NewTool("kuttl_help",
+		mcp.WithDescription("Get KUTTL help information"),
+		mcp.WithString("command",
+			mcp.Description("Get help for specific command (test)"),
+		),
+	)
+	s.AddTool(helpTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"kubectl", "kuttl", "help"}
+		
+		if command := request.GetString("command", ""); command != "" {
+			args = append(args, command)
+		}
+		
 		return executeShipCommand(args)
 	})
 }

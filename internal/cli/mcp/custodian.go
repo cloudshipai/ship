@@ -26,12 +26,33 @@ func AddCustodianTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 	)
 	s.AddTool(runPolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		policyFile := request.GetString("policy_file", "")
-		args := []string{"cloud", "custodian", "run", policyFile}
+		args := []string{"custodian", "run", "-s", "out", policyFile}
 		if region := request.GetString("region", ""); region != "" {
 			args = append(args, "--region", region)
 		}
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
+		return executeShipCommand(args)
+	})
+
+	// Custodian dry run policy tool
+	dryRunTool := mcp.NewTool("custodian_dry_run",
+		mcp.WithDescription("Dry run Cloud Custodian policy (preview mode)"),
+		mcp.WithString("policy_file",
+			mcp.Description("Path to custodian policy YAML file"),
+			mcp.Required(),
+		),
+		mcp.WithString("region",
+			mcp.Description("AWS region to run policy in"),
+		),
+		mcp.WithString("output_dir",
+			mcp.Description("Output directory for results (default: out)"),
+		),
+	)
+	s.AddTool(dryRunTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		policyFile := request.GetString("policy_file", "")
+		outputDir := request.GetString("output_dir", "out")
+		args := []string{"custodian", "run", "--dryrun", "-s", outputDir, policyFile}
+		if region := request.GetString("region", ""); region != "" {
+			args = append(args, "--region", region)
 		}
 		return executeShipCommand(args)
 	})
@@ -46,7 +67,7 @@ func AddCustodianTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 	)
 	s.AddTool(validateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		policyFile := request.GetString("policy_file", "")
-		args := []string{"cloud", "custodian", "validate", policyFile}
+		args := []string{"custodian", "validate", policyFile}
 		return executeShipCommand(args)
 	})
 
@@ -58,7 +79,7 @@ func AddCustodianTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		),
 	)
 	s.AddTool(schemaTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"cloud", "custodian", "schema"}
+		args := []string{"custodian", "schema"}
 		if resourceType := request.GetString("resource_type", ""); resourceType != "" {
 			args = append(args, resourceType)
 		}
@@ -70,7 +91,7 @@ func AddCustodianTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		mcp.WithDescription("Get Cloud Custodian version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"cloud", "custodian", "--version"}
+		args := []string{"custodian", "version"}
 		return executeShipCommand(args)
 	})
 }

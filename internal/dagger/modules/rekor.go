@@ -102,3 +102,60 @@ func (m *RekorModule) Verify(ctx context.Context, artifactPath string, signature
 
 	return output, nil
 }
+
+// GetByUUID gets a log entry by UUID
+func (m *RekorModule) GetByUUID(ctx context.Context, uuid string) (string, error) {
+	container := m.client.Container().
+		From("gcr.io/projectsigstore/rekor-cli:latest").
+		WithExec([]string{
+			"rekor-cli",
+			"get",
+			"--uuid", uuid,
+			"--format", "json",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get rekor entry by UUID: %w", err)
+	}
+
+	return output, nil
+}
+
+// VerifyByUUID verifies an entry by UUID
+func (m *RekorModule) VerifyByUUID(ctx context.Context, uuid string) (string, error) {
+	container := m.client.Container().
+		From("gcr.io/projectsigstore/rekor-cli:latest").
+		WithExec([]string{
+			"rekor-cli",
+			"verify",
+			"--uuid", uuid,
+			"--format", "json",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to verify rekor entry by UUID: %w", err)
+	}
+
+	return output, nil
+}
+
+// VerifyByIndex verifies an entry by log index
+func (m *RekorModule) VerifyByIndex(ctx context.Context, logIndex string) (string, error) {
+	container := m.client.Container().
+		From("gcr.io/projectsigstore/rekor-cli:latest").
+		WithExec([]string{
+			"rekor-cli",
+			"verify",
+			"--log-index", logIndex,
+			"--format", "json",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to verify rekor entry by index: %w", err)
+	}
+
+	return output, nil
+}

@@ -102,3 +102,87 @@ func (m *GrypeModule) ScanWithSeverity(ctx context.Context, target string, sever
 
 	return output, nil
 }
+
+// DBStatus checks database status
+func (m *GrypeModule) DBStatus(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("anchore/grype:latest").
+		WithExec([]string{"grype", "db", "status"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to check grype db status: %w", err)
+	}
+
+	return output, nil
+}
+
+// DBCheck checks if database update is available
+func (m *GrypeModule) DBCheck(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("anchore/grype:latest").
+		WithExec([]string{"grype", "db", "check"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to check grype db updates: %w", err)
+	}
+
+	return output, nil
+}
+
+// DBUpdate updates vulnerability database
+func (m *GrypeModule) DBUpdate(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("anchore/grype:latest").
+		WithExec([]string{"grype", "db", "update"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to update grype db: %w", err)
+	}
+
+	return output, nil
+}
+
+// DBList lists available databases
+func (m *GrypeModule) DBList(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("anchore/grype:latest").
+		WithExec([]string{"grype", "db", "list"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to list grype dbs: %w", err)
+	}
+
+	return output, nil
+}
+
+// Explain explains vulnerability findings
+func (m *GrypeModule) Explain(ctx context.Context, id string) (string, error) {
+	container := m.client.Container().
+		From("anchore/grype:latest").
+		WithExec([]string{"grype", "explain", id})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to explain vulnerability: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetVersion returns Grype version
+func (m *GrypeModule) GetVersion(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("anchore/grype:latest").
+		WithExec([]string{"grype", "version"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get grype version: %w", err)
+	}
+
+	return output, nil
+}

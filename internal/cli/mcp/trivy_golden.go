@@ -7,111 +7,212 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddTrivyGoldenTools adds enhanced Trivy for golden images MCP tool implementations
+// AddTrivyGoldenTools adds enhanced Trivy for golden images MCP tool implementations using real trivy CLI commands
 func AddTrivyGoldenTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// Trivy golden scan base image tool
-	scanBaseImageTool := mcp.NewTool("trivy_golden_scan_base_image",
-		mcp.WithDescription("Scan base image for golden image creation using enhanced Trivy"),
-		mcp.WithString("base_image",
-			mcp.Description("Base container image to scan"),
+	// Trivy image scan tool for golden images
+	scanImageTool := mcp.NewTool("trivy_golden_scan_image",
+		mcp.WithDescription("Scan container image for vulnerabilities using real trivy CLI"),
+		mcp.WithString("image",
+			mcp.Description("Container image to scan"),
 			mcp.Required(),
 		),
-		mcp.WithString("severity_threshold",
-			mcp.Description("Severity threshold (LOW, MEDIUM, HIGH, CRITICAL)"),
+		mcp.WithString("severity",
+			mcp.Description("Comma-separated list of severities to include"),
+			mcp.Enum("UNKNOWN", "LOW", "MEDIUM", "HIGH", "CRITICAL"),
+		),
+		mcp.WithString("format",
+			mcp.Description("Output format"),
+			mcp.Enum("table", "json", "sarif", "template", "cyclonedx", "spdx", "github"),
+		),
+		mcp.WithString("scanners",
+			mcp.Description("Comma-separated list of scanners to use"),
+		),
+		mcp.WithBoolean("exit_code",
+			mcp.Description("Exit with non-zero code if vulnerabilities found"),
+		),
+		mcp.WithString("output",
+			mcp.Description("Output file path"),
 		),
 	)
-	s.AddTool(scanBaseImageTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		baseImage := request.GetString("base_image", "")
-		args := []string{"security", "trivy-golden", "scan-base", baseImage}
-		if severity := request.GetString("severity_threshold", ""); severity != "" {
+	s.AddTool(scanImageTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		image := request.GetString("image", "")
+		args := []string{"trivy", "image"}
+		
+		if severity := request.GetString("severity", ""); severity != "" {
 			args = append(args, "--severity", severity)
 		}
-		return executeShipCommand(args)
-	})
-
-	// Trivy golden create policy tool
-	createPolicyTool := mcp.NewTool("trivy_golden_create_policy",
-		mcp.WithDescription("Create security policy for golden image compliance"),
-		mcp.WithString("policy_name",
-			mcp.Description("Name of the security policy"),
-			mcp.Required(),
-		),
-		mcp.WithString("compliance_framework",
-			mcp.Description("Compliance framework (cis, nist, pci-dss)"),
-			mcp.Required(),
-		),
-	)
-	s.AddTool(createPolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		policyName := request.GetString("policy_name", "")
-		framework := request.GetString("compliance_framework", "")
-		args := []string{"security", "trivy-golden", "create-policy", policyName, "--framework", framework}
-		return executeShipCommand(args)
-	})
-
-	// Trivy golden validate compliance tool
-	validateComplianceTool := mcp.NewTool("trivy_golden_validate_compliance",
-		mcp.WithDescription("Validate golden image compliance against security policies"),
-		mcp.WithString("image_name",
-			mcp.Description("Golden image to validate"),
-			mcp.Required(),
-		),
-		mcp.WithString("policy_file",
-			mcp.Description("Path to compliance policy file"),
-			mcp.Required(),
-		),
-	)
-	s.AddTool(validateComplianceTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		imageName := request.GetString("image_name", "")
-		policyFile := request.GetString("policy_file", "")
-		args := []string{"security", "trivy-golden", "validate-compliance", imageName, "--policy", policyFile}
-		return executeShipCommand(args)
-	})
-
-	// Trivy golden generate attestation tool
-	generateAttestationTool := mcp.NewTool("trivy_golden_generate_attestation",
-		mcp.WithDescription("Generate security attestation for golden image"),
-		mcp.WithString("image_name",
-			mcp.Description("Golden image to attest"),
-			mcp.Required(),
-		),
-		mcp.WithString("attestation_format",
-			mcp.Description("Attestation format (in-toto, slsa)"),
-		),
-	)
-	s.AddTool(generateAttestationTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		imageName := request.GetString("image_name", "")
-		args := []string{"security", "trivy-golden", "generate-attestation", imageName}
-		if format := request.GetString("attestation_format", ""); format != "" {
+		if format := request.GetString("format", ""); format != "" {
 			args = append(args, "--format", format)
 		}
+		if scanners := request.GetString("scanners", ""); scanners != "" {
+			args = append(args, "--scanners", scanners)
+		}
+		if request.GetBool("exit_code", false) {
+			args = append(args, "--exit-code", "1")
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		args = append(args, image)
+		
 		return executeShipCommand(args)
 	})
 
-	// Trivy golden benchmark tool
-	benchmarkTool := mcp.NewTool("trivy_golden_benchmark",
-		mcp.WithDescription("Run security benchmark against golden image"),
-		mcp.WithString("image_name",
-			mcp.Description("Golden image to benchmark"),
+	// Trivy filesystem scan tool for golden image builds
+	scanFilesystemTool := mcp.NewTool("trivy_golden_scan_filesystem",
+		mcp.WithDescription("Scan filesystem for vulnerabilities and misconfigurations using real trivy CLI"),
+		mcp.WithString("path",
+			mcp.Description("Path to scan"),
 			mcp.Required(),
 		),
-		mcp.WithString("benchmark_type",
-			mcp.Description("Benchmark type (cis-docker, cis-kubernetes)"),
-			mcp.Required(),
+		mcp.WithString("scanners",
+			mcp.Description("Comma-separated list of scanners (vuln,secret,misconfig,license)"),
+		),
+		mcp.WithString("severity",
+			mcp.Description("Comma-separated list of severities to include"),
+		),
+		mcp.WithString("format",
+			mcp.Description("Output format"),
+			mcp.Enum("table", "json", "sarif", "template", "cyclonedx", "spdx"),
+		),
+		mcp.WithString("output",
+			mcp.Description("Output file path"),
 		),
 	)
-	s.AddTool(benchmarkTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		imageName := request.GetString("image_name", "")
-		benchmarkType := request.GetString("benchmark_type", "")
-		args := []string{"security", "trivy-golden", "benchmark", imageName, "--type", benchmarkType}
+	s.AddTool(scanFilesystemTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		path := request.GetString("path", "")
+		args := []string{"trivy", "fs"}
+		
+		if scanners := request.GetString("scanners", ""); scanners != "" {
+			args = append(args, "--scanners", scanners)
+		}
+		if severity := request.GetString("severity", ""); severity != "" {
+			args = append(args, "--severity", severity)
+		}
+		if format := request.GetString("format", ""); format != "" {
+			args = append(args, "--format", format)
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		args = append(args, path)
+		
 		return executeShipCommand(args)
 	})
 
-	// Trivy golden get version tool
-	getVersionTool := mcp.NewTool("trivy_golden_get_version",
-		mcp.WithDescription("Get enhanced Trivy golden image tool version information"),
+	// Trivy config scan tool for IaC compliance
+	scanConfigTool := mcp.NewTool("trivy_golden_scan_config",
+		mcp.WithDescription("Scan configuration files for misconfigurations using real trivy CLI"),
+		mcp.WithString("path",
+			mcp.Description("Path to configuration files"),
+			mcp.Required(),
+		),
+		mcp.WithString("severity",
+			mcp.Description("Comma-separated list of severities to include"),
+		),
+		mcp.WithString("format",
+			mcp.Description("Output format"),
+			mcp.Enum("table", "json", "sarif", "template"),
+		),
+		mcp.WithString("policy",
+			mcp.Description("Path to custom policy file"),
+		),
+		mcp.WithString("output",
+			mcp.Description("Output file path"),
+		),
 	)
-	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "trivy-golden", "--version"}
+	s.AddTool(scanConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		path := request.GetString("path", "")
+		args := []string{"trivy", "config"}
+		
+		if severity := request.GetString("severity", ""); severity != "" {
+			args = append(args, "--severity", severity)
+		}
+		if format := request.GetString("format", ""); format != "" {
+			args = append(args, "--format", format)
+		}
+		if policy := request.GetString("policy", ""); policy != "" {
+			args = append(args, "--policy", policy)
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		args = append(args, path)
+		
+		return executeShipCommand(args)
+	})
+
+	// Trivy SBOM generation tool
+	generateSBOMTool := mcp.NewTool("trivy_golden_generate_sbom",
+		mcp.WithDescription("Generate Software Bill of Materials (SBOM) for golden image using real trivy CLI"),
+		mcp.WithString("image",
+			mcp.Description("Container image to generate SBOM for"),
+			mcp.Required(),
+		),
+		mcp.WithString("format",
+			mcp.Description("SBOM format"),
+			mcp.Enum("cyclonedx", "spdx", "spdx-json", "github"),
+			mcp.Required(),
+		),
+		mcp.WithString("output",
+			mcp.Description("Output file path"),
+		),
+	)
+	s.AddTool(generateSBOMTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		image := request.GetString("image", "")
+		format := request.GetString("format", "")
+		args := []string{"trivy", "image", "--format", format}
+		
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		args = append(args, image)
+		
+		return executeShipCommand(args)
+	})
+
+	// Trivy secret detection tool
+	scanSecretsTool := mcp.NewTool("trivy_golden_scan_secrets",
+		mcp.WithDescription("Scan for secrets in golden image using real trivy CLI"),
+		mcp.WithString("target",
+			mcp.Description("Target to scan (image name or filesystem path)"),
+			mcp.Required(),
+		),
+		mcp.WithString("target_type",
+			mcp.Description("Type of target to scan"),
+			mcp.Enum("image", "fs", "repo"),
+			mcp.Required(),
+		),
+		mcp.WithString("format",
+			mcp.Description("Output format"),
+			mcp.Enum("table", "json", "sarif"),
+		),
+		mcp.WithString("output",
+			mcp.Description("Output file path"),
+		),
+	)
+	s.AddTool(scanSecretsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		target := request.GetString("target", "")
+		targetType := request.GetString("target_type", "")
+		args := []string{"trivy", targetType, "--scanners", "secret"}
+		
+		if format := request.GetString("format", ""); format != "" {
+			args = append(args, "--format", format)
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		args = append(args, target)
+		
+		return executeShipCommand(args)
+	})
+
+	// Trivy version tool
+	versionTool := mcp.NewTool("trivy_version",
+		mcp.WithDescription("Get Trivy version information using real trivy CLI"),
+	)
+	s.AddTool(versionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"trivy", "version"}
 		return executeShipCommand(args)
 	})
 }

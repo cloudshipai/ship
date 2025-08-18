@@ -7,102 +7,107 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddHistoryScrubTools adds History Scrub (Git history cleanup) MCP tool implementations
+// AddHistoryScrubTools adds Git history cleanup MCP tool implementations using real tools
 func AddHistoryScrubTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// History Scrub scan repository tool
-	scanRepositoryTool := mcp.NewTool("history_scrub_scan_repository",
-		mcp.WithDescription("Scan git repository for sensitive data in history"),
+	// BFG Repo Cleaner - remove large files
+	bfgRemoveLargeFilesTool := mcp.NewTool("history_scrub_bfg_remove_large_files",
+		mcp.WithDescription("Remove large files from git history using BFG Repo-Cleaner"),
 		mcp.WithString("repository_path",
-			mcp.Description("Path to git repository (default: current directory)"),
+			mcp.Description("Path to git repository (.git directory)"),
+			mcp.Required(),
 		),
-		mcp.WithString("patterns_file",
-			mcp.Description("Path to file containing search patterns"),
+		mcp.WithString("size_threshold",
+			mcp.Description("Size threshold (e.g., 1M, 100K, 50M)"),
+			mcp.Required(),
 		),
 	)
-	s.AddTool(scanRepositoryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "history-scrub", "scan"}
-		if repoPath := request.GetString("repository_path", ""); repoPath != "" {
-			args = append(args, repoPath)
-		}
-		if patternsFile := request.GetString("patterns_file", ""); patternsFile != "" {
-			args = append(args, "--patterns", patternsFile)
-		}
+	s.AddTool(bfgRemoveLargeFilesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		repoPath := request.GetString("repository_path", "")
+		sizeThreshold := request.GetString("size_threshold", "")
+		args := []string{"bfg", "--strip-blobs-bigger-than", sizeThreshold, repoPath}
 		return executeShipCommand(args)
 	})
 
-	// History Scrub clean secrets tool
-	cleanSecretsTool := mcp.NewTool("history_scrub_clean_secrets",
-		mcp.WithDescription("Remove sensitive data from git history"),
+	// BFG Repo Cleaner - replace text/secrets
+	bfgReplaceTextTool := mcp.NewTool("history_scrub_bfg_replace_text",
+		mcp.WithDescription("Replace sensitive text in git history using BFG Repo-Cleaner"),
+		mcp.WithString("repository_path",
+			mcp.Description("Path to git repository (.git directory)"),
+			mcp.Required(),
+		),
+		mcp.WithString("replacements_file",
+			mcp.Description("Path to file containing text replacements (format: secret==>REMOVED)"),
+			mcp.Required(),
+		),
+	)
+	s.AddTool(bfgReplaceTextTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		repoPath := request.GetString("repository_path", "")
+		replacementsFile := request.GetString("replacements_file", "")
+		args := []string{"bfg", "--replace-text", replacementsFile, repoPath}
+		return executeShipCommand(args)
+	})
+
+	// Git filter-repo - remove files/paths
+	filterRepoRemovePathTool := mcp.NewTool("history_scrub_filter_repo_remove_path",
+		mcp.WithDescription("Remove files/paths from git history using git-filter-repo"),
 		mcp.WithString("repository_path",
 			mcp.Description("Path to git repository"),
 			mcp.Required(),
 		),
-		mcp.WithString("patterns_file",
-			mcp.Description("Path to file containing patterns to remove"),
+		mcp.WithString("path_to_remove",
+			mcp.Description("Path/pattern to remove from history"),
 			mcp.Required(),
 		),
-		mcp.WithBoolean("dry_run",
-			mcp.Description("Perform a dry run without making changes"),
+		mcp.WithBoolean("invert_paths",
+			mcp.Description("Keep only the specified paths (remove everything else)"),
 		),
 	)
-	s.AddTool(cleanSecretsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	s.AddTool(filterRepoRemovePathTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		repoPath := request.GetString("repository_path", "")
-		patternsFile := request.GetString("patterns_file", "")
-		args := []string{"security", "history-scrub", "clean", repoPath, "--patterns", patternsFile}
-		if request.GetBool("dry_run", false) {
-			args = append(args, "--dry-run")
+		pathToRemove := request.GetString("path_to_remove", "")
+		
+		// Change to repository directory and run git-filter-repo
+		args := []string{"sh", "-c", "cd " + repoPath + " && git filter-repo --path " + pathToRemove}
+		
+		if request.GetBool("invert_paths", false) {
+			// Use --path with invert to keep only the specified paths
+			args = []string{"sh", "-c", "cd " + repoPath + " && git filter-repo --path " + pathToRemove + " --invert-paths"}
 		}
+		
 		return executeShipCommand(args)
 	})
 
-	// History Scrub remove file tool
-	removeFileTool := mcp.NewTool("history_scrub_remove_file",
-		mcp.WithDescription("Remove specific file from git history"),
+	// Git history search using git log
+	searchHistoryTool := mcp.NewTool("history_scrub_search_history",
+		mcp.WithDescription("Search git history for sensitive patterns using git log"),
 		mcp.WithString("repository_path",
 			mcp.Description("Path to git repository"),
 			mcp.Required(),
 		),
-		mcp.WithString("file_path",
-			mcp.Description("Path to file to remove from history"),
+		mcp.WithString("search_pattern",
+			mcp.Description("Pattern to search for in commit history"),
 			mcp.Required(),
 		),
-		mcp.WithBoolean("force",
-			mcp.Description("Force removal without confirmation"),
+		mcp.WithBoolean("search_all_branches",
+			mcp.Description("Search all branches (default: current branch only)"),
 		),
 	)
-	s.AddTool(removeFileTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	s.AddTool(searchHistoryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		repoPath := request.GetString("repository_path", "")
-		filePath := request.GetString("file_path", "")
-		args := []string{"security", "history-scrub", "remove-file", repoPath, filePath}
-		if request.GetBool("force", false) {
-			args = append(args, "--force")
+		searchPattern := request.GetString("search_pattern", "")
+		
+		gitArgs := "git log -S\"" + searchPattern + "\" --oneline"
+		if request.GetBool("search_all_branches", false) {
+			gitArgs += " --all"
 		}
+		
+		args := []string{"sh", "-c", "cd " + repoPath + " && " + gitArgs}
 		return executeShipCommand(args)
 	})
 
-	// History Scrub verify cleanup tool
-	verifyCleanupTool := mcp.NewTool("history_scrub_verify_cleanup",
-		mcp.WithDescription("Verify that sensitive data has been removed from history"),
-		mcp.WithString("repository_path",
-			mcp.Description("Path to git repository"),
-			mcp.Required(),
-		),
-		mcp.WithString("patterns_file",
-			mcp.Description("Path to file containing verification patterns"),
-		),
-	)
-	s.AddTool(verifyCleanupTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		repoPath := request.GetString("repository_path", "")
-		args := []string{"security", "history-scrub", "verify", repoPath}
-		if patternsFile := request.GetString("patterns_file", ""); patternsFile != "" {
-			args = append(args, "--patterns", patternsFile)
-		}
-		return executeShipCommand(args)
-	})
-
-	// History Scrub backup repository tool
+	// Git repository backup using git clone
 	backupRepositoryTool := mcp.NewTool("history_scrub_backup_repository",
-		mcp.WithDescription("Create backup of repository before cleanup"),
+		mcp.WithDescription("Create backup of repository before cleanup using git clone"),
 		mcp.WithString("repository_path",
 			mcp.Description("Path to git repository"),
 			mcp.Required(),
@@ -111,11 +116,43 @@ func AddHistoryScrubTools(s *server.MCPServer, executeShipCommand ExecuteShipCom
 			mcp.Description("Path for backup location"),
 			mcp.Required(),
 		),
+		mcp.WithBoolean("bare_clone",
+			mcp.Description("Create bare clone backup"),
+		),
 	)
 	s.AddTool(backupRepositoryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		repoPath := request.GetString("repository_path", "")
 		backupPath := request.GetString("backup_path", "")
-		args := []string{"security", "history-scrub", "backup", repoPath, backupPath}
+		
+		if request.GetBool("bare_clone", false) {
+			args := []string{"git", "clone", "--bare", repoPath, backupPath}
+			return executeShipCommand(args)
+		} else {
+			args := []string{"git", "clone", repoPath, backupPath}
+			return executeShipCommand(args)
+		}
+	})
+
+	// Git cleanup post-processing
+	gitCleanupTool := mcp.NewTool("history_scrub_git_cleanup",
+		mcp.WithDescription("Run git cleanup commands after history rewriting"),
+		mcp.WithString("repository_path",
+			mcp.Description("Path to git repository"),
+			mcp.Required(),
+		),
+		mcp.WithBoolean("aggressive",
+			mcp.Description("Run aggressive garbage collection"),
+		),
+	)
+	s.AddTool(gitCleanupTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		repoPath := request.GetString("repository_path", "")
+		
+		gcArgs := "git reflog expire --expire=now --all && git gc --prune=now"
+		if request.GetBool("aggressive", false) {
+			gcArgs += " --aggressive"
+		}
+		
+		args := []string{"sh", "-c", "cd " + repoPath + " && " + gcArgs}
 		return executeShipCommand(args)
 	})
 }

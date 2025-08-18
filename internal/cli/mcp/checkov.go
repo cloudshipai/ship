@@ -7,191 +7,235 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddCheckovTools adds Checkov MCP tool implementations
+// AddCheckovTools adds Checkov (Infrastructure as Code static analysis) MCP tool implementations
 func AddCheckovTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
 	// Checkov scan directory tool
-	scanDirTool := mcp.NewTool("checkov_scan_directory",
-		mcp.WithDescription("Scan a directory for security issues using Checkov"),
+	scanDirectoryTool := mcp.NewTool("checkov_scan_directory",
+		mcp.WithDescription("Scan directory for security issues using Checkov"),
 		mcp.WithString("directory",
-			mcp.Description("Directory to scan (default: current directory)"),
+			mcp.Description("Directory to scan"),
+			mcp.Required(),
+		),
+		mcp.WithString("framework",
+			mcp.Description("Framework to scan (terraform, cloudformation, kubernetes, etc.)"),
+		),
+		mcp.WithString("output",
+			mcp.Description("Output format"),
+			mcp.Enum("cli", "json", "junitxml", "github_failed_only", "sarif", "csv"),
+		),
+		mcp.WithBoolean("compact",
+			mcp.Description("Compact output format"),
+		),
+		mcp.WithBoolean("quiet",
+			mcp.Description("Reduce verbosity"),
 		),
 	)
-	s.AddTool(scanDirTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"tf", "checkov"}
-		if dir := request.GetString("directory", ""); dir != "" {
-			args = append(args, dir)
+	s.AddTool(scanDirectoryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		directory := request.GetString("directory", "")
+		args := []string{"checkov", "--directory", directory}
+		
+		if framework := request.GetString("framework", ""); framework != "" {
+			args = append(args, "--framework", framework)
 		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		if request.GetBool("compact", false) {
+			args = append(args, "--compact")
+		}
+		if request.GetBool("quiet", false) {
+			args = append(args, "--quiet")
+		}
+		
 		return executeShipCommand(args)
 	})
 
 	// Checkov scan file tool
 	scanFileTool := mcp.NewTool("checkov_scan_file",
-		mcp.WithDescription("Scan a specific file for security issues using Checkov"),
-		mcp.WithString("file_path",
-			mcp.Description("Path to the file to scan"),
+		mcp.WithDescription("Scan specific file(s) for security issues using Checkov"),
+		mcp.WithString("file",
+			mcp.Description("Path to file to scan"),
 			mcp.Required(),
+		),
+		mcp.WithString("framework",
+			mcp.Description("Framework type for the file"),
+		),
+		mcp.WithString("output",
+			mcp.Description("Output format"),
+			mcp.Enum("cli", "json", "junitxml", "sarif"),
 		),
 	)
 	s.AddTool(scanFileTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		filePath := request.GetString("file_path", "")
-		args := []string{"tf", "checkov", "--file", filePath}
+		file := request.GetString("file", "")
+		args := []string{"checkov", "--file", file}
+		
+		if framework := request.GetString("framework", ""); framework != "" {
+			args = append(args, "--framework", framework)
+		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// Checkov scan with policy tool
-	scanWithPolicyTool := mcp.NewTool("checkov_scan_with_policy",
-		mcp.WithDescription("Scan with custom policy using Checkov"),
+	// Checkov scan with specific checks tool
+	scanWithChecksTool := mcp.NewTool("checkov_scan_with_checks",
+		mcp.WithDescription("Scan with specific checks enabled or disabled"),
 		mcp.WithString("directory",
-			mcp.Description("Directory to scan (default: current directory)"),
-		),
-		mcp.WithString("policy_path",
-			mcp.Description("Path to custom policy file"),
+			mcp.Description("Directory to scan"),
 			mcp.Required(),
 		),
-	)
-	s.AddTool(scanWithPolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"tf", "checkov"}
-		if dir := request.GetString("directory", ""); dir != "" {
-			args = append(args, dir)
-		}
-		policyPath := request.GetString("policy_path", "")
-		args = append(args, "--policy", policyPath)
-		return executeShipCommand(args)
-	})
-
-	// Checkov scan multi-framework tool
-	scanMultiFrameworkTool := mcp.NewTool("checkov_scan_multi_framework",
-		mcp.WithDescription("Scan with multiple frameworks using Checkov"),
-		mcp.WithString("directory",
-			mcp.Description("Directory to scan (default: current directory)"),
+		mcp.WithString("check",
+			mcp.Description("Comma-separated list of check IDs to run"),
 		),
-		mcp.WithString("frameworks",
-			mcp.Description("Comma-separated list of frameworks"),
-			mcp.Required(),
-			mcp.Enum("terraform", "cloudformation", "kubernetes", "dockerfile", "arm"),
-		),
-	)
-	s.AddTool(scanMultiFrameworkTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"tf", "checkov"}
-		if dir := request.GetString("directory", ""); dir != "" {
-			args = append(args, dir)
-		}
-		frameworks := request.GetString("frameworks", "")
-		args = append(args, "--framework", frameworks)
-		return executeShipCommand(args)
-	})
-
-	// Checkov scan with severity tool
-	scanWithSeverityTool := mcp.NewTool("checkov_scan_with_severity",
-		mcp.WithDescription("Scan with severity threshold using Checkov"),
-		mcp.WithString("directory",
-			mcp.Description("Directory to scan (default: current directory)"),
-		),
-		mcp.WithString("severities",
-			mcp.Description("Comma-separated list of severities"),
-			mcp.Required(),
-			mcp.Enum("LOW", "MEDIUM", "HIGH", "CRITICAL"),
-		),
-	)
-	s.AddTool(scanWithSeverityTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"tf", "checkov"}
-		if dir := request.GetString("directory", ""); dir != "" {
-			args = append(args, dir)
-		}
-		severities := request.GetString("severities", "")
-		args = append(args, "--severity", severities)
-		return executeShipCommand(args)
-	})
-
-	// Checkov scan with skips tool
-	scanWithSkipsTool := mcp.NewTool("checkov_scan_with_skips",
-		mcp.WithDescription("Scan with skipped checks using Checkov"),
-		mcp.WithString("directory",
-			mcp.Description("Directory to scan (default: current directory)"),
-		),
-		mcp.WithString("skip_checks",
+		mcp.WithString("skip_check",
 			mcp.Description("Comma-separated list of check IDs to skip"),
-			mcp.Required(),
 		),
 	)
-	s.AddTool(scanWithSkipsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"tf", "checkov"}
-		if dir := request.GetString("directory", ""); dir != "" {
-			args = append(args, dir)
+	s.AddTool(scanWithChecksTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		directory := request.GetString("directory", "")
+		args := []string{"checkov", "--directory", directory}
+		
+		if check := request.GetString("check", ""); check != "" {
+			args = append(args, "--check", check)
 		}
-		skipChecks := request.GetString("skip_checks", "")
-		args = append(args, "--skip-check", skipChecks)
+		if skipCheck := request.GetString("skip_check", ""); skipCheck != "" {
+			args = append(args, "--skip-check", skipCheck)
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// Checkov scan container image tool
-	scanContainerImageTool := mcp.NewTool("checkov_scan_container_image",
-		mcp.WithDescription("Scan container image for security issues using Checkov"),
-		mcp.WithString("image_name",
-			mcp.Description("Container image name to scan"),
+	// Checkov scan Docker image tool
+	scanDockerImageTool := mcp.NewTool("checkov_scan_docker_image",
+		mcp.WithDescription("Scan Docker container image for vulnerabilities"),
+		mcp.WithString("docker_image",
+			mcp.Description("Docker image to scan (name:tag)"),
 			mcp.Required(),
 		),
 		mcp.WithString("dockerfile_path",
-			mcp.Description("Path to Dockerfile for additional context"),
+			mcp.Description("Path to Dockerfile (optional)"),
+		),
+		mcp.WithString("output",
+			mcp.Description("Output format"),
+			mcp.Enum("cli", "json", "sarif"),
 		),
 	)
-	s.AddTool(scanContainerImageTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		imageName := request.GetString("image_name", "")
-		args := []string{"tf", "checkov", "--docker-image", imageName}
+	s.AddTool(scanDockerImageTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		dockerImage := request.GetString("docker_image", "")
+		args := []string{"checkov", "--docker-image", dockerImage, "--framework", "sca_image"}
+		
 		if dockerfilePath := request.GetString("dockerfile_path", ""); dockerfilePath != "" {
 			args = append(args, "--dockerfile-path", dockerfilePath)
 		}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// Checkov scan SCA packages tool
-	scanSCAPackagesTool := mcp.NewTool("checkov_scan_sca_packages",
-		mcp.WithDescription("Scan for software composition analysis using Checkov"),
+	// Checkov scan packages tool
+	scanPackagesTool := mcp.NewTool("checkov_scan_packages",
+		mcp.WithDescription("Scan package dependencies for vulnerabilities"),
 		mcp.WithString("directory",
-			mcp.Description("Directory to scan for package files (default: current directory)"),
+			mcp.Description("Directory containing package files"),
+			mcp.Required(),
+		),
+		mcp.WithString("output",
+			mcp.Description("Output format"),
+			mcp.Enum("cli", "json", "sarif"),
 		),
 	)
-	s.AddTool(scanSCAPackagesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"tf", "checkov", "--framework", "sca_package"}
-		if dir := request.GetString("directory", ""); dir != "" {
-			args = append(args, "--directory", dir)
+	s.AddTool(scanPackagesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		directory := request.GetString("directory", "")
+		args := []string{"checkov", "--directory", directory, "--framework", "sca_package"}
+		
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
 		}
+		
 		return executeShipCommand(args)
 	})
 
 	// Checkov scan secrets tool
 	scanSecretsTool := mcp.NewTool("checkov_scan_secrets",
-		mcp.WithDescription("Scan for secrets in code using Checkov"),
+		mcp.WithDescription("Scan for hardcoded secrets in code"),
 		mcp.WithString("directory",
-			mcp.Description("Directory to scan for secrets (default: current directory)"),
+			mcp.Description("Directory to scan for secrets"),
+			mcp.Required(),
+		),
+		mcp.WithString("output",
+			mcp.Description("Output format"),
+			mcp.Enum("cli", "json", "sarif"),
 		),
 	)
 	s.AddTool(scanSecretsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"tf", "checkov", "--framework", "secrets"}
-		if dir := request.GetString("directory", ""); dir != "" {
-			args = append(args, "--directory", dir)
+		directory := request.GetString("directory", "")
+		args := []string{"checkov", "--directory", directory, "--framework", "secrets"}
+		
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "--output", output)
 		}
+		
 		return executeShipCommand(args)
 	})
 
-	// Checkov scan with specific checks tool
-	scanWithSpecificChecksTool := mcp.NewTool("checkov_scan_with_specific_checks",
-		mcp.WithDescription("Scan with only specific checks enabled using Checkov"),
+	// Checkov scan with config file tool
+	scanWithConfigTool := mcp.NewTool("checkov_scan_with_config",
+		mcp.WithDescription("Scan using configuration file"),
 		mcp.WithString("directory",
-			mcp.Description("Directory to scan (default: current directory)"),
+			mcp.Description("Directory to scan"),
+			mcp.Required(),
 		),
-		mcp.WithString("checks",
-			mcp.Description("Comma-separated list of check IDs to run"),
+		mcp.WithString("config_file",
+			mcp.Description("Path to configuration file"),
 			mcp.Required(),
 		),
 	)
-	s.AddTool(scanWithSpecificChecksTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"tf", "checkov"}
-		if dir := request.GetString("directory", ""); dir != "" {
-			args = append(args, "--directory", dir)
+	s.AddTool(scanWithConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		directory := request.GetString("directory", "")
+		configFile := request.GetString("config_file", "")
+		args := []string{"checkov", "--directory", directory, "--config-file", configFile}
+		
+		return executeShipCommand(args)
+	})
+
+	// Checkov create config tool
+	createConfigTool := mcp.NewTool("checkov_create_config",
+		mcp.WithDescription("Generate configuration file from current settings"),
+		mcp.WithString("config_path",
+			mcp.Description("Path where config file should be created"),
+			mcp.Required(),
+		),
+	)
+	s.AddTool(createConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		configPath := request.GetString("config_path", "")
+		args := []string{"checkov", "--create-config", configPath}
+		
+		return executeShipCommand(args)
+	})
+
+	// Checkov download external modules tool
+	downloadModulesTool := mcp.NewTool("checkov_download_external_modules",
+		mcp.WithDescription("Scan with external module downloading enabled"),
+		mcp.WithString("directory",
+			mcp.Description("Directory to scan"),
+			mcp.Required(),
+		),
+		mcp.WithBoolean("download_external_modules",
+			mcp.Description("Download external terraform modules"),
+		),
+	)
+	s.AddTool(downloadModulesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		directory := request.GetString("directory", "")
+		args := []string{"checkov", "--directory", directory}
+		
+		if request.GetBool("download_external_modules", false) {
+			args = append(args, "--download-external-modules", "true")
 		}
-		checks := request.GetString("checks", "")
-		args = append(args, "--check", checks)
+		
 		return executeShipCommand(args)
 	})
 
@@ -200,7 +244,7 @@ func AddCheckovTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		mcp.WithDescription("Get Checkov version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"tf", "checkov", "--version"}
+		args := []string{"checkov", "--version"}
 		return executeShipCommand(args)
 	})
 }

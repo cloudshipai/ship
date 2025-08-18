@@ -2,224 +2,247 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddSteampipeTools adds Steampipe (cloud asset querying) MCP tool implementations
+// AddSteampipeTools adds Steampipe (cloud asset querying) MCP tool implementations using real steampipe CLI commands
 // NOTE: Steampipe is typically configured as an external MCP server via npx @turbot/steampipe-mcp
 // These tools provide Dagger-based execution as an alternative
 func AddSteampipeTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
 	// Steampipe query tool
 	queryTool := mcp.NewTool("steampipe_query",
-		mcp.WithDescription("Execute SQL query against cloud resources using Steampipe"),
+		mcp.WithDescription("Execute SQL query against cloud resources using real steampipe CLI"),
 		mcp.WithString("query",
 			mcp.Description("SQL query to execute"),
 			mcp.Required(),
 		),
-		mcp.WithString("plugin",
-			mcp.Description("Steampipe plugin to use"),
-			mcp.Required(),
-			mcp.Enum("aws", "azure", "gcp", "kubernetes", "github", "slack"),
-		),
 		mcp.WithString("output",
 			mcp.Description("Output format"),
-			mcp.Enum("json", "csv", "table"),
+			mcp.Enum("line", "csv", "json", "table", "snapshot"),
+		),
+		mcp.WithString("export",
+			mcp.Description("Export query output to a file"),
+		),
+		mcp.WithBoolean("header",
+			mcp.Description("Include column headers in output"),
+		),
+		mcp.WithString("timing",
+			mcp.Description("Show query execution timing"),
+			mcp.Enum("off", "on", "verbose"),
+		),
+		mcp.WithString("search_path",
+			mcp.Description("Set custom search path for connections"),
+		),
+		mcp.WithNumber("query_timeout",
+			mcp.Description("Query timeout in seconds"),
 		),
 	)
 	s.AddTool(queryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		query := request.GetString("query", "")
-		plugin := request.GetString("plugin", "")
-		args := []string{"security", "steampipe", "--query", query, "--plugin", plugin}
+		args := []string{"steampipe", "query", query}
+		
 		if output := request.GetString("output", ""); output != "" {
 			args = append(args, "--output", output)
 		}
-		return executeShipCommand(args)
-	})
-
-	// Steampipe query from file tool
-	queryFromFileTool := mcp.NewTool("steampipe_query_from_file",
-		mcp.WithDescription("Execute SQL queries from file against cloud resources"),
-		mcp.WithString("query_file",
-			mcp.Description("Path to SQL query file"),
-			mcp.Required(),
-		),
-		mcp.WithString("plugin",
-			mcp.Description("Steampipe plugin to use"),
-			mcp.Required(),
-			mcp.Enum("aws", "azure", "gcp", "kubernetes", "github", "slack"),
-		),
-		mcp.WithString("output",
-			mcp.Description("Output format"),
-			mcp.Enum("json", "csv", "table"),
-		),
-	)
-	s.AddTool(queryFromFileTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		queryFile := request.GetString("query_file", "")
-		plugin := request.GetString("plugin", "")
-		args := []string{"security", "steampipe", "--query-file", queryFile, "--plugin", plugin}
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "--output", output)
+		if export := request.GetString("export", ""); export != "" {
+			args = append(args, "--export", export)
 		}
-		return executeShipCommand(args)
-	})
-
-	// Steampipe list plugins tool
-	listPluginsTool := mcp.NewTool("steampipe_list_plugins",
-		mcp.WithDescription("List available Steampipe plugins"),
-	)
-	s.AddTool(listPluginsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "steampipe", "--list-plugins"}
-		return executeShipCommand(args)
-	})
-
-	// Steampipe cost analysis tool
-	costAnalysisTool := mcp.NewTool("steampipe_cost_analysis",
-		mcp.WithDescription("Run predefined cost analysis queries for AWS resources"),
-		mcp.WithString("analysis_type",
-			mcp.Description("Type of cost analysis to perform"),
-			mcp.Required(),
-			mcp.Enum("ec2_idle_instances", "ebs_unattached_volumes", "s3_unused_buckets", "cloudwatch_unused_log_groups", "elb_unused_load_balancers", "rds_idle_instances", "all_cost_issues"),
-		),
-		mcp.WithString("region",
-			mcp.Description("AWS region to analyze (default: all regions)"),
-		),
-		mcp.WithString("min_age_days",
-			mcp.Description("Minimum age in days for resources (default: 7)"),
-		),
-		mcp.WithString("output_format",
-			mcp.Description("Output format"),
-			mcp.Enum("json", "csv", "table"),
-		),
-	)
-	s.AddTool(costAnalysisTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		analysisType := request.GetString("analysis_type", "")
-		args := []string{"security", "steampipe", "--cost-analysis", analysisType}
+		if request.GetBool("header", true) {
+			args = append(args, "--header=true")
+		} else {
+			args = append(args, "--header=false")
+		}
+		if timing := request.GetString("timing", ""); timing != "" {
+			args = append(args, "--timing", timing)
+		}
+		if searchPath := request.GetString("search_path", ""); searchPath != "" {
+			args = append(args, "--search-path", searchPath)
+		}
+		if timeout := request.GetInt("query_timeout", 0); timeout > 0 {
+			args = append(args, "--query-timeout", fmt.Sprintf("%d", timeout))
+		}
 		
-		if region := request.GetString("region", ""); region != "" {
-			args = append(args, "--region", region)
-		}
-		if minAge := request.GetString("min_age_days", ""); minAge != "" {
-			args = append(args, "--min-age", minAge)
-		}
-		if output := request.GetString("output_format", ""); output != "" {
-			args = append(args, "--output", output)
-		}
 		return executeShipCommand(args)
 	})
 
-	// Steampipe compliance check tool
-	complianceCheckTool := mcp.NewTool("steampipe_compliance_check",
-		mcp.WithDescription("Run compliance checks against AWS resources using Steampipe benchmarks"),
-		mcp.WithString("benchmark",
-			mcp.Description("Compliance benchmark to run"),
-			mcp.Required(),
-			mcp.Enum("aws_thrifty", "aws_compliance", "aws_foundational_security", "cis_v140"),
-		),
-		mcp.WithString("tags",
-			mcp.Description("Comma-separated tags to filter controls"),
-		),
-		mcp.WithString("where_clause",
-			mcp.Description("SQL WHERE clause for additional filtering"),
-		),
-		mcp.WithString("output_format",
-			mcp.Description("Output format"),
-			mcp.Enum("json", "csv", "table"),
+	// Steampipe interactive query tool
+	interactiveQueryTool := mcp.NewTool("steampipe_query_interactive",
+		mcp.WithDescription("Start interactive SQL query shell using real steampipe CLI"),
+		mcp.WithString("workspace",
+			mcp.Description("Steampipe workspace profile to use"),
 		),
 	)
-	s.AddTool(complianceCheckTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		benchmark := request.GetString("benchmark", "")
-		args := []string{"security", "steampipe", "--benchmark", benchmark}
+	s.AddTool(interactiveQueryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"steampipe", "query"}
 		
-		if tags := request.GetString("tags", ""); tags != "" {
-			args = append(args, "--tags", tags)
+		if workspace := request.GetString("workspace", ""); workspace != "" {
+			args = append(args, "--workspace", workspace)
 		}
-		if whereClause := request.GetString("where_clause", ""); whereClause != "" {
-			args = append(args, "--where", whereClause)
-		}
-		if output := request.GetString("output_format", ""); output != "" {
-			args = append(args, "--output", output)
-		}
-		return executeShipCommand(args)
-	})
-
-	// Steampipe security assessment tool
-	securityAssessmentTool := mcp.NewTool("steampipe_security_assessment",
-		mcp.WithDescription("Comprehensive security assessment of cloud resources"),
-		mcp.WithString("assessment_type",
-			mcp.Description("Type of security assessment"),
-			mcp.Required(),
-			mcp.Enum("public_resources", "unencrypted_data", "overprivileged_access", "network_exposure", "compliance_gaps"),
-		),
-		mcp.WithString("cloud_provider",
-			mcp.Description("Cloud provider to assess"),
-			mcp.Required(),
-			mcp.Enum("aws", "azure", "gcp"),
-		),
-		mcp.WithString("severity_threshold",
-			mcp.Description("Minimum severity to report"),
-			mcp.Enum("low", "medium", "high", "critical"),
-		),
-	)
-	s.AddTool(securityAssessmentTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		assessmentType := request.GetString("assessment_type", "")
-		cloudProvider := request.GetString("cloud_provider", "")
-		args := []string{"security", "steampipe", "--security-assessment", assessmentType, "--provider", cloudProvider}
 		
-		if severity := request.GetString("severity_threshold", ""); severity != "" {
-			args = append(args, "--severity", severity)
-		}
 		return executeShipCommand(args)
 	})
 
-	// Steampipe resource inventory tool
-	resourceInventoryTool := mcp.NewTool("steampipe_resource_inventory",
-		mcp.WithDescription("Generate comprehensive cloud resource inventory"),
-		mcp.WithString("cloud_provider",
-			mcp.Description("Cloud provider for inventory"),
+	// Steampipe plugin list tool
+	pluginListTool := mcp.NewTool("steampipe_plugin_list",
+		mcp.WithDescription("List installed Steampipe plugins using real steampipe CLI"),
+	)
+	s.AddTool(pluginListTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"steampipe", "plugin", "list"}
+		return executeShipCommand(args)
+	})
+
+	// Steampipe plugin install tool
+	pluginInstallTool := mcp.NewTool("steampipe_plugin_install",
+		mcp.WithDescription("Install Steampipe plugins using real steampipe CLI"),
+		mcp.WithString("plugin_name",
+			mcp.Description("Name of the plugin to install (e.g., aws, azure, gcp)"),
 			mcp.Required(),
-			mcp.Enum("aws", "azure", "gcp", "kubernetes"),
 		),
-		mcp.WithString("resource_types",
-			mcp.Description("Comma-separated resource types to include"),
+		mcp.WithString("version",
+			mcp.Description("Specific version to install (e.g., @0.107.0)"),
 		),
-		mcp.WithString("regions",
-			mcp.Description("Comma-separated regions to include"),
-		),
-		mcp.WithString("output_format",
-			mcp.Description("Output format"),
-			mcp.Enum("json", "csv", "table"),
-		),
-		mcp.WithBoolean("include_metadata",
-			mcp.Description("Include detailed resource metadata"),
+		mcp.WithBoolean("skip_config",
+			mcp.Description("Skip creating the default config file"),
 		),
 	)
-	s.AddTool(resourceInventoryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		cloudProvider := request.GetString("cloud_provider", "")
-		args := []string{"security", "steampipe", "--inventory", "--provider", cloudProvider}
+	s.AddTool(pluginInstallTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		pluginName := request.GetString("plugin_name", "")
+		args := []string{"steampipe", "plugin", "install"}
 		
-		if resourceTypes := request.GetString("resource_types", ""); resourceTypes != "" {
-			args = append(args, "--resource-types", resourceTypes)
+		if version := request.GetString("version", ""); version != "" {
+			args = append(args, pluginName+"@"+version)
+		} else {
+			args = append(args, pluginName)
 		}
-		if regions := request.GetString("regions", ""); regions != "" {
-			args = append(args, "--regions", regions)
+		
+		if request.GetBool("skip_config", false) {
+			args = append(args, "--skip-config")
 		}
-		if output := request.GetString("output_format", ""); output != "" {
-			args = append(args, "--output", output)
-		}
-		if request.GetBool("include_metadata", false) {
-			args = append(args, "--include-metadata")
-		}
+		
 		return executeShipCommand(args)
 	})
 
-	// Steampipe get version tool
-	getVersionTool := mcp.NewTool("steampipe_get_version",
-		mcp.WithDescription("Get Steampipe version information"),
+	// Steampipe plugin update tool
+	pluginUpdateTool := mcp.NewTool("steampipe_plugin_update",
+		mcp.WithDescription("Update Steampipe plugins using real steampipe CLI"),
+		mcp.WithString("plugin_name",
+			mcp.Description("Name of specific plugin to update (leave empty to update all)"),
+		),
+		mcp.WithBoolean("all",
+			mcp.Description("Update all installed plugins"),
+		),
 	)
-	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "steampipe", "--version"}
+	s.AddTool(pluginUpdateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"steampipe", "plugin", "update"}
+		
+		if request.GetBool("all", false) {
+			args = append(args, "--all")
+		} else if pluginName := request.GetString("plugin_name", ""); pluginName != "" {
+			args = append(args, pluginName)
+		}
+		
+		return executeShipCommand(args)
+	})
+
+	// Steampipe plugin uninstall tool
+	pluginUninstallTool := mcp.NewTool("steampipe_plugin_uninstall",
+		mcp.WithDescription("Uninstall Steampipe plugins using real steampipe CLI"),
+		mcp.WithString("plugin_name",
+			mcp.Description("Name of the plugin to uninstall"),
+			mcp.Required(),
+		),
+	)
+	s.AddTool(pluginUninstallTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		pluginName := request.GetString("plugin_name", "")
+		args := []string{"steampipe", "plugin", "uninstall", pluginName}
+		return executeShipCommand(args)
+	})
+
+	// Steampipe service start tool
+	serviceStartTool := mcp.NewTool("steampipe_service_start",
+		mcp.WithDescription("Start Steampipe database service using real steampipe CLI"),
+		mcp.WithString("database_listen",
+			mcp.Description("Database connection scope"),
+			mcp.Enum("local", "network"),
+		),
+		mcp.WithNumber("database_port",
+			mcp.Description("Database service port (default 9193)"),
+		),
+		mcp.WithString("database_password",
+			mcp.Description("Database password for the session"),
+		),
+		mcp.WithBoolean("foreground",
+			mcp.Description("Run service in the foreground"),
+		),
+		mcp.WithBoolean("show_password",
+			mcp.Description("View database connection password"),
+		),
+	)
+	s.AddTool(serviceStartTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"steampipe", "service", "start"}
+		
+		if listen := request.GetString("database_listen", ""); listen != "" {
+			args = append(args, "--database-listen", listen)
+		}
+		if port := request.GetInt("database_port", 0); port > 0 {
+			args = append(args, "--database-port", fmt.Sprintf("%d", port))
+		}
+		if password := request.GetString("database_password", ""); password != "" {
+			args = append(args, "--database-password", password)
+		}
+		if request.GetBool("foreground", false) {
+			args = append(args, "--foreground")
+		}
+		if request.GetBool("show_password", false) {
+			args = append(args, "--show-password")
+		}
+		
+		return executeShipCommand(args)
+	})
+
+	// Steampipe service status tool
+	serviceStatusTool := mcp.NewTool("steampipe_service_status",
+		mcp.WithDescription("Check Steampipe service status using real steampipe CLI"),
+		mcp.WithBoolean("all",
+			mcp.Description("Show status of all running services"),
+		),
+	)
+	s.AddTool(serviceStatusTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"steampipe", "service", "status"}
+		
+		if request.GetBool("all", false) {
+			args = append(args, "--all")
+		}
+		
+		return executeShipCommand(args)
+	})
+
+	// Steampipe service stop tool
+	serviceStopTool := mcp.NewTool("steampipe_service_stop",
+		mcp.WithDescription("Stop Steampipe service using real steampipe CLI"),
+		mcp.WithBoolean("force",
+			mcp.Description("Force service shutdown"),
+		),
+	)
+	s.AddTool(serviceStopTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"steampipe", "service", "stop"}
+		
+		if request.GetBool("force", false) {
+			args = append(args, "--force")
+		}
+		
+		return executeShipCommand(args)
+	})
+
+	// Steampipe version tool
+	versionTool := mcp.NewTool("steampipe_version",
+		mcp.WithDescription("Get Steampipe version information using real steampipe CLI"),
+	)
+	s.AddTool(versionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"steampipe", "--version"}
 		return executeShipCommand(args)
 	})
 }

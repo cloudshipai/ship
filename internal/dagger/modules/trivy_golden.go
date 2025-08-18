@@ -106,3 +106,17 @@ func (m *TrivyGoldenModule) GenerateImageAttestation(ctx context.Context, imageN
 
 	return output, nil
 }
+
+// GetVersion returns the version of Trivy
+func (m *TrivyGoldenModule) GetVersion(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("aquasec/trivy:latest").
+		WithExec([]string{"trivy", "version"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get trivy version: %w", err)
+	}
+
+	return output, nil
+}

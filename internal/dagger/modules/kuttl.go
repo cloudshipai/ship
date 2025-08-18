@@ -32,7 +32,7 @@ func (m *KuttlModule) RunTest(ctx context.Context, testPath string, kubeconfig s
 	}
 
 	container = container.WithExec([]string{
-		"kubectl-kuttl",
+		"kubectl", "kuttl",
 		"test",
 		"/tests",
 		"--output", "json",
@@ -52,7 +52,7 @@ func (m *KuttlModule) ValidateTest(ctx context.Context, testPath string) (string
 		From("kudobuilder/kuttl:latest").
 		WithDirectory("/tests", m.client.Host().Directory(testPath)).
 		WithExec([]string{
-			"kubectl-kuttl",
+			"kubectl", "kuttl",
 			"test",
 			"--dry-run",
 			"/tests",

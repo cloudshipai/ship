@@ -7,66 +7,90 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddGoldilocksTools adds Goldilocks (Kubernetes resource recommendations) MCP tool implementations
+// AddGoldilocksTools adds Goldilocks (Kubernetes resource recommendations) MCP tool implementations using kubectl and Helm
 func AddGoldilocksTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// Goldilocks analyze tool
-	analyzeTool := mcp.NewTool("goldilocks_analyze",
-		mcp.WithDescription("Analyze Kubernetes deployments for resource recommendations"),
-		mcp.WithString("namespace",
-			mcp.Description("Kubernetes namespace to analyze"),
-		),
-		mcp.WithString("output_format",
-			mcp.Description("Output format"),
-			mcp.Enum("json", "yaml", "table"),
-		),
-	)
-	s.AddTool(analyzeTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"kubernetes", "goldilocks", "analyze"}
-		if namespace := request.GetString("namespace", ""); namespace != "" {
-			args = append(args, "--namespace", namespace)
-		}
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
-		}
-		return executeShipCommand(args)
-	})
-
-	// Goldilocks install tool
-	installTool := mcp.NewTool("goldilocks_install",
-		mcp.WithDescription("Install Goldilocks in Kubernetes cluster"),
+	// Goldilocks install via Helm
+	installHelmTool := mcp.NewTool("goldilocks_install_helm",
+		mcp.WithDescription("Install Goldilocks using Helm chart"),
 		mcp.WithString("namespace",
 			mcp.Description("Kubernetes namespace for installation"),
+			mcp.Required(),
+		),
+		mcp.WithString("release_name",
+			mcp.Description("Helm release name"),
 		),
 	)
-	s.AddTool(installTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"kubernetes", "goldilocks", "install"}
-		if namespace := request.GetString("namespace", ""); namespace != "" {
-			args = append(args, "--namespace", namespace)
-		}
+	s.AddTool(installHelmTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		namespace := request.GetString("namespace", "goldilocks")
+		releaseName := request.GetString("release_name", "goldilocks")
+		
+		// First add repo and create namespace, then install
+		args := []string{"sh", "-c", 
+			"helm repo add fairwinds-stable https://charts.fairwinds.com/stable && " +
+			"kubectl create namespace " + namespace + " --dry-run=client -o yaml | kubectl apply -f - && " +
+			"helm install " + releaseName + " --namespace " + namespace + " fairwinds-stable/goldilocks"}
 		return executeShipCommand(args)
 	})
 
-	// Goldilocks dashboard tool
+	// Goldilocks enable namespace tool
+	enableNamespaceTool := mcp.NewTool("goldilocks_enable_namespace",
+		mcp.WithDescription("Enable Goldilocks monitoring for a namespace"),
+		mcp.WithString("namespace",
+			mcp.Description("Kubernetes namespace to enable"),
+			mcp.Required(),
+		),
+	)
+	s.AddTool(enableNamespaceTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		namespace := request.GetString("namespace", "")
+		args := []string{"kubectl", "label", "ns", namespace, "goldilocks.fairwinds.com/enabled=true", "--overwrite"}
+		return executeShipCommand(args)
+	})
+
+	// Goldilocks dashboard access tool
 	dashboardTool := mcp.NewTool("goldilocks_dashboard",
-		mcp.WithDescription("Access Goldilocks dashboard for resource recommendations"),
-		mcp.WithNumber("port",
-			mcp.Description("Port for dashboard"),
+		mcp.WithDescription("Port-forward to access Goldilocks dashboard"),
+		mcp.WithString("namespace",
+			mcp.Description("Namespace where Goldilocks is installed"),
+		),
+		mcp.WithString("local_port",
+			mcp.Description("Local port for dashboard access"),
 		),
 	)
 	s.AddTool(dashboardTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"kubernetes", "goldilocks", "dashboard"}
-		if port := request.GetInt("port", 0); port > 0 {
-			args = append(args, "--port", string(rune(port)))
-		}
+		namespace := request.GetString("namespace", "goldilocks")
+		localPort := request.GetString("local_port", "8080")
+		args := []string{"kubectl", "-n", namespace, "port-forward", "svc/goldilocks-dashboard", localPort + ":80"}
 		return executeShipCommand(args)
 	})
 
-	// Goldilocks get version tool
-	getVersionTool := mcp.NewTool("goldilocks_get_version",
-		mcp.WithDescription("Get Goldilocks version information"),
+	// Goldilocks get VPA recommendations tool
+	getRecommendationsTool := mcp.NewTool("goldilocks_get_recommendations",
+		mcp.WithDescription("Get VPA recommendations from Goldilocks-enabled namespace"),
+		mcp.WithString("namespace",
+			mcp.Description("Namespace to get recommendations for"),
+			mcp.Required(),
+		),
 	)
-	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"kubernetes", "goldilocks", "--version"}
+	s.AddTool(getRecommendationsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		namespace := request.GetString("namespace", "")
+		args := []string{"kubectl", "get", "vpa", "-n", namespace, "-o", "yaml"}
+		return executeShipCommand(args)
+	})
+
+	// Goldilocks uninstall tool
+	uninstallTool := mcp.NewTool("goldilocks_uninstall",
+		mcp.WithDescription("Uninstall Goldilocks using Helm"),
+		mcp.WithString("namespace",
+			mcp.Description("Namespace where Goldilocks is installed"),
+		),
+		mcp.WithString("release_name",
+			mcp.Description("Helm release name"),
+		),
+	)
+	s.AddTool(uninstallTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		namespace := request.GetString("namespace", "goldilocks")
+		releaseName := request.GetString("release_name", "goldilocks")
+		args := []string{"helm", "uninstall", releaseName, "--namespace", namespace}
 		return executeShipCommand(args)
 	})
 }

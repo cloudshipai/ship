@@ -7,120 +7,240 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddKubeHunterTools adds Kube-hunter (Kubernetes penetration testing) MCP tool implementations
+// AddKubeHunterTools adds Kube-hunter (Kubernetes penetration testing) MCP tool implementations using real CLI commands
 func AddKubeHunterTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// Kube-hunter scan cluster tool
-	scanClusterTool := mcp.NewTool("kube_hunter_scan_cluster",
-		mcp.WithDescription("Scan Kubernetes cluster for security vulnerabilities"),
-		mcp.WithString("kubeconfig",
-			mcp.Description("Path to kubeconfig file"),
+	// Kube-hunter remote scan tool
+	remoteScanTool := mcp.NewTool("kube_hunter_remote_scan",
+		mcp.WithDescription("Scan specific IP addresses or DNS names using kube-hunter --remote"),
+		mcp.WithString("target",
+			mcp.Description("IP address or DNS name to scan"),
+			mcp.Required(),
 		),
-		mcp.WithString("output_format",
-			mcp.Description("Output format"),
-			mcp.Enum("json", "yaml", "table"),
+		mcp.WithBoolean("active",
+			mcp.Description("Enable active hunting (exploit testing)"),
+		),
+		mcp.WithString("log",
+			mcp.Description("Log level"),
+			mcp.Enum("DEBUG", "INFO", "WARNING"),
+		),
+		mcp.WithString("report",
+			mcp.Description("Report format"),
+			mcp.Enum("json"),
+		),
+		mcp.WithString("dispatch",
+			mcp.Description("Output method"),
+			mcp.Enum("stdout", "http"),
 		),
 	)
-	s.AddTool(scanClusterTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "kube-hunter", "--remote"}
-		if kubeconfig := request.GetString("kubeconfig", ""); kubeconfig != "" {
-			args = append(args, "--kubeconfig", kubeconfig)
+	s.AddTool(remoteScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		target := request.GetString("target", "")
+		args := []string{"kube-hunter", "--remote", target}
+		
+		if request.GetBool("active", false) {
+			args = append(args, "--active")
 		}
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
+		if log := request.GetString("log", ""); log != "" {
+			args = append(args, "--log", log)
 		}
+		if report := request.GetString("report", ""); report != "" {
+			args = append(args, "--report", report)
+		}
+		if dispatch := request.GetString("dispatch", ""); dispatch != "" {
+			args = append(args, "--dispatch", dispatch)
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// Kube-hunter scan network tool
-	scanNetworkTool := mcp.NewTool("kube_hunter_scan_network",
-		mcp.WithDescription("Scan network for Kubernetes services"),
+	// Kube-hunter CIDR scan tool
+	cidrScanTool := mcp.NewTool("kube_hunter_cidr_scan",
+		mcp.WithDescription("Scan IP range using kube-hunter --cidr"),
 		mcp.WithString("cidr",
-			mcp.Description("CIDR range to scan"),
+			mcp.Description("CIDR range to scan (e.g., 192.168.0.0/24)"),
 			mcp.Required(),
 		),
-		mcp.WithString("output_format",
-			mcp.Description("Output format"),
-			mcp.Enum("json", "yaml", "table"),
+		mcp.WithBoolean("active",
+			mcp.Description("Enable active hunting (exploit testing)"),
+		),
+		mcp.WithBoolean("mapping",
+			mcp.Description("Show only network mapping of Kubernetes nodes"),
+		),
+		mcp.WithBoolean("quick",
+			mcp.Description("Limit subnet scanning to /24 CIDR"),
+		),
+		mcp.WithString("log",
+			mcp.Description("Log level"),
+			mcp.Enum("DEBUG", "INFO", "WARNING"),
+		),
+		mcp.WithString("report",
+			mcp.Description("Report format"),
+			mcp.Enum("json"),
 		),
 	)
-	s.AddTool(scanNetworkTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	s.AddTool(cidrScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		cidr := request.GetString("cidr", "")
-		args := []string{"security", "kube-hunter", "--cidr", cidr}
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
+		args := []string{"kube-hunter", "--cidr", cidr}
+		
+		if request.GetBool("active", false) {
+			args = append(args, "--active")
 		}
+		if request.GetBool("mapping", false) {
+			args = append(args, "--mapping")
+		}
+		if request.GetBool("quick", false) {
+			args = append(args, "--quick")
+		}
+		if log := request.GetString("log", ""); log != "" {
+			args = append(args, "--log", log)
+		}
+		if report := request.GetString("report", ""); report != "" {
+			args = append(args, "--report", report)
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// Kube-hunter scan pod tool
-	scanPodTool := mcp.NewTool("kube_hunter_scan_pod",
-		mcp.WithDescription("Scan from within a Kubernetes pod"),
+	// Kube-hunter interface scan tool
+	interfaceScanTool := mcp.NewTool("kube_hunter_interface_scan",
+		mcp.WithDescription("Scan all local network interfaces using kube-hunter --interface"),
+		mcp.WithBoolean("active",
+			mcp.Description("Enable active hunting (exploit testing)"),
+		),
+		mcp.WithBoolean("quick",
+			mcp.Description("Limit subnet scanning to /24 CIDR"),
+		),
+		mcp.WithString("log",
+			mcp.Description("Log level"),
+			mcp.Enum("DEBUG", "INFO", "WARNING"),
+		),
+		mcp.WithString("report",
+			mcp.Description("Report format"),
+			mcp.Enum("json"),
+		),
+	)
+	s.AddTool(interfaceScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"kube-hunter", "--interface"}
+		
+		if request.GetBool("active", false) {
+			args = append(args, "--active")
+		}
+		if request.GetBool("quick", false) {
+			args = append(args, "--quick")
+		}
+		if log := request.GetString("log", ""); log != "" {
+			args = append(args, "--log", log)
+		}
+		if report := request.GetString("report", ""); report != "" {
+			args = append(args, "--report", report)
+		}
+		
+		return executeShipCommand(args)
+	})
+
+	// Kube-hunter pod scan tool
+	podScanTool := mcp.NewTool("kube_hunter_pod_scan",
+		mcp.WithDescription("Scan from within a Kubernetes pod using kube-hunter --pod"),
+		mcp.WithBoolean("active",
+			mcp.Description("Enable active hunting (exploit testing)"),
+		),
+		mcp.WithBoolean("k8s_auto_discover_nodes",
+			mcp.Description("Query Kubernetes for all nodes and scan them"),
+		),
 		mcp.WithString("kubeconfig",
 			mcp.Description("Path to kubeconfig file"),
 		),
-		mcp.WithString("output_format",
-			mcp.Description("Output format"),
-			mcp.Enum("json", "yaml", "table"),
+		mcp.WithString("service_account_token",
+			mcp.Description("JWT Bearer token of service account"),
+		),
+		mcp.WithString("log",
+			mcp.Description("Log level"),
+			mcp.Enum("DEBUG", "INFO", "WARNING"),
+		),
+		mcp.WithString("report",
+			mcp.Description("Report format"),
+			mcp.Enum("json"),
 		),
 	)
-	s.AddTool(scanPodTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "kube-hunter", "--pod"}
+	s.AddTool(podScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"kube-hunter", "--pod"}
+		
+		if request.GetBool("active", false) {
+			args = append(args, "--active")
+		}
+		if request.GetBool("k8s_auto_discover_nodes", false) {
+			args = append(args, "--k8s-auto-discover-nodes")
+		}
 		if kubeconfig := request.GetString("kubeconfig", ""); kubeconfig != "" {
 			args = append(args, "--kubeconfig", kubeconfig)
 		}
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
+		if token := request.GetString("service_account_token", ""); token != "" {
+			args = append(args, "--service-account-token", token)
 		}
+		if log := request.GetString("log", ""); log != "" {
+			args = append(args, "--log", log)
+		}
+		if report := request.GetString("report", ""); report != "" {
+			args = append(args, "--report", report)
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// Kube-hunter scan with custom hunters tool
-	scanWithHuntersTool := mcp.NewTool("kube_hunter_scan_with_hunters",
-		mcp.WithDescription("Scan using specific hunters"),
+	// Kube-hunter list tests tool
+	listTestsTool := mcp.NewTool("kube_hunter_list_tests",
+		mcp.WithDescription("List available tests using kube-hunter --list"),
+		mcp.WithBoolean("active",
+			mcp.Description("Include active hunting tests in the list"),
+		),
+		mcp.WithBoolean("raw_hunter_names",
+			mcp.Description("Show raw hunter class names"),
+		),
+	)
+	s.AddTool(listTestsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"kube-hunter", "--list"}
+		
+		if request.GetBool("active", false) {
+			args = append(args, "--active")
+		}
+		if request.GetBool("raw_hunter_names", false) {
+			args = append(args, "--raw-hunter-names")
+		}
+		
+		return executeShipCommand(args)
+	})
+
+	// Kube-hunter custom hunters tool
+	customHuntersTool := mcp.NewTool("kube_hunter_custom_hunters",
+		mcp.WithDescription("Run specific hunters using kube-hunter --custom"),
 		mcp.WithString("hunters",
-			mcp.Description("Comma-separated list of hunters to run"),
+			mcp.Description("Space-separated list of hunter class names"),
 			mcp.Required(),
 		),
-		mcp.WithString("kubeconfig",
-			mcp.Description("Path to kubeconfig file"),
+		mcp.WithBoolean("active",
+			mcp.Description("Enable active hunting (exploit testing)"),
+		),
+		mcp.WithString("target",
+			mcp.Description("Target IP address or DNS name (for remote scanning)"),
+		),
+		mcp.WithString("log",
+			mcp.Description("Log level"),
+			mcp.Enum("DEBUG", "INFO", "WARNING"),
 		),
 	)
-	s.AddTool(scanWithHuntersTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	s.AddTool(customHuntersTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		hunters := request.GetString("hunters", "")
-		args := []string{"security", "kube-hunter", "--include-hunter", hunters}
-		if kubeconfig := request.GetString("kubeconfig", ""); kubeconfig != "" {
-			args = append(args, "--kubeconfig", kubeconfig)
+		args := []string{"kube-hunter", "--custom", hunters}
+		
+		if request.GetBool("active", false) {
+			args = append(args, "--active")
 		}
-		return executeShipCommand(args)
-	})
-
-	// Kube-hunter scan with severity filter tool
-	scanWithSeverityTool := mcp.NewTool("kube_hunter_scan_with_severity",
-		mcp.WithDescription("Scan and filter results by severity"),
-		mcp.WithString("min_severity",
-			mcp.Description("Minimum severity level to report"),
-			mcp.Required(),
-			mcp.Enum("low", "medium", "high"),
-		),
-		mcp.WithString("kubeconfig",
-			mcp.Description("Path to kubeconfig file"),
-		),
-	)
-	s.AddTool(scanWithSeverityTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		minSeverity := request.GetString("min_severity", "")
-		args := []string{"security", "kube-hunter", "--severity", minSeverity}
-		if kubeconfig := request.GetString("kubeconfig", ""); kubeconfig != "" {
-			args = append(args, "--kubeconfig", kubeconfig)
+		if target := request.GetString("target", ""); target != "" {
+			args = append(args, "--remote", target)
 		}
-		return executeShipCommand(args)
-	})
-
-	// Kube-hunter get version tool
-	getVersionTool := mcp.NewTool("kube_hunter_get_version",
-		mcp.WithDescription("Get kube-hunter version information"),
-	)
-	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "kube-hunter", "--version"}
+		if log := request.GetString("log", ""); log != "" {
+			args = append(args, "--log", log)
+		}
+		
 		return executeShipCommand(args)
 	})
 }

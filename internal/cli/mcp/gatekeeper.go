@@ -7,131 +7,119 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddGatekeeperTools adds Gatekeeper (Kubernetes policy engine) MCP tool implementations
+// AddGatekeeperTools adds Gatekeeper (OPA Kubernetes policy engine) MCP tool implementations using kubectl
 func AddGatekeeperTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// Gatekeeper install tool
+	// Gatekeeper install tool using kubectl
 	installTool := mcp.NewTool("gatekeeper_install",
-		mcp.WithDescription("Install Gatekeeper in Kubernetes cluster"),
-		mcp.WithString("namespace",
-			mcp.Description("Kubernetes namespace for installation (default: gatekeeper-system)"),
+		mcp.WithDescription("Install Gatekeeper using kubectl"),
+		mcp.WithString("version",
+			mcp.Description("Gatekeeper version to install (default: v3.20.0)"),
 		),
-		mcp.WithBoolean("dry_run",
-			mcp.Description("Perform a dry run without making changes"),
+		mcp.WithBoolean("use_helm",
+			mcp.Description("Use Helm for installation instead of kubectl"),
 		),
 	)
 	s.AddTool(installTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "gatekeeper", "install"}
-		if namespace := request.GetString("namespace", ""); namespace != "" {
-			args = append(args, "--namespace", namespace)
+		version := request.GetString("version", "v3.20.0")
+		useHelm := request.GetBool("use_helm", false)
+		
+		if useHelm {
+			args := []string{"helm", "install", "gatekeeper", "gatekeeper/gatekeeper", 
+				"--namespace", "gatekeeper-system", "--create-namespace"}
+			return executeShipCommand(args)
+		} else {
+			url := "https://raw.githubusercontent.com/open-policy-agent/gatekeeper/" + version + "/deploy/gatekeeper.yaml"
+			args := []string{"kubectl", "apply", "-f", url}
+			return executeShipCommand(args)
 		}
-		if request.GetBool("dry_run", false) {
-			args = append(args, "--dry-run")
-		}
-		return executeShipCommand(args)
 	})
 
-	// Gatekeeper validate policy tool
-	validatePolicyTool := mcp.NewTool("gatekeeper_validate_policy",
-		mcp.WithDescription("Validate Gatekeeper policy constraints"),
-		mcp.WithString("policy_path",
-			mcp.Description("Path to policy file or directory"),
+	// Gatekeeper uninstall tool
+	uninstallTool := mcp.NewTool("gatekeeper_uninstall",
+		mcp.WithDescription("Uninstall Gatekeeper from cluster"),
+		mcp.WithString("version",
+			mcp.Description("Gatekeeper version to uninstall (default: v3.20.0)"),
+		),
+		mcp.WithBoolean("use_helm",
+			mcp.Description("Use Helm for uninstallation instead of kubectl"),
+		),
+	)
+	s.AddTool(uninstallTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		version := request.GetString("version", "v3.20.0")
+		useHelm := request.GetBool("use_helm", false)
+		
+		if useHelm {
+			args := []string{"helm", "delete", "gatekeeper", "--namespace", "gatekeeper-system"}
+			return executeShipCommand(args)
+		} else {
+			url := "https://raw.githubusercontent.com/open-policy-agent/gatekeeper/" + version + "/deploy/gatekeeper.yaml"
+			args := []string{"kubectl", "delete", "-f", url}
+			return executeShipCommand(args)
+		}
+	})
+
+	// Apply constraint template
+	applyConstraintTemplateTool := mcp.NewTool("gatekeeper_apply_constraint_template",
+		mcp.WithDescription("Apply Gatekeeper constraint template using kubectl"),
+		mcp.WithString("template_file",
+			mcp.Description("Path to constraint template YAML file"),
 			mcp.Required(),
 		),
 	)
-	s.AddTool(validatePolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		policyPath := request.GetString("policy_path", "")
-		args := []string{"security", "gatekeeper", "validate", policyPath}
+	s.AddTool(applyConstraintTemplateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		templateFile := request.GetString("template_file", "")
+		args := []string{"kubectl", "apply", "-f", templateFile}
 		return executeShipCommand(args)
 	})
 
-	// Gatekeeper scan cluster tool
-	scanClusterTool := mcp.NewTool("gatekeeper_scan_cluster",
-		mcp.WithDescription("Scan Kubernetes cluster for policy violations"),
-		mcp.WithString("namespace",
-			mcp.Description("Kubernetes namespace to scan (default: all namespaces)"),
-		),
-		mcp.WithString("policy_path",
-			mcp.Description("Path to specific policy to check"),
-		),
-	)
-	s.AddTool(scanClusterTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "gatekeeper", "scan"}
-		if namespace := request.GetString("namespace", ""); namespace != "" {
-			args = append(args, "--namespace", namespace)
-		}
-		if policyPath := request.GetString("policy_path", ""); policyPath != "" {
-			args = append(args, "--policy", policyPath)
-		}
-		return executeShipCommand(args)
-	})
-
-	// Gatekeeper apply constraints tool
-	applyConstraintsTool := mcp.NewTool("gatekeeper_apply_constraints",
-		mcp.WithDescription("Apply Gatekeeper constraints to cluster"),
-		mcp.WithString("constraints_path",
-			mcp.Description("Path to constraints file or directory"),
+	// Apply constraint
+	applyConstraintTool := mcp.NewTool("gatekeeper_apply_constraint",
+		mcp.WithDescription("Apply Gatekeeper constraint using kubectl"),
+		mcp.WithString("constraint_file",
+			mcp.Description("Path to constraint YAML file"),
 			mcp.Required(),
 		),
-		mcp.WithBoolean("dry_run",
-			mcp.Description("Perform a dry run without applying changes"),
-		),
 	)
-	s.AddTool(applyConstraintsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		constraintsPath := request.GetString("constraints_path", "")
-		args := []string{"security", "gatekeeper", "apply", constraintsPath}
-		if request.GetBool("dry_run", false) {
-			args = append(args, "--dry-run")
-		}
+	s.AddTool(applyConstraintTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		constraintFile := request.GetString("constraint_file", "")
+		args := []string{"kubectl", "apply", "-f", constraintFile}
 		return executeShipCommand(args)
 	})
 
-	// Gatekeeper generate template tool
-	generateTemplateTool := mcp.NewTool("gatekeeper_generate_template",
-		mcp.WithDescription("Generate Gatekeeper constraint template"),
-		mcp.WithString("template_name",
-			mcp.Description("Name for the constraint template"),
-			mcp.Required(),
-		),
-		mcp.WithString("output_path",
-			mcp.Description("Output path for generated template"),
-		),
+	// Get constraint templates
+	getConstraintTemplatesTool := mcp.NewTool("gatekeeper_get_constraint_templates",
+		mcp.WithDescription("List Gatekeeper constraint templates"),
 	)
-	s.AddTool(generateTemplateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		templateName := request.GetString("template_name", "")
-		args := []string{"security", "gatekeeper", "generate", "--template", templateName}
-		if outputPath := request.GetString("output_path", ""); outputPath != "" {
-			args = append(args, "--output", outputPath)
-		}
+	s.AddTool(getConstraintTemplatesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"kubectl", "get", "constrainttemplates"}
 		return executeShipCommand(args)
 	})
 
-	// Gatekeeper list violations tool
-	listViolationsTool := mcp.NewTool("gatekeeper_list_violations",
-		mcp.WithDescription("List current policy violations in cluster"),
-		mcp.WithString("namespace",
-			mcp.Description("Kubernetes namespace to check (default: all namespaces)"),
-		),
-		mcp.WithString("resource_type",
-			mcp.Description("Filter by resource type (pod, deployment, service, etc.)"),
+	// Get constraints
+	getConstraintsTool := mcp.NewTool("gatekeeper_get_constraints",
+		mcp.WithDescription("List Gatekeeper constraints"),
+		mcp.WithString("constraint_type",
+			mcp.Description("Specific constraint type to list"),
 		),
 	)
-	s.AddTool(listViolationsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "gatekeeper", "violations"}
-		if namespace := request.GetString("namespace", ""); namespace != "" {
-			args = append(args, "--namespace", namespace)
+	s.AddTool(getConstraintsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		constraintType := request.GetString("constraint_type", "")
+		if constraintType != "" {
+			args := []string{"kubectl", "get", constraintType}
+			return executeShipCommand(args)
+		} else {
+			// List all constraint types by getting constraint templates first
+			args := []string{"kubectl", "get", "constrainttemplates", "-o", "name"}
+			return executeShipCommand(args)
 		}
-		if resourceType := request.GetString("resource_type", ""); resourceType != "" {
-			args = append(args, "--resource", resourceType)
-		}
-		return executeShipCommand(args)
 	})
 
-	// Gatekeeper get version tool
-	getVersionTool := mcp.NewTool("gatekeeper_get_version",
-		mcp.WithDescription("Get Gatekeeper version information"),
+	// Get Gatekeeper status
+	getStatusTool := mcp.NewTool("gatekeeper_get_status",
+		mcp.WithDescription("Get Gatekeeper system status"),
 	)
-	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "gatekeeper", "--version"}
+	s.AddTool(getStatusTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"kubectl", "get", "pods", "-n", "gatekeeper-system"}
 		return executeShipCommand(args)
 	})
 }

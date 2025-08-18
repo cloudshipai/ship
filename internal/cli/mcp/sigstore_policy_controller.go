@@ -7,147 +7,158 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddSigstorePolicyControllerTools adds Sigstore Policy Controller MCP tool implementations
+// AddSigstorePolicyControllerTools adds Sigstore Policy Controller MCP tool implementations using real CLI tools
 func AddSigstorePolicyControllerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// Validate policy tool
-	validatePolicyTool := mcp.NewTool("sigstore_validate_policy",
-		mcp.WithDescription("Validate Sigstore policy syntax and structure"),
-		mcp.WithString("policy_path",
-			mcp.Description("Path to policy file"),
-			mcp.Required(),
-		),
-	)
-	s.AddTool(validatePolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		policyPath := request.GetString("policy_path", "")
-		args := []string{"security", "sigstore-policy-controller", "--validate", policyPath}
-		return executeShipCommand(args)
-	})
-
-	// Test policy tool
+	// Test policy against image using policy-controller-tester
 	testPolicyTool := mcp.NewTool("sigstore_test_policy",
-		mcp.WithDescription("Test Sigstore policy against an image"),
-		mcp.WithString("policy_path",
-			mcp.Description("Path to policy file"),
+		mcp.WithDescription("Test Sigstore policy against container image using real policy-controller-tester"),
+		mcp.WithString("policy",
+			mcp.Description("Path to ClusterImagePolicy file or URL"),
 			mcp.Required(),
 		),
-		mcp.WithString("image_name",
-			mcp.Description("Container image name to test"),
+		mcp.WithString("image",
+			mcp.Description("Container image to test against policy"),
 			mcp.Required(),
+		),
+		mcp.WithString("resource",
+			mcp.Description("Path to Kubernetes resource file"),
+		),
+		mcp.WithString("trustroot",
+			mcp.Description("Path to Kubernetes TrustRoot resource"),
+		),
+		mcp.WithString("log_level",
+			mcp.Description("Log level for output"),
+			mcp.Enum("debug", "info", "warn", "error"),
 		),
 	)
 	s.AddTool(testPolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		policyPath := request.GetString("policy_path", "")
-		imageName := request.GetString("image_name", "")
-		args := []string{"security", "sigstore-policy-controller", "--test", policyPath, "--image", imageName}
+		policy := request.GetString("policy", "")
+		image := request.GetString("image", "")
+		args := []string{"policy-tester", "--policy", policy, "--image", image}
+		if resource := request.GetString("resource", ""); resource != "" {
+			args = append(args, "-resource", resource)
+		}
+		if trustroot := request.GetString("trustroot", ""); trustroot != "" {
+			args = append(args, "-trustroot", trustroot)
+		}
+		if logLevel := request.GetString("log_level", ""); logLevel != "" {
+			args = append(args, "-log-level", logLevel)
+		}
 		return executeShipCommand(args)
 	})
 
-	// Verify signature tool
-	verifySignatureTool := mcp.NewTool("sigstore_verify_signature",
-		mcp.WithDescription("Verify container image signature"),
-		mcp.WithString("image_name",
-			mcp.Description("Container image name"),
-			mcp.Required(),
-		),
-		mcp.WithString("public_key_path",
-			mcp.Description("Path to public key file"),
-			mcp.Required(),
-		),
+	// Get tester version
+	versionTool := mcp.NewTool("sigstore_tester_version",
+		mcp.WithDescription("Get policy-controller-tester version"),
 	)
-	s.AddTool(verifySignatureTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		imageName := request.GetString("image_name", "")
-		publicKeyPath := request.GetString("public_key_path", "")
-		args := []string{"security", "sigstore-policy-controller", "--verify", imageName, "--public-key", publicKeyPath}
+	s.AddTool(versionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"policy-tester", "--version"}
 		return executeShipCommand(args)
 	})
 
-	// Generate policy template tool
-	generateTemplateTool := mcp.NewTool("sigstore_generate_template",
-		mcp.WithDescription("Generate Sigstore policy template"),
+	// Create ClusterImagePolicy using kubectl
+	createPolicyTool := mcp.NewTool("sigstore_create_policy",
+		mcp.WithDescription("Create ClusterImagePolicy using kubectl"),
+		mcp.WithString("policy_file",
+			mcp.Description("Path to ClusterImagePolicy YAML file"),
+			mcp.Required(),
+		),
 		mcp.WithString("namespace",
-			mcp.Description("Kubernetes namespace"),
-			mcp.Required(),
-		),
-		mcp.WithString("key_ref",
-			mcp.Description("Key reference for policy generation"),
-			mcp.Required(),
+			mcp.Description("Namespace for the policy (optional)"),
 		),
 	)
-	s.AddTool(generateTemplateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		namespace := request.GetString("namespace", "")
-		keyRef := request.GetString("key_ref", "")
-		args := []string{"security", "sigstore-policy-controller", "--generate", "--namespace", namespace, "--key-ref", keyRef}
+	s.AddTool(createPolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		policyFile := request.GetString("policy_file", "")
+		args := []string{"kubectl", "apply", "-f", policyFile}
+		if namespace := request.GetString("namespace", ""); namespace != "" {
+			args = append(args, "-n", namespace)
+		}
 		return executeShipCommand(args)
 	})
 
-	// Validate manifest tool
-	validateManifestTool := mcp.NewTool("sigstore_validate_manifest",
-		mcp.WithDescription("Validate Kubernetes manifest against policy"),
-		mcp.WithString("manifest_path",
-			mcp.Description("Path to manifest file"),
-			mcp.Required(),
-		),
-		mcp.WithString("policy_path",
-			mcp.Description("Path to policy file"),
-			mcp.Required(),
+	// List ClusterImagePolicies using kubectl
+	listPolicesTool := mcp.NewTool("sigstore_list_policies",
+		mcp.WithDescription("List ClusterImagePolicies using kubectl"),
+		mcp.WithString("output",
+			mcp.Description("Output format"),
+			mcp.Enum("yaml", "json", "wide", "name"),
 		),
 	)
-	s.AddTool(validateManifestTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		manifestPath := request.GetString("manifest_path", "")
-		policyPath := request.GetString("policy_path", "")
-		args := []string{"security", "sigstore-policy-controller", "--validate-manifest", manifestPath, "--policy", policyPath}
+	s.AddTool(listPolicesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"kubectl", "get", "clusterimagepolicy"}
+		if output := request.GetString("output", ""); output != "" {
+			args = append(args, "-o", output)
+		}
 		return executeShipCommand(args)
 	})
 
-	// Check compliance tool
-	checkComplianceTool := mcp.NewTool("sigstore_check_compliance",
-		mcp.WithDescription("Check manifests compliance with policy"),
-		mcp.WithString("manifests_path",
-			mcp.Description("Path to manifests directory"),
-			mcp.Required(),
-		),
-		mcp.WithString("policy_path",
-			mcp.Description("Path to policy file"),
+	// Delete ClusterImagePolicy using kubectl
+	deletePolicyTool := mcp.NewTool("sigstore_delete_policy",
+		mcp.WithDescription("Delete ClusterImagePolicy using kubectl"),
+		mcp.WithString("policy_name",
+			mcp.Description("Name of the ClusterImagePolicy to delete"),
 			mcp.Required(),
 		),
 	)
-	s.AddTool(checkComplianceTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		manifestsPath := request.GetString("manifests_path", "")
-		policyPath := request.GetString("policy_path", "")
-		args := []string{"security", "sigstore-policy-controller", "--check-compliance", manifestsPath, "--policy", policyPath}
+	s.AddTool(deletePolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		policyName := request.GetString("policy_name", "")
+		args := []string{"kubectl", "delete", "clusterimagepolicy", policyName}
 		return executeShipCommand(args)
 	})
 
-	// List policies tool
-	listPoliciesTool := mcp.NewTool("sigstore_list_policies",
-		mcp.WithDescription("List available Sigstore policies"),
-		mcp.WithString("policies_path",
-			mcp.Description("Path to policies directory"),
-			mcp.Required(),
-		),
-	)
-	s.AddTool(listPoliciesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		policiesPath := request.GetString("policies_path", "")
-		args := []string{"security", "sigstore-policy-controller", "--list", policiesPath}
-		return executeShipCommand(args)
-	})
-
-	// Audit images tool
-	auditImagesTool := mcp.NewTool("sigstore_audit_images",
-		mcp.WithDescription("Audit container images in namespace"),
+	// Enable policy enforcement for namespace using kubectl
+	enableNamespaceTool := mcp.NewTool("sigstore_enable_namespace",
+		mcp.WithDescription("Enable Sigstore policy enforcement for namespace using kubectl"),
 		mcp.WithString("namespace",
-			mcp.Description("Kubernetes namespace"),
-			mcp.Required(),
-		),
-		mcp.WithString("policy_path",
-			mcp.Description("Path to policy file"),
+			mcp.Description("Namespace to enable policy enforcement"),
 			mcp.Required(),
 		),
 	)
-	s.AddTool(auditImagesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	s.AddTool(enableNamespaceTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		namespace := request.GetString("namespace", "")
-		policyPath := request.GetString("policy_path", "")
-		args := []string{"security", "sigstore-policy-controller", "--audit", "--namespace", namespace, "--policy", policyPath}
+		args := []string{"kubectl", "label", "namespace", namespace, "policy.sigstore.dev/include=true"}
+		return executeShipCommand(args)
+	})
+
+	// Disable policy enforcement for namespace using kubectl
+	disableNamespaceTool := mcp.NewTool("sigstore_disable_namespace",
+		mcp.WithDescription("Disable Sigstore policy enforcement for namespace using kubectl"),
+		mcp.WithString("namespace",
+			mcp.Description("Namespace to disable policy enforcement"),
+			mcp.Required(),
+		),
+	)
+	s.AddTool(disableNamespaceTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		namespace := request.GetString("namespace", "")
+		args := []string{"kubectl", "label", "namespace", namespace, "policy.sigstore.dev/exclude=true"}
+		return executeShipCommand(args)
+	})
+
+	// Get policy enforcement status for namespace using kubectl
+	getNamespaceStatusTool := mcp.NewTool("sigstore_get_namespace_status",
+		mcp.WithDescription("Get Sigstore policy enforcement status for namespace using kubectl"),
+		mcp.WithString("namespace",
+			mcp.Description("Namespace to check policy enforcement status"),
+			mcp.Required(),
+		),
+	)
+	s.AddTool(getNamespaceStatusTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		namespace := request.GetString("namespace", "")
+		args := []string{"kubectl", "get", "namespace", namespace, "--show-labels"}
+		return executeShipCommand(args)
+	})
+
+	// Describe ClusterImagePolicy using kubectl
+	describePolicyTool := mcp.NewTool("sigstore_describe_policy",
+		mcp.WithDescription("Describe ClusterImagePolicy using kubectl"),
+		mcp.WithString("policy_name",
+			mcp.Description("Name of the ClusterImagePolicy to describe"),
+			mcp.Required(),
+		),
+	)
+	s.AddTool(describePolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		policyName := request.GetString("policy_name", "")
+		args := []string{"kubectl", "describe", "clusterimagepolicy", policyName}
 		return executeShipCommand(args)
 	})
 }

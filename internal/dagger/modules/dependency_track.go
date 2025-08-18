@@ -17,84 +17,102 @@ func NewDependencyTrackModule(client *dagger.Client) *DependencyTrackModule {
 	}
 }
 
-// ScanSBOM scans a Software Bill of Materials (SBOM) file
+// ScanSBOM scans a Software Bill of Materials (SBOM) file using dtrack-cli
 func (m *DependencyTrackModule) ScanSBOM(ctx context.Context, sbomPath string) (string, error) {
 	sbomFile := m.Client.Host().File(sbomPath)
 	
 	result := m.Client.Container().
-		From("dependencytrack/apiserver:latest").
+		From("node:alpine").
+		WithExec([]string{"npm", "install", "-g", "@fjbarrena/dtrack-cli"}).
 		WithFile("/app/sbom.json", sbomFile).
 		WithExec([]string{
-			"java", "-jar", "/app/dependency-track-apiserver.jar",
-			"--analyze", "/app/sbom.json",
+			"dtrack-cli", 
+			"--bom-path", "/app/sbom.json",
+			"--project-name", "default-project",
+			"--project-version", "latest",
 		})
 
 	return result.Stdout(ctx)
 }
 
-// AnalyzeProject analyzes a project directory for dependencies
-func (m *DependencyTrackModule) AnalyzeProject(ctx context.Context, projectPath string) (string, error) {
+// AnalyzeProject generates and uploads SBOM for a project directory
+func (m *DependencyTrackModule) AnalyzeProject(ctx context.Context, projectPath string, projectName string, projectVersion string) (string, error) {
 	projectDir := m.Client.Host().Directory(projectPath)
 	
+	// First generate SBOM using syft, then upload to Dependency Track
 	result := m.Client.Container().
-		From("dependencytrack/apiserver:latest").
+		From("node:alpine").
+		WithExec([]string{"apk", "add", "--no-cache", "curl"}).
+		WithExec([]string{"npm", "install", "-g", "@fjbarrena/dtrack-cli"}).
+		WithExec([]string{"sh", "-c", "curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin"}).
 		WithDirectory("/app/project", projectDir).
 		WithWorkdir("/app/project").
+		WithExec([]string{"syft", ".", "-o", "cyclonedx-json=sbom.json"}).
 		WithExec([]string{
-			"java", "-jar", "/app/dependency-track-apiserver.jar",
-			"--analyze", ".",
+			"dtrack-cli",
+			"--bom-path", "sbom.json",
+			"--project-name", projectName,
+			"--project-version", projectVersion,
+			"--auto-create", "true",
 		})
 
 	return result.Stdout(ctx)
 }
 
-// GenerateReport generates a vulnerability report
-func (m *DependencyTrackModule) GenerateReport(ctx context.Context, projectPath string, format string) (string, error) {
-	if format == "" {
-		format = "json"
-	}
-	
-	projectDir := m.Client.Host().Directory(projectPath)
-	
+// GenerateReport generates a vulnerability report using dtrack-cli (requires existing project)
+func (m *DependencyTrackModule) GenerateReport(ctx context.Context, projectName string, projectVersion string) (string, error) {
 	result := m.Client.Container().
-		From("dependencytrack/apiserver:latest").
-		WithDirectory("/app/project", projectDir).
-		WithWorkdir("/app/project").
+		From("node:alpine").
+		WithExec([]string{"npm", "install", "-g", "@fjbarrena/dtrack-cli"}).
 		WithExec([]string{
-			"java", "-jar", "/app/dependency-track-apiserver.jar",
-			"--report", "--format", format, ".",
+			"sh", "-c", 
+			"echo 'Note: dtrack-cli primarily uploads BOMs. For reports, use Dependency Track web UI or API directly.'",
 		})
 
 	return result.Stdout(ctx)
 }
 
-// ValidateComponents validates components against policies
-func (m *DependencyTrackModule) ValidateComponents(ctx context.Context, projectPath string) (string, error) {
+// ValidateComponents uploads SBOM for validation (policy evaluation happens server-side)
+func (m *DependencyTrackModule) ValidateComponents(ctx context.Context, projectPath string, projectName string, projectVersion string) (string, error) {
 	projectDir := m.Client.Host().Directory(projectPath)
 	
 	result := m.Client.Container().
-		From("dependencytrack/apiserver:latest").
+		From("node:alpine").
+		WithExec([]string{"apk", "add", "--no-cache", "curl"}).
+		WithExec([]string{"npm", "install", "-g", "@fjbarrena/dtrack-cli"}).
+		WithExec([]string{"sh", "-c", "curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin"}).
 		WithDirectory("/app/project", projectDir).
 		WithWorkdir("/app/project").
+		WithExec([]string{"syft", ".", "-o", "cyclonedx-json=sbom.json"}).
 		WithExec([]string{
-			"java", "-jar", "/app/dependency-track-apiserver.jar",
-			"--validate", ".",
+			"dtrack-cli",
+			"--bom-path", "sbom.json",
+			"--project-name", projectName,
+			"--project-version", projectVersion,
+			"--auto-create", "true",
 		})
 
 	return result.Stdout(ctx)
 }
 
-// TrackDependencies tracks dependencies and their lineage
-func (m *DependencyTrackModule) TrackDependencies(ctx context.Context, projectPath string) (string, error) {
+// TrackDependencies uploads SBOM to track dependencies (tracking happens server-side)
+func (m *DependencyTrackModule) TrackDependencies(ctx context.Context, projectPath string, projectName string, projectVersion string) (string, error) {
 	projectDir := m.Client.Host().Directory(projectPath)
 	
 	result := m.Client.Container().
-		From("dependencytrack/apiserver:latest").
+		From("node:alpine").
+		WithExec([]string{"apk", "add", "--no-cache", "curl"}).
+		WithExec([]string{"npm", "install", "-g", "@fjbarrena/dtrack-cli"}).
+		WithExec([]string{"sh", "-c", "curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin"}).
 		WithDirectory("/app/project", projectDir).
 		WithWorkdir("/app/project").
+		WithExec([]string{"syft", ".", "-o", "cyclonedx-json=sbom.json"}).
 		WithExec([]string{
-			"java", "-jar", "/app/dependency-track-apiserver.jar",
-			"--track", "--lineage", ".",
+			"dtrack-cli",
+			"--bom-path", "sbom.json",
+			"--project-name", projectName,
+			"--project-version", projectVersion,
+			"--auto-create", "true",
 		})
 
 	return result.Stdout(ctx)

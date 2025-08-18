@@ -93,3 +93,121 @@ func (m *SteampipeModule) GetVersion(ctx context.Context) (string, error) {
 
 	return output, nil
 }
+
+// QueryInteractive starts an interactive query session
+func (m *SteampipeModule) QueryInteractive(ctx context.Context, plugin string) (string, error) {
+	container := m.client.Container().
+		From("turbot/steampipe:latest").
+		WithExec([]string{
+			"steampipe", "plugin", "install", plugin,
+		}).
+		WithExec([]string{
+			"steampipe", "query", "--output", "json",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to start interactive query: %w", err)
+	}
+
+	return output, nil
+}
+
+// InstallPlugin installs a Steampipe plugin
+func (m *SteampipeModule) InstallPlugin(ctx context.Context, plugin string) (string, error) {
+	container := m.client.Container().
+		From("turbot/steampipe:latest").
+		WithExec([]string{
+			"steampipe", "plugin", "install", plugin,
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to install plugin: %w", err)
+	}
+
+	return output, nil
+}
+
+// UpdatePlugin updates a Steampipe plugin
+func (m *SteampipeModule) UpdatePlugin(ctx context.Context, plugin string) (string, error) {
+	container := m.client.Container().
+		From("turbot/steampipe:latest").
+		WithExec([]string{
+			"steampipe", "plugin", "update", plugin,
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to update plugin: %w", err)
+	}
+
+	return output, nil
+}
+
+// UninstallPlugin uninstalls a Steampipe plugin
+func (m *SteampipeModule) UninstallPlugin(ctx context.Context, plugin string) (string, error) {
+	container := m.client.Container().
+		From("turbot/steampipe:latest").
+		WithExec([]string{
+			"steampipe", "plugin", "uninstall", plugin,
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to uninstall plugin: %w", err)
+	}
+
+	return output, nil
+}
+
+// StartService starts the Steampipe service
+func (m *SteampipeModule) StartService(ctx context.Context, port int) (string, error) {
+	args := []string{"steampipe", "service", "start"}
+	if port > 0 {
+		args = append(args, "--port", fmt.Sprintf("%d", port))
+	}
+
+	container := m.client.Container().
+		From("turbot/steampipe:latest").
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to start service: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetServiceStatus gets the status of the Steampipe service
+func (m *SteampipeModule) GetServiceStatus(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("turbot/steampipe:latest").
+		WithExec([]string{
+			"steampipe", "service", "status",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get service status: %w", err)
+	}
+
+	return output, nil
+}
+
+// StopService stops the Steampipe service
+func (m *SteampipeModule) StopService(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("turbot/steampipe:latest").
+		WithExec([]string{
+			"steampipe", "service", "stop",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to stop service: %w", err)
+	}
+
+	return output, nil
+}

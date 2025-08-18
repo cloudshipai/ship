@@ -244,6 +244,15 @@ kubectl get events --all-namespaces --field-selector reason=ConstraintViolation 
 	return container, nil
 }
 
+// GetVersion returns the version of Gatekeeper
+func (m *GatekeeperModule) GetVersion(ctx context.Context) (*dagger.Container, error) {
+	container := m.client.Container().
+		From("openpolicyagent/gatekeeper:v3.17.1").
+		WithExec([]string{"manager", "--version"})
+
+	return container, nil
+}
+
 type GatekeeperConfig struct {
 	GatekeeperVersion string
 	RegoVersion       string

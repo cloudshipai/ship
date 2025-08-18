@@ -17,15 +17,19 @@ func NewSigstorePolicyControllerModule(client *dagger.Client) *SigstorePolicyCon
 	}
 }
 
-// ValidatePolicy validates a ClusterImagePolicy
+// ValidatePolicy validates a ClusterImagePolicy using locally built policy-tester
 func (m *SigstorePolicyControllerModule) ValidatePolicy(ctx context.Context, policyPath string) (string, error) {
 	policyFile := m.Client.Host().File(policyPath)
 	
 	result := m.Client.Container().
-		From("ghcr.io/sigstore/policy-controller:latest").
+		From("golang:alpine").
+		WithExec([]string{"apk", "add", "--no-cache", "git", "make"}).
+		WithExec([]string{"git", "clone", "https://github.com/sigstore/policy-controller.git", "/src"}).
+		WithWorkdir("/src").
+		WithExec([]string{"make", "policy-tester"}).
 		WithFile("/app/policy.yaml", policyFile).
 		WithExec([]string{
-			"policy-controller", "validate", "/app/policy.yaml",
+			"./policy-tester", "--policy", "/app/policy.yaml",
 		})
 
 	return result.Stdout(ctx)
@@ -39,9 +43,7 @@ func (m *SigstorePolicyControllerModule) TestPolicy(ctx context.Context, policyP
 		From("ghcr.io/sigstore/policy-controller:latest").
 		WithFile("/app/policy.yaml", policyFile).
 		WithExec([]string{
-			"policy-controller", "test",
-			"--policy", "/app/policy.yaml",
-			"--image", imageName,
+			"policy-tester", "--policy", "/app/policy.yaml", "--image", imageName,
 		})
 
 	return result.Stdout(ctx)

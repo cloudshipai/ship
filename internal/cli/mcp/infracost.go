@@ -7,129 +7,284 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddInfracostTools adds Infracost MCP tool implementations
+// AddInfracostTools adds Infracost MCP tool implementations using real CLI commands
 func AddInfracostTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// Infracost breakdown directory tool
-	breakdownDirTool := mcp.NewTool("infracost_breakdown_directory",
-		mcp.WithDescription("Generate cost breakdown for Terraform directory"),
-		mcp.WithString("directory",
-			mcp.Description("Directory containing Terraform files (default: current directory)"),
-		),
-	)
-	s.AddTool(breakdownDirTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"terraform-tools", "cost-estimate"}
-		if dir := request.GetString("directory", ""); dir != "" {
-			args = append(args, dir)
-		}
-		return executeShipCommand(args)
-	})
-
-	// Infracost breakdown plan tool
-	breakdownPlanTool := mcp.NewTool("infracost_breakdown_plan",
-		mcp.WithDescription("Generate cost breakdown from Terraform plan file"),
-		mcp.WithString("plan_file",
-			mcp.Description("Path to Terraform plan JSON file"),
+	// Infracost breakdown tool
+	breakdownTool := mcp.NewTool("infracost_breakdown",
+		mcp.WithDescription("Generate cost breakdown for Terraform projects using infracost breakdown"),
+		mcp.WithString("path",
+			mcp.Description("Path to Terraform directory or JSON/plan file"),
 			mcp.Required(),
 		),
+		mcp.WithString("config_file",
+			mcp.Description("Path to Infracost config file"),
+		),
+		mcp.WithString("format",
+			mcp.Description("Output format"),
+			mcp.Enum("json", "table", "html"),
+		),
+		mcp.WithString("out_file",
+			mcp.Description("Save output to a file"),
+		),
+		mcp.WithBoolean("show_skipped",
+			mcp.Description("List unsupported resources"),
+		),
+		mcp.WithString("terraform_var_file",
+			mcp.Description("Load variable files (relative to path)"),
+		),
+		mcp.WithString("terraform_var",
+			mcp.Description("Set value for an input variable"),
+		),
+		mcp.WithString("terraform_workspace",
+			mcp.Description("Terraform workspace to use"),
+		),
+		mcp.WithString("usage_file",
+			mcp.Description("Path to Infracost usage file"),
+		),
 	)
-	s.AddTool(breakdownPlanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		planFile := request.GetString("plan_file", "")
-		args := []string{"terraform-tools", "cost-estimate", "--plan", planFile}
+	s.AddTool(breakdownTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		path := request.GetString("path", "")
+		args := []string{"infracost", "breakdown", "--path", path}
+		
+		if configFile := request.GetString("config_file", ""); configFile != "" {
+			args = append(args, "--config-file", configFile)
+		}
+		if format := request.GetString("format", ""); format != "" {
+			args = append(args, "--format", format)
+		}
+		if outFile := request.GetString("out_file", ""); outFile != "" {
+			args = append(args, "--out-file", outFile)
+		}
+		if request.GetBool("show_skipped", false) {
+			args = append(args, "--show-skipped")
+		}
+		if terraformVarFile := request.GetString("terraform_var_file", ""); terraformVarFile != "" {
+			args = append(args, "--terraform-var-file", terraformVarFile)
+		}
+		if terraformVar := request.GetString("terraform_var", ""); terraformVar != "" {
+			args = append(args, "--terraform-var", terraformVar)
+		}
+		if terraformWorkspace := request.GetString("terraform_workspace", ""); terraformWorkspace != "" {
+			args = append(args, "--terraform-workspace", terraformWorkspace)
+		}
+		if usageFile := request.GetString("usage_file", ""); usageFile != "" {
+			args = append(args, "--usage-file", usageFile)
+		}
+		
 		return executeShipCommand(args)
 	})
 
 	// Infracost diff tool
 	diffTool := mcp.NewTool("infracost_diff",
-		mcp.WithDescription("Show cost difference between current and planned state"),
-		mcp.WithString("directory",
-			mcp.Description("Directory containing Terraform files (default: current directory)"),
+		mcp.WithDescription("Show diff of monthly costs between current and planned state using infracost diff"),
+		mcp.WithString("path",
+			mcp.Description("Path to Terraform directory or JSON/plan file"),
+			mcp.Required(),
+		),
+		mcp.WithString("compare_to",
+			mcp.Description("Path to Infracost JSON file to compare against"),
+		),
+		mcp.WithString("format",
+			mcp.Description("Output format"),
+			mcp.Enum("json", "diff"),
+		),
+		mcp.WithString("out_file",
+			mcp.Description("Save output to a file"),
+		),
+		mcp.WithBoolean("show_skipped",
+			mcp.Description("List unsupported resources"),
+		),
+		mcp.WithString("terraform_var_file",
+			mcp.Description("Load variable files (relative to path)"),
+		),
+		mcp.WithString("terraform_var",
+			mcp.Description("Set value for an input variable"),
+		),
+		mcp.WithString("usage_file",
+			mcp.Description("Path to Infracost usage file"),
 		),
 	)
 	s.AddTool(diffTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"terraform-tools", "cost-estimate", "--diff"}
-		if dir := request.GetString("directory", ""); dir != "" {
-			args = append(args, dir)
+		path := request.GetString("path", "")
+		args := []string{"infracost", "diff", "--path", path}
+		
+		if compareTo := request.GetString("compare_to", ""); compareTo != "" {
+			args = append(args, "--compare-to", compareTo)
 		}
+		if format := request.GetString("format", ""); format != "" {
+			args = append(args, "--format", format)
+		}
+		if outFile := request.GetString("out_file", ""); outFile != "" {
+			args = append(args, "--out-file", outFile)
+		}
+		if request.GetBool("show_skipped", false) {
+			args = append(args, "--show-skipped")
+		}
+		if terraformVarFile := request.GetString("terraform_var_file", ""); terraformVarFile != "" {
+			args = append(args, "--terraform-var-file", terraformVarFile)
+		}
+		if terraformVar := request.GetString("terraform_var", ""); terraformVar != "" {
+			args = append(args, "--terraform-var", terraformVar)
+		}
+		if usageFile := request.GetString("usage_file", ""); usageFile != "" {
+			args = append(args, "--usage-file", usageFile)
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// Infracost breakdown with config tool
-	breakdownConfigTool := mcp.NewTool("infracost_breakdown_config",
-		mcp.WithDescription("Generate cost breakdown using Infracost config file"),
-		mcp.WithString("config_file",
-			mcp.Description("Path to Infracost config file"),
+	// Infracost output tool
+	outputTool := mcp.NewTool("infracost_output",
+		mcp.WithDescription("Combine and output Infracost JSON files in different formats using infracost output"),
+		mcp.WithString("path",
+			mcp.Description("Path to Infracost JSON files (supports glob patterns)"),
+			mcp.Required(),
+		),
+		mcp.WithString("format",
+			mcp.Description("Output format"),
+			mcp.Enum("json", "diff", "table", "html", "github-comment", "gitlab-comment", "azure-repos-comment", "bitbucket-comment", "bitbucket-comment-summary", "slack-message"),
+		),
+		mcp.WithString("out_file",
+			mcp.Description("Save output to a file"),
+		),
+		mcp.WithBoolean("show_skipped",
+			mcp.Description("List unsupported resources"),
+		),
+		mcp.WithBoolean("show_all_projects",
+			mcp.Description("Show all projects in the table of the comment output"),
+		),
+	)
+	s.AddTool(outputTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		path := request.GetString("path", "")
+		args := []string{"infracost", "output", "--path", path}
+		
+		if format := request.GetString("format", ""); format != "" {
+			args = append(args, "--format", format)
+		}
+		if outFile := request.GetString("out_file", ""); outFile != "" {
+			args = append(args, "--out-file", outFile)
+		}
+		if request.GetBool("show_skipped", false) {
+			args = append(args, "--show-skipped")
+		}
+		if request.GetBool("show_all_projects", false) {
+			args = append(args, "--show-all-projects")
+		}
+		
+		return executeShipCommand(args)
+	})
+
+	// Infracost upload tool
+	uploadTool := mcp.NewTool("infracost_upload",
+		mcp.WithDescription("Upload an Infracost JSON file to Infracost Cloud using infracost upload"),
+		mcp.WithString("path",
+			mcp.Description("Path to Infracost JSON file"),
+			mcp.Required(),
+		),
+		mcp.WithString("format",
+			mcp.Description("Output format"),
+			mcp.Enum("json"),
+		),
+	)
+	s.AddTool(uploadTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		path := request.GetString("path", "")
+		args := []string{"infracost", "upload", "--path", path}
+		
+		if format := request.GetString("format", ""); format != "" {
+			args = append(args, "--format", format)
+		}
+		
+		return executeShipCommand(args)
+	})
+
+	// Infracost configure tool
+	configureTool := mcp.NewTool("infracost_configure",
+		mcp.WithDescription("Set global configuration using infracost configure set"),
+		mcp.WithString("setting",
+			mcp.Description("Configuration setting to set"),
+			mcp.Required(),
+			mcp.Enum("api_key", "pricing_api_endpoint", "currency", "tls_insecure_skip_verify", "tls_ca_cert_file"),
+		),
+		mcp.WithString("value",
+			mcp.Description("Value for the configuration setting"),
 			mcp.Required(),
 		),
 	)
-	s.AddTool(breakdownConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		configFile := request.GetString("config_file", "")
-		args := []string{"terraform-tools", "cost-estimate", "--config", configFile}
+	s.AddTool(configureTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		setting := request.GetString("setting", "")
+		value := request.GetString("value", "")
+		args := []string{"infracost", "configure", "set", setting, value}
+		
 		return executeShipCommand(args)
 	})
 
-	// Infracost generate HTML report tool
-	htmlReportTool := mcp.NewTool("infracost_generate_html",
-		mcp.WithDescription("Generate HTML cost report"),
-		mcp.WithString("directory",
-			mcp.Description("Directory containing Terraform files (default: current directory)"),
+	// Infracost generate config tool
+	generateConfigTool := mcp.NewTool("infracost_generate_config",
+		mcp.WithDescription("Generate Infracost config file from a template file using infracost generate config"),
+		mcp.WithString("repo_path",
+			mcp.Description("Repository path"),
+			mcp.Required(),
 		),
-		mcp.WithString("output",
-			mcp.Description("Output file path for HTML report"),
+		mcp.WithString("template_path",
+			mcp.Description("Path to template file"),
+			mcp.Required(),
 		),
 	)
-	s.AddTool(htmlReportTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"terraform-tools", "cost-estimate", "--format", "html"}
-		if dir := request.GetString("directory", ""); dir != "" {
-			args = append(args, dir)
-		}
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "--output", output)
-		}
+	s.AddTool(generateConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		repoPath := request.GetString("repo_path", "")
+		templatePath := request.GetString("template_path", "")
+		args := []string{"infracost", "generate", "config", "--repo-path", repoPath, "--template-path", templatePath}
+		
 		return executeShipCommand(args)
 	})
 
-	// Infracost generate table report tool
-	tableReportTool := mcp.NewTool("infracost_generate_table",
-		mcp.WithDescription("Generate table format cost report"),
-		mcp.WithString("directory",
-			mcp.Description("Directory containing Terraform files (default: current directory)"),
-		),
-		mcp.WithString("output",
-			mcp.Description("Output file path for table report"),
-		),
+	// Infracost auth login tool
+	authTool := mcp.NewTool("infracost_auth_login",
+		mcp.WithDescription("Get a free API key or log in to existing account using infracost auth login"),
 	)
-	s.AddTool(tableReportTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"terraform-tools", "cost-estimate", "--format", "table"}
-		if dir := request.GetString("directory", ""); dir != "" {
-			args = append(args, dir)
-		}
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "--output", output)
-		}
+	s.AddTool(authTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"infracost", "auth", "login"}
 		return executeShipCommand(args)
 	})
 
-	// Infracost get version tool
-	getVersionTool := mcp.NewTool("infracost_get_version",
-		mcp.WithDescription("Get the version of Infracost"),
-	)
-	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"terraform-tools", "cost-estimate", "--version"}
-		return executeShipCommand(args)
-	})
-
-	// Infracost get pricing tool
-	getPricingTool := mcp.NewTool("infracost_get_pricing",
-		mcp.WithDescription("Get cloud pricing information"),
-		mcp.WithString("service",
-			mcp.Description("Cloud service to get pricing for (e.g., aws, azure, gcp)"),
+	// Infracost comment GitHub tool
+	commentGitHubTool := mcp.NewTool("infracost_comment_github",
+		mcp.WithDescription("Post an Infracost comment to GitHub using infracost comment github"),
+		mcp.WithString("path",
+			mcp.Description("Path to Infracost JSON file"),
+			mcp.Required(),
+		),
+		mcp.WithString("repo",
+			mcp.Description("Repository in owner/repo format"),
+			mcp.Required(),
+		),
+		mcp.WithString("pull_request",
+			mcp.Description("Pull request number"),
+			mcp.Required(),
+		),
+		mcp.WithString("github_token",
+			mcp.Description("GitHub access token (or use GITHUB_TOKEN env var)"),
+		),
+		mcp.WithString("behavior",
+			mcp.Description("Comment behavior"),
+			mcp.Enum("update", "delete-and-new", "new"),
 		),
 	)
-	s.AddTool(getPricingTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"terraform-tools", "cost-estimate", "--pricing"}
-		if service := request.GetString("service", ""); service != "" {
-			args = append(args, "--service", service)
+	s.AddTool(commentGitHubTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		path := request.GetString("path", "")
+		repo := request.GetString("repo", "")
+		pr := request.GetString("pull_request", "")
+		
+		args := []string{"infracost", "comment", "github", "--path", path, "--repo", repo, "--pull-request", pr}
+		
+		if token := request.GetString("github_token", ""); token != "" {
+			args = append(args, "--github-token", token)
 		}
+		if behavior := request.GetString("behavior", ""); behavior != "" {
+			args = append(args, "--behavior", behavior)
+		}
+		
 		return executeShipCommand(args)
 	})
 }
+

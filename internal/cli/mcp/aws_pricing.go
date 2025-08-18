@@ -7,88 +7,111 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddAWSPricingTools adds AWS Pricing (cost calculator) MCP tool implementations
+// AddAWSPricingTools adds AWS Pricing (official AWS CLI pricing commands) MCP tool implementations
 func AddAWSPricingTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// AWS pricing estimate tool
-	estimateTool := mcp.NewTool("aws_pricing_estimate",
-		mcp.WithDescription("Estimate AWS pricing for resources"),
-		mcp.WithString("service",
-			mcp.Description("AWS service name (e.g., ec2, s3, rds)"),
+	// AWS pricing describe services tool
+	describeServicesTool := mcp.NewTool("aws_pricing_describe_services",
+		mcp.WithDescription("Get metadata for AWS services and their pricing attributes"),
+		mcp.WithString("service_code",
+			mcp.Description("AWS service code (e.g., AmazonEC2, AmazonS3) - leave empty to list all services"),
+		),
+		mcp.WithString("profile",
+			mcp.Description("AWS profile to use"),
+		),
+		mcp.WithString("max_items",
+			mcp.Description("Maximum number of items to return"),
+		),
+	)
+	s.AddTool(describeServicesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"aws", "pricing", "describe-services"}
+		if serviceCode := request.GetString("service_code", ""); serviceCode != "" {
+			args = append(args, "--service-code", serviceCode)
+		}
+		if profile := request.GetString("profile", ""); profile != "" {
+			args = append(args, "--profile", profile)
+		}
+		if maxItemsStr := request.GetString("max_items", ""); maxItemsStr != "" {
+			args = append(args, "--max-items", maxItemsStr)
+		}
+		return executeShipCommand(args)
+	})
+
+	// AWS pricing get attribute values tool
+	getAttributeValuesTool := mcp.NewTool("aws_pricing_get_attribute_values",
+		mcp.WithDescription("Get available attribute values for AWS service pricing filters"),
+		mcp.WithString("service_code",
+			mcp.Description("AWS service code (e.g., AmazonEC2, AmazonS3)"),
 			mcp.Required(),
 		),
-		mcp.WithString("region",
-			mcp.Description("AWS region for pricing"),
-		),
-		mcp.WithString("instance_type",
-			mcp.Description("Instance type for compute services"),
-		),
-		mcp.WithString("output_format",
-			mcp.Description("Output format"),
-			mcp.Enum("json", "table", "csv"),
-		),
-	)
-	s.AddTool(estimateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		service := request.GetString("service", "")
-		args := []string{"aws", "pricing", "estimate", service}
-		if region := request.GetString("region", ""); region != "" {
-			args = append(args, "--region", region)
-		}
-		if instanceType := request.GetString("instance_type", ""); instanceType != "" {
-			args = append(args, "--instance-type", instanceType)
-		}
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
-		}
-		return executeShipCommand(args)
-	})
-
-	// AWS pricing compare tool
-	compareTool := mcp.NewTool("aws_pricing_compare",
-		mcp.WithDescription("Compare AWS pricing across regions or instance types"),
-		mcp.WithString("service",
-			mcp.Description("AWS service name"),
+		mcp.WithString("attribute_name",
+			mcp.Description("Attribute name (e.g., instanceType, volumeType, location)"),
 			mcp.Required(),
 		),
-		mcp.WithString("regions",
-			mcp.Description("Comma-separated list of regions to compare"),
+		mcp.WithString("profile",
+			mcp.Description("AWS profile to use"),
 		),
-		mcp.WithString("instance_types",
-			mcp.Description("Comma-separated list of instance types to compare"),
+		mcp.WithString("max_items",
+			mcp.Description("Maximum number of items to return"),
 		),
 	)
-	s.AddTool(compareTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		service := request.GetString("service", "")
-		args := []string{"aws", "pricing", "compare", service}
-		if regions := request.GetString("regions", ""); regions != "" {
-			args = append(args, "--regions", regions)
+	s.AddTool(getAttributeValuesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		serviceCode := request.GetString("service_code", "")
+		attributeName := request.GetString("attribute_name", "")
+		args := []string{"aws", "pricing", "get-attribute-values", "--service-code", serviceCode, "--attribute-name", attributeName}
+		if profile := request.GetString("profile", ""); profile != "" {
+			args = append(args, "--profile", profile)
 		}
-		if instanceTypes := request.GetString("instance_types", ""); instanceTypes != "" {
-			args = append(args, "--instance-types", instanceTypes)
+		if maxItemsStr := request.GetString("max_items", ""); maxItemsStr != "" {
+			args = append(args, "--max-items", maxItemsStr)
 		}
 		return executeShipCommand(args)
 	})
 
-	// AWS pricing list services tool
-	listServicesTool := mcp.NewTool("aws_pricing_list_services",
-		mcp.WithDescription("List available AWS services for pricing"),
-		mcp.WithString("category",
-			mcp.Description("Service category filter"),
+	// AWS pricing get products tool
+	getProductsTool := mcp.NewTool("aws_pricing_get_products",
+		mcp.WithDescription("Get AWS pricing information for products that match filter criteria"),
+		mcp.WithString("service_code",
+			mcp.Description("AWS service code (e.g., AmazonEC2, AmazonS3)"),
+			mcp.Required(),
+		),
+		mcp.WithString("filters",
+			mcp.Description("JSON string of filter criteria (e.g., '[{\"Type\":\"TERM_MATCH\",\"Field\":\"location\",\"Value\":\"US East (N. Virginia)\"}]')"),
+		),
+		mcp.WithString("format_version",
+			mcp.Description("Format version for response"),
+			mcp.Enum("aws_v1"),
+		),
+		mcp.WithString("profile",
+			mcp.Description("AWS profile to use"),
+		),
+		mcp.WithString("max_items",
+			mcp.Description("Maximum number of items to return"),
 		),
 	)
-	s.AddTool(listServicesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"aws", "pricing", "list-services"}
-		if category := request.GetString("category", ""); category != "" {
-			args = append(args, "--category", category)
+	s.AddTool(getProductsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		serviceCode := request.GetString("service_code", "")
+		args := []string{"aws", "pricing", "get-products", "--service-code", serviceCode}
+		if filters := request.GetString("filters", ""); filters != "" {
+			args = append(args, "--filters", filters)
+		}
+		if formatVersion := request.GetString("format_version", ""); formatVersion != "" {
+			args = append(args, "--format-version", formatVersion)
+		}
+		if profile := request.GetString("profile", ""); profile != "" {
+			args = append(args, "--profile", profile)
+		}
+		if maxItemsStr := request.GetString("max_items", ""); maxItemsStr != "" {
+			args = append(args, "--max-items", maxItemsStr)
 		}
 		return executeShipCommand(args)
 	})
 
-	// AWS pricing get version tool
+	// AWS CLI version tool
 	getVersionTool := mcp.NewTool("aws_pricing_get_version",
-		mcp.WithDescription("Get AWS pricing tool version information"),
+		mcp.WithDescription("Get AWS CLI version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"aws", "pricing", "--version"}
+		args := []string{"aws", "--version"}
 		return executeShipCommand(args)
 	})
 }

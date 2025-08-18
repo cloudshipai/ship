@@ -24,15 +24,12 @@ func AddFalcoTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 		),
 	)
 	s.AddTool(startMonitoringTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "falco", "--start"}
+		args := []string{"falco"}
 		if configPath := request.GetString("config_path", ""); configPath != "" {
-			args = append(args, "--config", configPath)
+			args = append(args, "-c", configPath)
 		}
 		if rulesPath := request.GetString("rules_path", ""); rulesPath != "" {
-			args = append(args, "--rules", rulesPath)
-		}
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
+			args = append(args, "-r", rulesPath)
 		}
 		return executeShipCommand(args)
 	})
@@ -47,26 +44,28 @@ func AddFalcoTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 	)
 	s.AddTool(validateRulesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		rulesPath := request.GetString("rules_path", "")
-		args := []string{"security", "falco", "--validate", rulesPath}
+		args := []string{"falco", "-V", rulesPath}
 		return executeShipCommand(args)
 	})
 
-	// Falco test rules tool
-	testRulesTool := mcp.NewTool("falco_test_rules",
-		mcp.WithDescription("Test Falco rules against sample events"),
-		mcp.WithString("rules_path",
-			mcp.Description("Path to Falco rules file"),
-			mcp.Required(),
+	// Falco dry run tool
+	dryRunTool := mcp.NewTool("falco_dry_run",
+		mcp.WithDescription("Run Falco in dry-run mode without processing events"),
+		mcp.WithString("config_path",
+			mcp.Description("Path to Falco configuration file"),
 		),
-		mcp.WithString("events_path",
-			mcp.Description("Path to test events file"),
-			mcp.Required(),
+		mcp.WithString("rules_path",
+			mcp.Description("Path to custom Falco rules"),
 		),
 	)
-	s.AddTool(testRulesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		rulesPath := request.GetString("rules_path", "")
-		eventsPath := request.GetString("events_path", "")
-		args := []string{"security", "falco", "--test", rulesPath, "--events", eventsPath}
+	s.AddTool(dryRunTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"falco", "--dry-run"}
+		if configPath := request.GetString("config_path", ""); configPath != "" {
+			args = append(args, "-c", configPath)
+		}
+		if rulesPath := request.GetString("rules_path", ""); rulesPath != "" {
+			args = append(args, "-r", rulesPath)
+		}
 		return executeShipCommand(args)
 	})
 
@@ -79,9 +78,9 @@ func AddFalcoTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 		),
 	)
 	s.AddTool(listFieldsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "falco", "--list-fields"}
+		args := []string{"falco", "--list"}
 		if source := request.GetString("source", ""); source != "" {
-			args = append(args, "--source", source)
+			args = append(args, source)
 		}
 		return executeShipCommand(args)
 	})
@@ -91,7 +90,42 @@ func AddFalcoTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 		mcp.WithDescription("Get Falco version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "falco", "--version"}
+		args := []string{"falco", "--version"}
+		return executeShipCommand(args)
+	})
+
+	// Falco list rules tool
+	listRulesTool := mcp.NewTool("falco_list_rules",
+		mcp.WithDescription("List all loaded Falco rules"),
+		mcp.WithString("rules_path",
+			mcp.Description("Path to custom Falco rules"),
+		),
+	)
+	s.AddTool(listRulesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"falco", "-L"}
+		if rulesPath := request.GetString("rules_path", ""); rulesPath != "" {
+			args = append(args, "-r", rulesPath)
+		}
+		return executeShipCommand(args)
+	})
+
+	// Falco describe rule tool
+	describeRuleTool := mcp.NewTool("falco_describe_rule",
+		mcp.WithDescription("Show description of a specific Falco rule"),
+		mcp.WithString("rule_name",
+			mcp.Description("Name of the rule to describe"),
+			mcp.Required(),
+		),
+		mcp.WithString("rules_path",
+			mcp.Description("Path to custom Falco rules"),
+		),
+	)
+	s.AddTool(describeRuleTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		ruleName := request.GetString("rule_name", "")
+		args := []string{"falco", "-l", ruleName}
+		if rulesPath := request.GetString("rules_path", ""); rulesPath != "" {
+			args = append(args, "-r", rulesPath)
+		}
 		return executeShipCommand(args)
 	})
 }

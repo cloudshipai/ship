@@ -32,7 +32,7 @@ func (m *DockleModule) ScanImage(ctx context.Context, imageRef string, opts ...D
 		From("goodwithtech/dockle:" + config.DockleVersion).
 		WithWorkdir("/workspace")
 
-	args := []string{}
+	args := []string{"dockle"}
 
 	// Add format
 	if config.Format != "" {
@@ -91,7 +91,7 @@ func (m *DockleModule) ScanTarball(ctx context.Context, tarballPath string, opts
 		container = container.WithMountedFile("/workspace/image.tar", m.client.Host().File(tarballPath))
 	}
 
-	args := []string{}
+	args := []string{"dockle"}
 
 	// Add format
 	if config.Format != "" {
@@ -145,7 +145,7 @@ func (m *DockleModule) ScanDockerfile(ctx context.Context, dockerfilePath string
 		container = container.WithMountedFile("/workspace/Dockerfile", m.client.Host().File(dockerfilePath))
 	}
 
-	args := []string{}
+	args := []string{"dockle"}
 
 	// Add format
 	if config.Format != "" {
@@ -260,7 +260,7 @@ func (m *DockleModule) ScanWithPolicy(ctx context.Context, imageRef string, poli
 		container = container.WithMountedFile("/workspace/.dockleignore", m.client.Host().File(policyPath))
 	}
 
-	args := []string{}
+	args := []string{"dockle"}
 
 	// Add format
 	if config.Format != "" {

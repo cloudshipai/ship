@@ -7,140 +7,209 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// AddLicenseDetectorTools adds License Detector (software license detection) MCP tool implementations
+// AddLicenseDetectorTools adds License Detector (software license detection) MCP tool implementations using real CLI commands
 func AddLicenseDetectorTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// License Detector scan directory tool
-	scanDirectoryTool := mcp.NewTool("license_detector_scan_directory",
-		mcp.WithDescription("Scan directory for software licenses"),
-		mcp.WithString("directory",
-			mcp.Description("Directory to scan (default: current directory)"),
+	// Askalono license detection tool
+	askalonoIdentifyTool := mcp.NewTool("license_detector_askalono_identify",
+		mcp.WithDescription("Identify license in a file using askalono CLI"),
+		mcp.WithString("file_path",
+			mcp.Description("Path to license file to identify"),
+			mcp.Required(),
 		),
-		mcp.WithBoolean("recursive",
-			mcp.Description("Recursively scan subdirectories"),
-		),
-		mcp.WithString("output_format",
-			mcp.Description("Output format (json, csv, table)"),
+		mcp.WithBoolean("optimize",
+			mcp.Description("Optimize detection for files with headers/footers"),
 		),
 	)
-	s.AddTool(scanDirectoryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "license-detector", "scan"}
-		if directory := request.GetString("directory", ""); directory != "" {
-			args = append(args, directory)
+	s.AddTool(askalonoIdentifyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		filePath := request.GetString("file_path", "")
+		args := []string{"askalono", "id", filePath}
+		
+		if request.GetBool("optimize", false) {
+			args = []string{"askalono", "id", "--optimize", filePath}
 		}
-		if request.GetBool("recursive", false) {
-			args = append(args, "--recursive")
-		}
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "--format", outputFormat)
-		}
+		
 		return executeShipCommand(args)
 	})
 
-	// License Detector scan file tool
-	scanFileTool := mcp.NewTool("license_detector_scan_file",
-		mcp.WithDescription("Scan specific file for license information"),
+	// Askalono crawl directory tool
+	askalonoCrawlTool := mcp.NewTool("license_detector_askalono_crawl",
+		mcp.WithDescription("Crawl directory for license files using askalono CLI"),
+		mcp.WithString("directory",
+			mcp.Description("Directory to crawl for license files"),
+			mcp.Required(),
+		),
+	)
+	s.AddTool(askalonoCrawlTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		directory := request.GetString("directory", "")
+		args := []string{"askalono", "crawl", directory}
+		return executeShipCommand(args)
+	})
+
+	// CycloneDX license-scanner scan file tool
+	licenseScannerFileTool := mcp.NewTool("license_detector_scanner_file",
+		mcp.WithDescription("Scan specific file using CycloneDX license-scanner CLI"),
 		mcp.WithString("file_path",
 			mcp.Description("Path to file to scan"),
 			mcp.Required(),
 		),
-		mcp.WithString("confidence_threshold",
-			mcp.Description("Minimum confidence threshold (0.0-1.0)"),
+		mcp.WithBoolean("show_copyrights",
+			mcp.Description("Show copyright information"),
+		),
+		mcp.WithBoolean("show_hash",
+			mcp.Description("Output file hash"),
+		),
+		mcp.WithBoolean("show_keywords",
+			mcp.Description("Flag keywords"),
+		),
+		mcp.WithBoolean("debug",
+			mcp.Description("Enable debug logging"),
 		),
 	)
-	s.AddTool(scanFileTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	s.AddTool(licenseScannerFileTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		filePath := request.GetString("file_path", "")
-		args := []string{"security", "license-detector", "scan-file", filePath}
-		if threshold := request.GetString("confidence_threshold", ""); threshold != "" {
-			args = append(args, "--threshold", threshold)
+		args := []string{"license-scanner", "--file", filePath}
+		
+		if request.GetBool("show_copyrights", false) {
+			args = append(args, "--copyrights")
 		}
+		if request.GetBool("show_hash", false) {
+			args = append(args, "--hash")
+		}
+		if request.GetBool("show_keywords", false) {
+			args = append(args, "--keywords")
+		}
+		if request.GetBool("debug", false) {
+			args = append(args, "--debug")
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// License Detector check compliance tool
-	checkComplianceTool := mcp.NewTool("license_detector_check_compliance",
-		mcp.WithDescription("Check license compliance against policy"),
+	// CycloneDX license-scanner scan directory tool
+	licenseScannerDirTool := mcp.NewTool("license_detector_scanner_directory",
+		mcp.WithDescription("Scan directory using CycloneDX license-scanner CLI"),
 		mcp.WithString("directory",
-			mcp.Description("Directory to check (default: current directory)"),
-		),
-		mcp.WithString("policy_file",
-			mcp.Description("Path to license policy file"),
+			mcp.Description("Directory to scan"),
 			mcp.Required(),
 		),
-		mcp.WithBoolean("fail_on_violation",
-			mcp.Description("Fail if policy violations are found"),
+		mcp.WithBoolean("show_copyrights",
+			mcp.Description("Show copyright information"),
+		),
+		mcp.WithBoolean("show_hash",
+			mcp.Description("Output file hash"),
+		),
+		mcp.WithBoolean("quiet",
+			mcp.Description("Suppress logging"),
 		),
 	)
-	s.AddTool(checkComplianceTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		policyFile := request.GetString("policy_file", "")
-		args := []string{"security", "license-detector", "check", "--policy", policyFile}
-		if directory := request.GetString("directory", ""); directory != "" {
-			args = append(args, directory)
+	s.AddTool(licenseScannerDirTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		directory := request.GetString("directory", "")
+		args := []string{"license-scanner", "--dir", directory}
+		
+		if request.GetBool("show_copyrights", false) {
+			args = append(args, "--copyrights")
 		}
-		if request.GetBool("fail_on_violation", false) {
-			args = append(args, "--fail-on-violation")
+		if request.GetBool("show_hash", false) {
+			args = append(args, "--hash")
 		}
+		if request.GetBool("quiet", false) {
+			args = append(args, "--quiet")
+		}
+		
 		return executeShipCommand(args)
 	})
 
-	// License Detector generate report tool
-	generateReportTool := mcp.NewTool("license_detector_generate_report",
-		mcp.WithDescription("Generate comprehensive license report"),
-		mcp.WithString("directory",
-			mcp.Description("Directory to analyze (default: current directory)"),
-		),
-		mcp.WithString("report_format",
-			mcp.Description("Report format (html, pdf, json, csv)"),
-		),
-		mcp.WithString("output_file",
-			mcp.Description("Output file path for the report"),
-		),
+	// CycloneDX license-scanner list templates tool
+	licenseScannerListTool := mcp.NewTool("license_detector_scanner_list",
+		mcp.WithDescription("List license templates using CycloneDX license-scanner CLI"),
 	)
-	s.AddTool(generateReportTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "license-detector", "report"}
-		if directory := request.GetString("directory", ""); directory != "" {
-			args = append(args, directory)
-		}
-		if reportFormat := request.GetString("report_format", ""); reportFormat != "" {
-			args = append(args, "--format", reportFormat)
-		}
-		if outputFile := request.GetString("output_file", ""); outputFile != "" {
-			args = append(args, "--output", outputFile)
-		}
+	s.AddTool(licenseScannerListTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"license-scanner", "--list"}
 		return executeShipCommand(args)
 	})
 
-	// License Detector list supported licenses tool
-	listLicensesTool := mcp.NewTool("license_detector_list_licenses",
-		mcp.WithDescription("List all supported license types"),
-		mcp.WithBoolean("show_details",
-			mcp.Description("Show detailed license information"),
-		),
-	)
-	s.AddTool(listLicensesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "license-detector", "list"}
-		if request.GetBool("show_details", false) {
-			args = append(args, "--details")
-		}
-		return executeShipCommand(args)
-	})
-
-	// License Detector validate license tool
-	validateLicenseTool := mcp.NewTool("license_detector_validate_license",
-		mcp.WithDescription("Validate specific license text"),
-		mcp.WithString("license_text",
-			mcp.Description("License text to validate"),
+	// Go license detector tool
+	goLicenseDetectorTool := mcp.NewTool("license_detector_go_detector",
+		mcp.WithDescription("Detect project license using go-license-detector CLI"),
+		mcp.WithString("path",
+			mcp.Description("Path to project directory or GitHub repository URL"),
 			mcp.Required(),
 		),
-		mcp.WithString("expected_license",
-			mcp.Description("Expected license type for comparison"),
+	)
+	s.AddTool(goLicenseDetectorTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		path := request.GetString("path", "")
+		args := []string{"license-detector", path}
+		return executeShipCommand(args)
+	})
+
+	// LicenseFinder scan dependencies tool
+	licenseFinderScanTool := mcp.NewTool("license_detector_licensefinder_scan",
+		mcp.WithDescription("Scan project dependencies using LicenseFinder CLI"),
+		mcp.WithString("project_path",
+			mcp.Description("Path to project directory (default: current directory)"),
+		),
+		mcp.WithString("decisions_file",
+			mcp.Description("Path to decisions file"),
 		),
 	)
-	s.AddTool(validateLicenseTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		licenseText := request.GetString("license_text", "")
-		args := []string{"security", "license-detector", "validate", "--text", licenseText}
-		if expectedLicense := request.GetString("expected_license", ""); expectedLicense != "" {
-			args = append(args, "--expected", expectedLicense)
+	s.AddTool(licenseFinderScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"license_finder"}
+		
+		if projectPath := request.GetString("project_path", ""); projectPath != "" {
+			// Change to project directory
+			args = []string{"sh", "-c", "cd " + projectPath + " && license_finder"}
 		}
+		if decisionsFile := request.GetString("decisions_file", ""); decisionsFile != "" {
+			args = append(args, "--decisions_file", decisionsFile)
+		}
+		
+		return executeShipCommand(args)
+	})
+
+	// LicenseFinder generate report tool
+	licenseFinderReportTool := mcp.NewTool("license_detector_licensefinder_report",
+		mcp.WithDescription("Generate license report using LicenseFinder CLI"),
+		mcp.WithString("format",
+			mcp.Description("Report format (text, csv, html, markdown)"),
+			mcp.Enum("text", "csv", "html", "markdown"),
+		),
+		mcp.WithString("project_path",
+			mcp.Description("Path to project directory (default: current directory)"),
+		),
+	)
+	s.AddTool(licenseFinderReportTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"license_finder", "report"}
+		
+		if format := request.GetString("format", ""); format != "" {
+			args = append(args, "--format", format)
+		}
+		
+		if projectPath := request.GetString("project_path", ""); projectPath != "" {
+			// Change to project directory
+			fullCommand := "cd " + projectPath + " && " + "license_finder report"
+			if format := request.GetString("format", ""); format != "" {
+				fullCommand += " --format " + format
+			}
+			args = []string{"sh", "-c", fullCommand}
+		}
+		
+		return executeShipCommand(args)
+	})
+
+	// LicenseFinder action items tool
+	licenseFinderActionItemsTool := mcp.NewTool("license_detector_licensefinder_action_items",
+		mcp.WithDescription("Show dependencies needing approval using LicenseFinder CLI"),
+		mcp.WithString("project_path",
+			mcp.Description("Path to project directory (default: current directory)"),
+		),
+	)
+	s.AddTool(licenseFinderActionItemsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := []string{"license_finder", "action_items"}
+		
+		if projectPath := request.GetString("project_path", ""); projectPath != "" {
+			args = []string{"sh", "-c", "cd " + projectPath + " && license_finder action_items"}
+		}
+		
 		return executeShipCommand(args)
 	})
 }

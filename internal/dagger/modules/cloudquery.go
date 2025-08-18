@@ -77,6 +77,133 @@ func (m *CloudQueryModule) ListProviders(ctx context.Context) (string, error) {
 	return output, nil
 }
 
+// MigrateConfig updates destination schema
+func (m *CloudQueryModule) MigrateConfig(ctx context.Context, configPath string) (string, error) {
+	container := m.client.Container().
+		From("ghcr.io/cloudquery/cloudquery:latest").
+		WithDirectory("/config", m.client.Host().Directory(configPath)).
+		WithExec([]string{
+			"cloudquery",
+			"migrate",
+			"/config/config.yml",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to run cloudquery migrate: %w", err)
+	}
+
+	return output, nil
+}
+
+// InitConfig generates initial configuration
+func (m *CloudQueryModule) InitConfig(ctx context.Context, source string, destination string) (string, error) {
+	args := []string{"cloudquery", "init"}
+	if source != "" {
+		args = append(args, "--source", source)
+	}
+	if destination != "" {
+		args = append(args, "--destination", destination)
+	}
+
+	container := m.client.Container().
+		From("ghcr.io/cloudquery/cloudquery:latest").
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to run cloudquery init: %w", err)
+	}
+
+	return output, nil
+}
+
+// TestConnection tests plugin connections
+func (m *CloudQueryModule) TestConnection(ctx context.Context, configPath string) (string, error) {
+	container := m.client.Container().
+		From("ghcr.io/cloudquery/cloudquery:latest").
+		WithDirectory("/config", m.client.Host().Directory(configPath)).
+		WithExec([]string{
+			"cloudquery",
+			"test-connection",
+			"/config/config.yml",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to run cloudquery test-connection: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetTables generates table documentation
+func (m *CloudQueryModule) GetTables(ctx context.Context, source string, outputDir string, format string) (string, error) {
+	args := []string{"cloudquery", "tables"}
+	if source != "" {
+		args = append(args, source)
+	}
+	if outputDir != "" {
+		args = append(args, "--output-dir", outputDir)
+	}
+	if format != "" {
+		args = append(args, "--format", format)
+	}
+
+	container := m.client.Container().
+		From("ghcr.io/cloudquery/cloudquery:latest").
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to run cloudquery tables: %w", err)
+	}
+
+	return output, nil
+}
+
+// Login to CloudQuery Hub
+func (m *CloudQueryModule) Login(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("ghcr.io/cloudquery/cloudquery:latest").
+		WithExec([]string{"cloudquery", "login"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to run cloudquery login: %w", err)
+	}
+
+	return output, nil
+}
+
+// Logout from CloudQuery Hub
+func (m *CloudQueryModule) Logout(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("ghcr.io/cloudquery/cloudquery:latest").
+		WithExec([]string{"cloudquery", "logout"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to run cloudquery logout: %w", err)
+	}
+
+	return output, nil
+}
+
+// InstallPlugin installs a CloudQuery plugin
+func (m *CloudQueryModule) InstallPlugin(ctx context.Context, pluginName string) (string, error) {
+	container := m.client.Container().
+		From("ghcr.io/cloudquery/cloudquery:latest").
+		WithExec([]string{"cloudquery", "plugin", "install", pluginName})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to install cloudquery plugin: %w", err)
+	}
+
+	return output, nil
+}
+
 // GetVersion returns the version of CloudQuery
 func (m *CloudQueryModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().

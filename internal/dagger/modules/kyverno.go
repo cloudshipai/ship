@@ -101,3 +101,151 @@ func (m *KyvernoModule) GetVersion(ctx context.Context) (string, error) {
 
 	return output, nil
 }
+
+// Install installs Kyverno using Helm
+func (m *KyvernoModule) Install(ctx context.Context, namespace string, kubeconfig string) (string, error) {
+	if namespace == "" {
+		namespace = "kyverno"
+	}
+
+	container := m.client.Container().
+		From("alpine/helm:latest")
+
+	if kubeconfig != "" {
+		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
+	}
+
+	container = container.WithExec([]string{
+		"helm", "repo", "add", "kyverno", "https://kyverno.github.io/kyverno/",
+	}).WithExec([]string{
+		"helm", "install", "kyverno", "kyverno/kyverno",
+		"--namespace", namespace,
+		"--create-namespace",
+	})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to install kyverno: %w", err)
+	}
+
+	return output, nil
+}
+
+// ListPolicies lists Kyverno policies
+func (m *KyvernoModule) ListPolicies(ctx context.Context, namespace string, kubeconfig string) (string, error) {
+	args := []string{"kubectl", "get", "policies"}
+	if namespace != "" {
+		args = append(args, "-n", namespace)
+	} else {
+		args = append(args, "--all-namespaces")
+	}
+	args = append(args, "-o", "json")
+
+	container := m.client.Container().
+		From("bitnami/kubectl:latest")
+
+	if kubeconfig != "" {
+		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to list kyverno policies: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetPolicyReports gets Kyverno policy reports
+func (m *KyvernoModule) GetPolicyReports(ctx context.Context, namespace string, kubeconfig string) (string, error) {
+	args := []string{"kubectl", "get", "policyreports"}
+	if namespace != "" {
+		args = append(args, "-n", namespace)
+	} else {
+		args = append(args, "--all-namespaces")
+	}
+	args = append(args, "-o", "json")
+
+	container := m.client.Container().
+		From("bitnami/kubectl:latest")
+
+	if kubeconfig != "" {
+		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get policy reports: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetStatus gets Kyverno installation status
+func (m *KyvernoModule) GetStatus(ctx context.Context, namespace string, kubeconfig string) (string, error) {
+	if namespace == "" {
+		namespace = "kyverno"
+	}
+
+	container := m.client.Container().
+		From("bitnami/kubectl:latest")
+
+	if kubeconfig != "" {
+		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
+	}
+
+	container = container.WithExec([]string{"kubectl", "get", "pods", "-n", namespace, "-o", "json"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get kyverno status: %w", err)
+	}
+
+	return output, nil
+}
+
+// CreateClusterRole creates necessary RBAC cluster role for Kyverno
+func (m *KyvernoModule) CreateClusterRole(ctx context.Context, kubeconfig string) (string, error) {
+	clusterRoleYAML := `apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kyverno-cluster-role
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kyverno-cluster-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kyverno-cluster-role
+subjects:
+- kind: ServiceAccount
+  name: kyverno
+  namespace: kyverno`
+
+	container := m.client.Container().
+		From("bitnami/kubectl:latest").
+		WithNewFile("/workspace/cluster-role.yaml", clusterRoleYAML)
+
+	if kubeconfig != "" {
+		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
+	}
+
+	container = container.WithExec([]string{"kubectl", "apply", "-f", "/workspace/cluster-role.yaml"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to create cluster role: %w", err)
+	}
+
+	return output, nil
+}

@@ -341,7 +341,7 @@ func main() {
 }
 `
 
-func generateRegistryCode(services map[string]*dagger.Service) string {
+func generateRegistryCode(_ map[string]*dagger.Service) string {
 	// Generate registry code that knows about all services
 	return `
 package main

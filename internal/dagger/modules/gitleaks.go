@@ -27,7 +27,7 @@ func (m *GitleaksModule) ScanDirectory(ctx context.Context, dir string) (string,
 		From("zricethezav/gitleaks:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"gitleaks", "detect", "--source", ".", "--report-format", "json", "--no-git"})
+		WithExec([]string{"gitleaks", "dir", ".", "--report-format", "json"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -49,7 +49,7 @@ func (m *GitleaksModule) ScanFile(ctx context.Context, filePath string) (string,
 		From("zricethezav/gitleaks:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"gitleaks", "detect", "--source", filename, "--report-format", "json", "--no-git"})
+		WithExec([]string{"gitleaks", "dir", filename, "--report-format", "json"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -67,7 +67,7 @@ func (m *GitleaksModule) ScanGitRepo(ctx context.Context, repoDir string) (strin
 		From("zricethezav/gitleaks:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(repoDir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"gitleaks", "detect", "--source", ".", "--report-format", "json"})
+		WithExec([]string{"gitleaks", "git", ".", "--report-format", "json"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -85,13 +85,43 @@ func (m *GitleaksModule) ScanWithConfig(ctx context.Context, dir string, configF
 		From("zricethezav/gitleaks:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"gitleaks", "detect", "--source", ".", "--config", configFile, "--report-format", "json", "--no-git"})
+		WithExec([]string{"gitleaks", "dir", ".", "--config", configFile, "--report-format", "json"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
 		// Try to get stderr output if stdout fails
 		output, _ = container.Stderr(ctx)
 		return output, nil
+	}
+
+	return output, nil
+}
+
+// ScanStdin scans secrets from stdin input
+func (m *GitleaksModule) ScanStdin(ctx context.Context, input string) (string, error) {
+	container := m.client.Container().
+		From("zricethezav/gitleaks:latest").
+		WithExec([]string{"sh", "-c", "echo '" + input + "' | gitleaks stdin --report-format json"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		// Try to get stderr output if stdout fails
+		output, _ = container.Stderr(ctx)
+		return output, nil
+	}
+
+	return output, nil
+}
+
+// GetVersion returns the Gitleaks version
+func (m *GitleaksModule) GetVersion(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("zricethezav/gitleaks:latest").
+		WithExec([]string{"gitleaks", "version"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", err
 	}
 
 	return output, nil

@@ -102,3 +102,63 @@ func (m *StepCAModule) GetVersion(ctx context.Context) (string, error) {
 
 	return output, nil
 }
+
+// AddProvisioner adds a new provisioner to the CA
+func (m *StepCAModule) AddProvisioner(ctx context.Context, name string, provisionerType string, caConfig string) (string, error) {
+	args := []string{"step", "ca", "provisioner", "add", name, "--type", provisionerType}
+	if caConfig != "" {
+		args = append(args, "--ca-config", "/config/ca.json")
+	}
+
+	container := m.client.Container().
+		From("smallstep/step-ca:latest")
+
+	if caConfig != "" {
+		container = container.WithFile("/config/ca.json", m.client.Host().File(caConfig))
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to add provisioner: %w", err)
+	}
+
+	return output, nil
+}
+
+// RevokeCertificate revokes a certificate
+func (m *StepCAModule) RevokeCertificate(ctx context.Context, certPath string, keyPath string, caURL string, reason string) (string, error) {
+	args := []string{"step", "ca", "revoke"}
+	if certPath != "" {
+		args = append(args, "--cert", "/cert.pem")
+	}
+	if keyPath != "" {
+		args = append(args, "--key", "/key.pem")
+	}
+	if caURL != "" {
+		args = append(args, "--ca-url", caURL)
+	}
+	if reason != "" {
+		args = append(args, "--reason", reason)
+	}
+
+	container := m.client.Container().
+		From("smallstep/step-ca:latest")
+
+	if certPath != "" {
+		container = container.WithFile("/cert.pem", m.client.Host().File(certPath))
+	}
+	if keyPath != "" {
+		container = container.WithFile("/key.pem", m.client.Host().File(keyPath))
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to revoke certificate: %w", err)
+	}
+
+	return output, nil
+}

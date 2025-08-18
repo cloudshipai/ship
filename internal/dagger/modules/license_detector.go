@@ -21,10 +21,12 @@ func NewLicenseDetectorModule(client *dagger.Client) *LicenseDetectorModule {
 	}
 }
 
-// DetectLicenses detects licenses in a directory
+// DetectLicenses detects licenses in a directory using multiple tools for comprehensive analysis
 func (m *LicenseDetectorModule) DetectLicenses(ctx context.Context, dir string) (string, error) {
 	container := m.client.Container().
-		From("licensee/licensee:latest").
+		From("ruby:alpine").
+		WithExec([]string{"apk", "add", "--no-cache", "git", "build-base"}).
+		WithExec([]string{"gem", "install", "licensee"}).
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
@@ -95,6 +97,151 @@ func (m *LicenseDetectorModule) ValidateLicenseCompliance(ctx context.Context, d
 	output, err := container.Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to validate license compliance: %w", err)
+	}
+
+	return output, nil
+}
+
+// AskalonoIdentify identifies license in a file using askalono
+func (m *LicenseDetectorModule) AskalonoIdentify(ctx context.Context, filePath string, optimize bool) (string, error) {
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "curl"}).
+		WithExec([]string{"sh", "-c", "curl -L https://github.com/amzn/askalono/releases/latest/download/askalono-Linux.tar.gz | tar xz && mv askalono /usr/local/bin/"}).
+		WithFile("/workspace/license.txt", m.client.Host().File(filePath))
+
+	args := []string{"askalono", "id", "/workspace/license.txt"}
+	if optimize {
+		args = []string{"askalono", "id", "--optimize", "/workspace/license.txt"}
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to identify license with askalono: %w", err)
+	}
+
+	return output, nil
+}
+
+// AskalonoCrawl crawls directory for license files using askalono
+func (m *LicenseDetectorModule) AskalonoCrawl(ctx context.Context, dir string) (string, error) {
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "curl"}).
+		WithExec([]string{"sh", "-c", "curl -L https://github.com/amzn/askalono/releases/latest/download/askalono-Linux.tar.gz | tar xz && mv askalono /usr/local/bin/"}).
+		WithDirectory("/workspace", m.client.Host().Directory(dir)).
+		WithWorkdir("/workspace").
+		WithExec([]string{"askalono", "crawl", "."})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to crawl for licenses with askalono: %w", err)
+	}
+
+	return output, nil
+}
+
+// LicenseScannerFile scans specific file using CycloneDX license-scanner
+func (m *LicenseDetectorModule) LicenseScannerFile(ctx context.Context, filePath string, showCopyrights bool, showHash bool, showKeywords bool, debug bool) (string, error) {
+	container := m.client.Container().
+		From("python:alpine").
+		WithExec([]string{"pip", "install", "cyclone-scanner"}).
+		WithFile("/workspace/file.txt", m.client.Host().File(filePath))
+
+	args := []string{"license-scanner", "--file", "/workspace/file.txt"}
+	if showCopyrights {
+		args = append(args, "--copyrights")
+	}
+	if showHash {
+		args = append(args, "--hash")
+	}
+	if showKeywords {
+		args = append(args, "--keywords")
+	}
+	if debug {
+		args = append(args, "--debug")
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to scan file with license-scanner: %w", err)
+	}
+
+	return output, nil
+}
+
+// LicenseScannerDirectory scans directory using CycloneDX license-scanner
+func (m *LicenseDetectorModule) LicenseScannerDirectory(ctx context.Context, dir string, showCopyrights bool, showHash bool, quiet bool) (string, error) {
+	container := m.client.Container().
+		From("python:alpine").
+		WithExec([]string{"pip", "install", "cyclone-scanner"}).
+		WithDirectory("/workspace", m.client.Host().Directory(dir))
+
+	args := []string{"license-scanner", "--dir", "/workspace"}
+	if showCopyrights {
+		args = append(args, "--copyrights")
+	}
+	if showHash {
+		args = append(args, "--hash")
+	}
+	if quiet {
+		args = append(args, "--quiet")
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to scan directory with license-scanner: %w", err)
+	}
+
+	return output, nil
+}
+
+// LicenseFinderReport generates license report using LicenseFinder
+func (m *LicenseDetectorModule) LicenseFinderReport(ctx context.Context, projectPath string, format string) (string, error) {
+	container := m.client.Container().
+		From("licensefinder/license_finder:latest")
+
+	if projectPath != "" {
+		container = container.WithDirectory("/workspace", m.client.Host().Directory(projectPath)).WithWorkdir("/workspace")
+	}
+
+	args := []string{"license_finder", "report"}
+	if format != "" {
+		args = append(args, "--format", format)
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate license finder report: %w", err)
+	}
+
+	return output, nil
+}
+
+// GoLicenseDetector detects project license using go-license-detector
+func (m *LicenseDetectorModule) GoLicenseDetector(ctx context.Context, projectPath string) (string, error) {
+	container := m.client.Container().
+		From("golang:alpine").
+		WithExec([]string{"go", "install", "github.com/go-enry/go-license-detector/v4/cmd/license-detector@latest"})
+
+	if projectPath != "" {
+		container = container.WithDirectory("/workspace", m.client.Host().Directory(projectPath))
+		container = container.WithExec([]string{"license-detector", "/workspace"})
+	} else {
+		container = container.WithExec([]string{"license-detector", "."})
+	}
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to detect license with go-license-detector: %w", err)
 	}
 
 	return output, nil

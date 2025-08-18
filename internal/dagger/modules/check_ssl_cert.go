@@ -21,14 +21,16 @@ func NewCheckSSLCertModule(client *dagger.Client) *CheckSSLCertModule {
 	}
 }
 
-// CheckCertificate checks SSL certificate for a host
+// CheckCertificate checks SSL certificate for a host using check_ssl_cert
 func (m *CheckSSLCertModule) CheckCertificate(ctx context.Context, host string, port int) (string, error) {
 	container := m.client.Container().
 		From("alpine:latest").
-		WithExec([]string{"apk", "add", "--no-cache", "openssl", "curl"}).
+		WithExec([]string{"apk", "add", "--no-cache", "curl", "openssl", "bash"}).
+		WithExec([]string{"sh", "-c", "curl -L https://raw.githubusercontent.com/matteocorti/check_ssl_cert/master/check_ssl_cert -o /usr/local/bin/check_ssl_cert && chmod +x /usr/local/bin/check_ssl_cert"}).
 		WithExec([]string{
-			"sh", "-c",
-			fmt.Sprintf("echo | openssl s_client -servername %s -connect %s:%d 2>/dev/null | openssl x509 -noout -dates -subject -issuer", host, host, port),
+			"check_ssl_cert",
+			"-H", host,
+			"-p", fmt.Sprintf("%d", port),
 		})
 
 	output, err := container.Stdout(ctx)
@@ -79,6 +81,144 @@ func (m *CheckSSLCertModule) ValidateCertificateChain(ctx context.Context, host 
 	output, err := container.Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to validate certificate chain: %w", err)
+	}
+
+	return output, nil
+}
+
+// CheckCertificateFromFile checks SSL certificate from a local file
+func (m *CheckSSLCertModule) CheckCertificateFromFile(ctx context.Context, filePath string, warningDays int, criticalDays int, allowSelfSigned bool) (string, error) {
+	args := []string{"check_ssl_cert", "-f", "/cert"}
+	if warningDays > 0 {
+		args = append(args, "-w", fmt.Sprintf("%d", warningDays))
+	}
+	if criticalDays > 0 {
+		args = append(args, "-c", fmt.Sprintf("%d", criticalDays))
+	}
+	if allowSelfSigned {
+		args = append(args, "-s")
+	}
+
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "curl", "openssl", "bash"}).
+		WithExec([]string{"sh", "-c", "curl -L https://raw.githubusercontent.com/matteocorti/check_ssl_cert/master/check_ssl_cert -o /usr/local/bin/check_ssl_cert && chmod +x /usr/local/bin/check_ssl_cert"}).
+		WithFile("/cert", m.client.Host().File(filePath)).
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to check SSL certificate from file: %w", err)
+	}
+
+	return output, nil
+}
+
+// CheckCertificateWithAdvancedOptions checks SSL certificate with advanced options
+func (m *CheckSSLCertModule) CheckCertificateWithAdvancedOptions(ctx context.Context, host string, port int, protocol string, warningDays int, criticalDays int, allowSelfSigned bool, rootCert string, checkChain bool, ignoreAuth bool, timeout int, debug bool) (string, error) {
+	args := []string{"check_ssl_cert", "-H", host, "-p", fmt.Sprintf("%d", port)}
+	
+	if protocol != "" {
+		args = append(args, "-P", protocol)
+	}
+	if warningDays > 0 {
+		args = append(args, "-w", fmt.Sprintf("%d", warningDays))
+	}
+	if criticalDays > 0 {
+		args = append(args, "-c", fmt.Sprintf("%d", criticalDays))
+	}
+	if allowSelfSigned {
+		args = append(args, "-s")
+	}
+	if rootCert != "" {
+		args = append(args, "-r", "/rootcert")
+	}
+	if checkChain {
+		args = append(args, "--check-chain")
+	}
+	if ignoreAuth {
+		args = append(args, "-A")
+	}
+	if timeout > 0 {
+		args = append(args, "--timeout", fmt.Sprintf("%d", timeout))
+	}
+	if debug {
+		args = append(args, "-d")
+	}
+
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "curl", "openssl", "bash"}).
+		WithExec([]string{"sh", "-c", "curl -L https://raw.githubusercontent.com/matteocorti/check_ssl_cert/master/check_ssl_cert -o /usr/local/bin/check_ssl_cert && chmod +x /usr/local/bin/check_ssl_cert"})
+	
+	if rootCert != "" {
+		container = container.WithFile("/rootcert", m.client.Host().File(rootCert))
+	}
+	
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to check SSL certificate with advanced options: %w", err)
+	}
+
+	return output, nil
+}
+
+// CheckCertificateFingerprint checks SSL certificate fingerprint
+func (m *CheckSSLCertModule) CheckCertificateFingerprint(ctx context.Context, host string, port int, expectedFingerprint string) (string, error) {
+	args := []string{"check_ssl_cert", "-H", host, "-p", fmt.Sprintf("%d", port), "--fingerprint", expectedFingerprint}
+
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "curl", "openssl", "bash"}).
+		WithExec([]string{"sh", "-c", "curl -L https://raw.githubusercontent.com/matteocorti/check_ssl_cert/master/check_ssl_cert -o /usr/local/bin/check_ssl_cert && chmod +x /usr/local/bin/check_ssl_cert"}).
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to check SSL certificate fingerprint: %w", err)
+	}
+
+	return output, nil
+}
+
+// CheckCertificateComprehensive performs comprehensive SSL certificate check with all options
+func (m *CheckSSLCertModule) CheckCertificateComprehensive(ctx context.Context, host string, port int, timeout int, debug bool) (string, error) {
+	args := []string{"check_ssl_cert", "-H", host, "-p", fmt.Sprintf("%d", port), "--all"}
+	
+	if timeout > 0 {
+		args = append(args, "--timeout", fmt.Sprintf("%d", timeout))
+	}
+	if debug {
+		args = append(args, "-d")
+	}
+
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "curl", "openssl", "bash"}).
+		WithExec([]string{"sh", "-c", "curl -L https://raw.githubusercontent.com/matteocorti/check_ssl_cert/master/check_ssl_cert -o /usr/local/bin/check_ssl_cert && chmod +x /usr/local/bin/check_ssl_cert"}).
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to run comprehensive SSL certificate check: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetVersion returns the version of check_ssl_cert
+func (m *CheckSSLCertModule) GetVersion(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "curl", "bash"}).
+		WithExec([]string{"sh", "-c", "curl -L https://raw.githubusercontent.com/matteocorti/check_ssl_cert/master/check_ssl_cert -o /usr/local/bin/check_ssl_cert && chmod +x /usr/local/bin/check_ssl_cert"}).
+		WithExec([]string{"check_ssl_cert", "--version"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get check_ssl_cert version: %w", err)
 	}
 
 	return output, nil

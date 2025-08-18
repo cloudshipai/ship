@@ -9,118 +9,165 @@ import (
 
 // AddCheckSSLCertTools adds SSL certificate validation MCP tool implementations
 func AddCheckSSLCertTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// Check SSL certificate tool
-	checkCertificateTool := mcp.NewTool("check_ssl_cert_validate",
-		mcp.WithDescription("Validate SSL certificate for domain or IP"),
-		mcp.WithString("target",
-			mcp.Description("Domain name or IP address to check"),
+	// Check SSL certificate for host tool
+	checkHostTool := mcp.NewTool("check_ssl_cert_host",
+		mcp.WithDescription("Check SSL certificate for a remote host"),
+		mcp.WithString("host",
+			mcp.Description("Server hostname or IP address to check"),
 			mcp.Required(),
 		),
 		mcp.WithString("port",
-			mcp.Description("Port number (default: 443)"),
+			mcp.Description("TCP port (default: 443)"),
 		),
-		mcp.WithString("timeout",
-			mcp.Description("Connection timeout (e.g., 10s, 30s)"),
+		mcp.WithString("warning",
+			mcp.Description("Days before expiry to warn (default: 20)"),
+		),
+		mcp.WithString("critical",
+			mcp.Description("Days before expiry for critical (default: 15)"),
+		),
+		mcp.WithString("protocol",
+			mcp.Description("Protocol to use (https, smtp, ftp, imap, pop3, etc.)"),
+		),
+		mcp.WithBoolean("selfsigned",
+			mcp.Description("Allow self-signed certificates"),
 		),
 	)
-	s.AddTool(checkCertificateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		target := request.GetString("target", "")
-		args := []string{"security", "check-ssl-cert", "validate", target}
+	s.AddTool(checkHostTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		host := request.GetString("host", "")
+		args := []string{"check_ssl_cert", "-H", host}
 		if port := request.GetString("port", ""); port != "" {
-			args = append(args, "--port", port)
+			args = append(args, "-p", port)
 		}
-		if timeout := request.GetString("timeout", ""); timeout != "" {
-			args = append(args, "--timeout", timeout)
+		if warning := request.GetString("warning", ""); warning != "" {
+			args = append(args, "-w", warning)
 		}
-		return executeShipCommand(args)
-	})
-
-	// Check SSL certificate expiry tool
-	checkExpiryTool := mcp.NewTool("check_ssl_cert_expiry",
-		mcp.WithDescription("Check SSL certificate expiration date"),
-		mcp.WithString("target",
-			mcp.Description("Domain name or IP address to check"),
-			mcp.Required(),
-		),
-		mcp.WithString("warning_days",
-			mcp.Description("Days before expiry to warn (default: 30)"),
-		),
-	)
-	s.AddTool(checkExpiryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		target := request.GetString("target", "")
-		args := []string{"security", "check-ssl-cert", "expiry", target}
-		if warningDays := request.GetString("warning_days", ""); warningDays != "" {
-			args = append(args, "--warning", warningDays)
+		if critical := request.GetString("critical", ""); critical != "" {
+			args = append(args, "-c", critical)
+		}
+		if protocol := request.GetString("protocol", ""); protocol != "" {
+			args = append(args, "-P", protocol)
+		}
+		if request.GetBool("selfsigned", false) {
+			args = append(args, "-s")
 		}
 		return executeShipCommand(args)
 	})
 
-	// Check SSL certificate chain tool
-	checkChainTool := mcp.NewTool("check_ssl_cert_chain",
-		mcp.WithDescription("Validate SSL certificate chain"),
-		mcp.WithString("target",
-			mcp.Description("Domain name or IP address to check"),
-			mcp.Required(),
-		),
-		mcp.WithString("ca_file",
-			mcp.Description("Path to CA bundle file (optional)"),
-		),
-	)
-	s.AddTool(checkChainTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		target := request.GetString("target", "")
-		args := []string{"security", "check-ssl-cert", "chain", target}
-		if caFile := request.GetString("ca_file", ""); caFile != "" {
-			args = append(args, "--ca-file", caFile)
-		}
-		return executeShipCommand(args)
-	})
-
-	// Check SSL certificate file tool
+	// Check SSL certificate from file tool
 	checkFileTool := mcp.NewTool("check_ssl_cert_file",
-		mcp.WithDescription("Validate SSL certificate from file"),
-		mcp.WithString("cert_file",
-			mcp.Description("Path to certificate file"),
+		mcp.WithDescription("Check SSL certificate from a local file"),
+		mcp.WithString("file",
+			mcp.Description("Path to certificate file (PEM, DER, PKCS12, etc.)"),
 			mcp.Required(),
 		),
-		mcp.WithString("key_file",
-			mcp.Description("Path to private key file (optional)"),
+		mcp.WithString("warning",
+			mcp.Description("Days before expiry to warn (default: 20)"),
+		),
+		mcp.WithString("critical",
+			mcp.Description("Days before expiry for critical (default: 15)"),
+		),
+		mcp.WithBoolean("selfsigned",
+			mcp.Description("Allow self-signed certificates"),
 		),
 	)
 	s.AddTool(checkFileTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		certFile := request.GetString("cert_file", "")
-		args := []string{"security", "check-ssl-cert", "file", certFile}
-		if keyFile := request.GetString("key_file", ""); keyFile != "" {
-			args = append(args, "--key", keyFile)
+		file := request.GetString("file", "")
+		args := []string{"check_ssl_cert", "-f", file}
+		if warning := request.GetString("warning", ""); warning != "" {
+			args = append(args, "-w", warning)
+		}
+		if critical := request.GetString("critical", ""); critical != "" {
+			args = append(args, "-c", critical)
+		}
+		if request.GetBool("selfsigned", false) {
+			args = append(args, "-s")
 		}
 		return executeShipCommand(args)
 	})
 
-	// Check SSL certificate bulk tool
-	checkBulkTool := mcp.NewTool("check_ssl_cert_bulk",
-		mcp.WithDescription("Check multiple SSL certificates from a list"),
-		mcp.WithString("targets_file",
-			mcp.Description("File containing list of targets to check"),
+	// Check SSL certificate with chain validation tool
+	checkChainTool := mcp.NewTool("check_ssl_cert_chain",
+		mcp.WithDescription("Check SSL certificate with chain validation"),
+		mcp.WithString("host",
+			mcp.Description("Server hostname or IP address to check"),
 			mcp.Required(),
 		),
-		mcp.WithString("output_format",
-			mcp.Description("Output format (json, csv, table)"),
+		mcp.WithString("rootcert",
+			mcp.Description("Path to root certificate for validation"),
+		),
+		mcp.WithBoolean("check_chain",
+			mcp.Description("Verify certificate chain integrity"),
+		),
+		mcp.WithBoolean("noauth",
+			mcp.Description("Ignore authority warnings"),
 		),
 	)
-	s.AddTool(checkBulkTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		targetsFile := request.GetString("targets_file", "")
-		args := []string{"security", "check-ssl-cert", "bulk", targetsFile}
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--format", format)
+	s.AddTool(checkChainTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		host := request.GetString("host", "")
+		args := []string{"check_ssl_cert", "-H", host}
+		if rootcert := request.GetString("rootcert", ""); rootcert != "" {
+			args = append(args, "-r", rootcert)
+		}
+		if request.GetBool("check_chain", false) {
+			args = append(args, "--check-chain")
+		}
+		if request.GetBool("noauth", false) {
+			args = append(args, "-A")
+		}
+		return executeShipCommand(args)
+	})
+
+	// Check SSL certificate with fingerprint tool
+	checkFingerprintTool := mcp.NewTool("check_ssl_cert_fingerprint",
+		mcp.WithDescription("Check SSL certificate fingerprint"),
+		mcp.WithString("host",
+			mcp.Description("Server hostname or IP address to check"),
+			mcp.Required(),
+		),
+		mcp.WithString("fingerprint",
+			mcp.Description("Expected certificate fingerprint"),
+			mcp.Required(),
+		),
+	)
+	s.AddTool(checkFingerprintTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		host := request.GetString("host", "")
+		fingerprint := request.GetString("fingerprint", "")
+		args := []string{"check_ssl_cert", "-H", host, "--fingerprint", fingerprint}
+		return executeShipCommand(args)
+	})
+
+	// Check SSL certificate with all checks tool
+	checkAllTool := mcp.NewTool("check_ssl_cert_all",
+		mcp.WithDescription("Check SSL certificate with all optional checks enabled"),
+		mcp.WithString("host",
+			mcp.Description("Server hostname or IP address to check"),
+			mcp.Required(),
+		),
+		mcp.WithString("timeout",
+			mcp.Description("Connection timeout in seconds"),
+		),
+		mcp.WithBoolean("debug",
+			mcp.Description("Produce debugging output"),
+		),
+	)
+	s.AddTool(checkAllTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		host := request.GetString("host", "")
+		args := []string{"check_ssl_cert", "-H", host, "--all"}
+		if timeout := request.GetString("timeout", ""); timeout != "" {
+			args = append(args, "--timeout", timeout)
+		}
+		if request.GetBool("debug", false) {
+			args = append(args, "-d")
 		}
 		return executeShipCommand(args)
 	})
 
 	// Check SSL cert get version tool
 	getVersionTool := mcp.NewTool("check_ssl_cert_get_version",
-		mcp.WithDescription("Get SSL certificate checker version information"),
+		mcp.WithDescription("Get check_ssl_cert version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"security", "check-ssl-cert", "--version"}
+		args := []string{"check_ssl_cert", "--version"}
 		return executeShipCommand(args)
 	})
 }

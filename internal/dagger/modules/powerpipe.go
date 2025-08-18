@@ -13,11 +13,13 @@ type PowerpipeModule struct {
 	name   string
 }
 
+const powerpipeBinary = "/usr/local/bin/powerpipe"
+
 // NewPowerpipeModule creates a new Powerpipe module
 func NewPowerpipeModule(client *dagger.Client) *PowerpipeModule {
 	return &PowerpipeModule{
 		client: client,
-		name:   "powerpipe",
+		name:   powerpipeBinary,
 	}
 }
 
@@ -31,7 +33,7 @@ func (m *PowerpipeModule) RunBenchmark(ctx context.Context, benchmark string, mo
 	}
 
 	container = container.WithExec([]string{
-		"powerpipe",
+		powerpipeBinary,
 		"benchmark", "run", benchmark,
 		"--output", "json",
 	})
@@ -54,7 +56,7 @@ func (m *PowerpipeModule) RunControl(ctx context.Context, control string, modPat
 	}
 
 	container = container.WithExec([]string{
-		"powerpipe",
+		powerpipeBinary,
 		"control", "run", control,
 		"--output", "json",
 	})
@@ -77,7 +79,7 @@ func (m *PowerpipeModule) ListBenchmarks(ctx context.Context, modPath string) (s
 	}
 
 	container = container.WithExec([]string{
-		"powerpipe",
+		powerpipeBinary,
 		"benchmark", "list",
 		"--output", "json",
 	})
@@ -94,7 +96,7 @@ func (m *PowerpipeModule) ListBenchmarks(ctx context.Context, modPath string) (s
 func (m *PowerpipeModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("turbot/powerpipe:latest").
-		WithExec([]string{"powerpipe", "--version"})
+		WithExec([]string{powerpipeBinary, "--version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -115,7 +117,7 @@ func (m *PowerpipeModule) RunQuery(ctx context.Context, query string, modPath st
 	}
 
 	container = container.WithExec([]string{
-		"powerpipe",
+		powerpipeBinary,
 		"query", "run", query,
 		"--output", "json",
 	})
@@ -139,7 +141,7 @@ func (m *PowerpipeModule) ListQueries(ctx context.Context, modPath string) (stri
 	}
 
 	container = container.WithExec([]string{
-		"powerpipe",
+		powerpipeBinary,
 		"query", "list",
 		"--output", "json",
 	})
@@ -162,7 +164,7 @@ func (m *PowerpipeModule) StartServer(ctx context.Context, modPath string, port 
 			WithWorkdir("/workspace")
 	}
 
-	args := []string{"powerpipe", "server"}
+	args := []string{powerpipeBinary, "server"}
 	if port > 0 {
 		args = append(args, "--port", fmt.Sprintf("%d", port))
 	}
@@ -188,7 +190,7 @@ func (m *PowerpipeModule) ListDashboards(ctx context.Context, modPath string) (s
 	}
 
 	container = container.WithExec([]string{
-		"powerpipe",
+		powerpipeBinary,
 		"dashboard", "list",
 		"--output", "json",
 	})

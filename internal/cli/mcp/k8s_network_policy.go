@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddK8sNetworkPolicyTools adds Kubernetes network policy management MCP tool implementations using real CLI tools
+// AddK8sNetworkPolicyTools adds Kubernetes network policy management MCP tool implementations using direct Dagger calls
 func AddK8sNetworkPolicyTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addK8sNetworkPolicyToolsDirect(s)
+}
+
+// addK8sNetworkPolicyToolsDirect adds K8s network policy tools using direct Dagger module calls
+func addK8sNetworkPolicyToolsDirect(s *server.MCPServer) {
 	// kubectl network policy management
 	kubectlNetworkPolicyTool := mcp.NewTool("k8s_network_policy_kubectl",
 		mcp.WithDescription("Manage network policies using kubectl"),
@@ -27,39 +36,39 @@ func AddK8sNetworkPolicyTools(s *server.MCPServer, executeShipCommand ExecuteShi
 			mcp.Description("Output format"),
 			mcp.Enum("json", "yaml", "wide", "name"),
 		),
+		mcp.WithString("kubeconfig",
+			mcp.Description("Path to kubeconfig file"),
+		),
 	)
 	s.AddTool(kubectlNetworkPolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewK8sNetworkPolicyModule(client)
+
+		// Get parameters
 		action := request.GetString("action", "")
+		if action == "" {
+			return mcp.NewToolResultError("action is required"), nil
+		}
+
 		resource := request.GetString("resource", "")
-		
-		var args []string
-		switch action {
-		case "get":
-			args = []string{"kubectl", "get", "networkpolicy"}
-			if resource != "" {
-				args = append(args, resource)
-			}
-		case "describe":
-			args = []string{"kubectl", "describe", "networkpolicy"}
-			if resource != "" {
-				args = append(args, resource)
-			}
-		case "delete":
-			args = []string{"kubectl", "delete", "networkpolicy", resource}
-		case "create":
-			args = []string{"kubectl", "create", "-f", resource}
-		case "apply":
-			args = []string{"kubectl", "apply", "-f", resource}
+		namespace := request.GetString("namespace", "")
+		outputFormat := request.GetString("output", "")
+		kubeconfig := request.GetString("kubeconfig", "")
+
+		// Execute kubectl command
+		output, err := module.KubectlNetworkPolicy(ctx, action, resource, namespace, outputFormat, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("kubectl command failed: %v", err)), nil
 		}
-		
-		if namespace := request.GetString("namespace", ""); namespace != "" {
-			args = append(args, "-n", namespace)
-		}
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "-o", output)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Netfetch network policy scanner
@@ -82,25 +91,30 @@ func AddK8sNetworkPolicyTools(s *server.MCPServer, executeShipCommand ExecuteShi
 		),
 	)
 	s.AddTool(netfetchScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"netfetch", "scan"}
-		
-		if namespace := request.GetString("namespace", ""); namespace != "" {
-			args = append(args, namespace)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if request.GetBool("dryrun", false) {
-			args = append(args, "--dryrun")
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewK8sNetworkPolicyModule(client)
+
+		// Get parameters
+		namespace := request.GetString("namespace", "")
+		dryrun := request.GetBool("dryrun", false)
+		cilium := request.GetBool("cilium", false)
+		target := request.GetString("target", "")
+		kubeconfig := request.GetString("kubeconfig", "")
+
+		// Execute netfetch scan
+		output, err := module.NetfetchScan(ctx, namespace, dryrun, cilium, target, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("netfetch scan failed: %v", err)), nil
 		}
-		if request.GetBool("cilium", false) {
-			args = append(args, "--cilium")
-		}
-		if target := request.GetString("target", ""); target != "" {
-			args = append(args, "--target", target)
-		}
-		if kubeconfig := request.GetString("kubeconfig", ""); kubeconfig != "" {
-			args = append(args, "--kubeconfig", kubeconfig)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Netfetch dashboard
@@ -109,15 +123,32 @@ func AddK8sNetworkPolicyTools(s *server.MCPServer, executeShipCommand ExecuteShi
 		mcp.WithString("port",
 			mcp.Description("Port number for dashboard (default: 8080)"),
 		),
+		mcp.WithString("kubeconfig",
+			mcp.Description("Path to kubeconfig file"),
+		),
 	)
 	s.AddTool(netfetchDashTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"netfetch", "dash"}
-		
-		if port := request.GetString("port", ""); port != "" {
-			args = append(args, "--port", port)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewK8sNetworkPolicyModule(client)
+
+		// Get parameters
+		port := request.GetString("port", "")
+		kubeconfig := request.GetString("kubeconfig", "")
+
+		// Launch dashboard
+		output, err := module.NetfetchDashboard(ctx, port, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("netfetch dashboard failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Netpol-analyzer evaluation
@@ -143,20 +174,42 @@ func AddK8sNetworkPolicyTools(s *server.MCPServer, executeShipCommand ExecuteShi
 		),
 	)
 	s.AddTool(netpolAnalyzerEvalTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewK8sNetworkPolicyModule(client)
+
+		// Get parameters
 		dirpath := request.GetString("dirpath", "")
+		if dirpath == "" {
+			return mcp.NewToolResultError("dirpath is required"), nil
+		}
+
 		source := request.GetString("source", "")
+		if source == "" {
+			return mcp.NewToolResultError("source is required"), nil
+		}
+
 		destination := request.GetString("destination", "")
-		
-		args := []string{"netpol-analyzer", "eval", "--dirpath", dirpath, "-s", source, "-d", destination}
-		
-		if port := request.GetString("port", ""); port != "" {
-			args = append(args, "-p", port)
+		if destination == "" {
+			return mcp.NewToolResultError("destination is required"), nil
 		}
-		if request.GetBool("verbose", false) {
-			args = append(args, "-v")
+
+		port := request.GetString("port", "")
+		verbose := request.GetBool("verbose", false)
+
+		// Evaluate connectivity
+		output, err := module.NetpolEval(ctx, dirpath, source, destination, port, verbose)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("netpol eval failed: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Netpol-analyzer list connections
@@ -174,17 +227,32 @@ func AddK8sNetworkPolicyTools(s *server.MCPServer, executeShipCommand ExecuteShi
 		),
 	)
 	s.AddTool(netpolAnalyzerListTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewK8sNetworkPolicyModule(client)
+
+		// Get parameters
 		dirpath := request.GetString("dirpath", "")
-		args := []string{"netpol-analyzer", "list", "--dirpath", dirpath}
-		
-		if request.GetBool("verbose", false) {
-			args = append(args, "-v")
+		if dirpath == "" {
+			return mcp.NewToolResultError("dirpath is required"), nil
 		}
-		if request.GetBool("quiet", false) {
-			args = append(args, "-q")
+
+		verbose := request.GetBool("verbose", false)
+		quiet := request.GetBool("quiet", false)
+
+		// List connections
+		output, err := module.NetpolList(ctx, dirpath, verbose, quiet)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("netpol list failed: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Netpol-analyzer diff
@@ -198,19 +266,41 @@ func AddK8sNetworkPolicyTools(s *server.MCPServer, executeShipCommand ExecuteShi
 			mcp.Description("Second directory containing Kubernetes resources"),
 			mcp.Required(),
 		),
-		mcp.WithBoolean("verbose",
-			mcp.Description("Enable verbose output"),
+		mcp.WithString("output_format",
+			mcp.Description("Output format: md, csv, text"),
+			mcp.Enum("md", "csv", "text"),
 		),
 	)
 	s.AddTool(netpolAnalyzerDiffTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		dir1 := request.GetString("dir1", "")
-		dir2 := request.GetString("dir2", "")
-		args := []string{"netpol-analyzer", "diff", "--dir1", dir1, "--dir2", dir2}
-		
-		if request.GetBool("verbose", false) {
-			args = append(args, "-v")
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewK8sNetworkPolicyModule(client)
+
+		// Get parameters
+		dir1 := request.GetString("dir1", "")
+		if dir1 == "" {
+			return mcp.NewToolResultError("dir1 is required"), nil
+		}
+
+		dir2 := request.GetString("dir2", "")
+		if dir2 == "" {
+			return mcp.NewToolResultError("dir2 is required"), nil
+		}
+
+		outputFormat := request.GetString("output_format", "")
+
+		// Compare directories
+		output, err := module.NetpolDiff(ctx, dir1, dir2, outputFormat)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("netpol diff failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 }

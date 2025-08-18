@@ -2,13 +2,23 @@ package mcp
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddInTotoTools adds in-toto (supply chain attestation) MCP tool implementations using real CLI tools
+// AddInTotoTools adds in-toto (supply chain attestation) MCP tool implementations using direct Dagger calls
 func AddInTotoTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addInTotoToolsDirect(s)
+}
+
+// addInTotoToolsDirect adds in-toto tools using direct Dagger module calls
+func addInTotoToolsDirect(s *server.MCPServer) {
 	// in-toto-run tool
 	runStepTool := mcp.NewTool("in_toto_run_step",
 		mcp.WithDescription("Run in-toto supply chain step with attestation using in-toto-run"),
@@ -40,32 +50,66 @@ func AddInTotoTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(runStepTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewInTotoModule(client)
+
+		// Get parameters
 		stepName := request.GetString("step_name", "")
+		if stepName == "" {
+			return mcp.NewToolResultError("step_name is required"), nil
+		}
+
 		command := request.GetString("command", "")
-		args := []string{"in-toto-run", "-n", stepName}
+		if command == "" && !request.GetBool("no_command", false) {
+			return mcp.NewToolResultError("command is required unless no_command is true"), nil
+		}
+
+		// Prepare options
+		var opts []modules.InTotoOption
 		
 		if signingKey := request.GetString("signing_key", ""); signingKey != "" {
-			args = append(args, "--signing-key", signingKey)
-		}
-		if gpgKeyid := request.GetString("gpg_keyid", ""); gpgKeyid != "" {
-			args = append(args, "-g", gpgKeyid)
-		}
-		if materials := request.GetString("materials", ""); materials != "" {
-			args = append(args, "-m", materials)
-		}
-		if products := request.GetString("products", ""); products != "" {
-			args = append(args, "-p", products)
-		}
-		if request.GetBool("record_streams", false) {
-			args = append(args, "-s")
-		}
-		if request.GetBool("no_command", false) {
-			args = append(args, "-x")
-		} else {
-			args = append(args, "--", command)
+			opts = append(opts, modules.WithKeyPath(signingKey))
 		}
 		
-		return executeShipCommand(args)
+		if materials := request.GetString("materials", ""); materials != "" {
+			materialsList := strings.Split(materials, ",")
+			opts = append(opts, modules.WithMaterials(materialsList))
+		}
+		
+		if products := request.GetString("products", ""); products != "" {
+			productsList := strings.Split(products, ",")
+			opts = append(opts, modules.WithProducts(productsList))
+		}
+
+		// Execute step or record metadata
+		var container *dagger.Container
+		if request.GetBool("no_command", false) {
+			// Record metadata without running command
+			container, err = module.RecordMetadata(ctx, stepName, opts...)
+		} else {
+			// Run step with command
+			commandParts := strings.Fields(command)
+			container, err = module.RunStep(ctx, stepName, commandParts, opts...)
+		}
+
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to run step: %v", err)), nil
+		}
+
+		// Get output
+		output, err := container.Stdout(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to get output: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// in-toto-verify tool
@@ -86,20 +130,47 @@ func AddInTotoTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(verifySupplyChainTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewInTotoModule(client)
+
+		// Get parameters
 		layoutPath := request.GetString("layout_path", "")
-		args := []string{"in-toto-verify", "-l", layoutPath}
+		if layoutPath == "" {
+			return mcp.NewToolResultError("layout_path is required"), nil
+		}
+
+		// Prepare options
+		var opts []modules.InTotoOption
 		
 		if layoutKeyPaths := request.GetString("layout_key_paths", ""); layoutKeyPaths != "" {
-			args = append(args, "-k", layoutKeyPaths)
-		}
-		if linkDir := request.GetString("link_dir", ""); linkDir != "" {
-			args = append(args, "-d", linkDir)
-		}
-		if request.GetBool("verbose", false) {
-			args = append(args, "-v")
+			keysList := strings.Split(layoutKeyPaths, ",")
+			opts = append(opts, modules.WithPublicKeys(keysList))
 		}
 		
-		return executeShipCommand(args)
+		if linkDir := request.GetString("link_dir", ""); linkDir != "" {
+			opts = append(opts, modules.WithLinkDir(linkDir))
+		}
+
+		// Verify supply chain
+		container, err := module.VerifySupplyChain(ctx, layoutPath, opts...)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to verify supply chain: %v", err)), nil
+		}
+
+		// Get output
+		output, err := container.Stdout(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to get output: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// in-toto-record tool
@@ -128,32 +199,68 @@ func AddInTotoTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(recordTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewInTotoModule(client)
+
+		// Get parameters
 		stepName := request.GetString("step_name", "")
+		if stepName == "" {
+			return mcp.NewToolResultError("step_name is required"), nil
+		}
+
 		operation := request.GetString("operation", "")
-		args := []string{"in-toto-record", operation, "-n", stepName}
+		if operation == "" {
+			return mcp.NewToolResultError("operation is required"), nil
+		}
+
+		// Prepare options
+		var opts []modules.InTotoOption
 		
 		if signingKey := request.GetString("signing_key", ""); signingKey != "" {
-			args = append(args, "--signing-key", signingKey)
-		}
-		if gpgKeyid := request.GetString("gpg_keyid", ""); gpgKeyid != "" {
-			args = append(args, "-g", gpgKeyid)
-		}
-		if materials := request.GetString("materials", ""); materials != "" {
-			args = append(args, "-m", materials)
-		}
-		if products := request.GetString("products", ""); products != "" {
-			args = append(args, "-p", products)
+			opts = append(opts, modules.WithKeyPath(signingKey))
 		}
 		
-		return executeShipCommand(args)
+		if materials := request.GetString("materials", ""); materials != "" {
+			materialsList := strings.Split(materials, ",")
+			if operation == "start" {
+				opts = append(opts, modules.WithMaterials(materialsList))
+			}
+		}
+		
+		if products := request.GetString("products", ""); products != "" {
+			productsList := strings.Split(products, ",")
+			if operation == "stop" {
+				opts = append(opts, modules.WithProducts(productsList))
+			}
+		}
+
+		// Record metadata
+		container, err := module.RecordMetadata(ctx, fmt.Sprintf("%s-%s", stepName, operation), opts...)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to record metadata: %v", err)), nil
+		}
+
+		// Get output
+		output, err := container.Stdout(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to get output: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// in-toto-sign tool
+	// in-toto-sign tool (or generate layout)
 	signTool := mcp.NewTool("in_toto_sign",
-		mcp.WithDescription("Sign in-toto metadata using in-toto-sign"),
+		mcp.WithDescription("Sign in-toto metadata or generate layout"),
 		mcp.WithString("metadata_file",
-			mcp.Description("Path to metadata file to sign"),
-			mcp.Required(),
+			mcp.Description("Path to metadata file to sign (or empty to generate layout)"),
 		),
 		mcp.WithString("signing_key",
 			mcp.Description("Path to signing key in PKCS8/PEM format"),
@@ -166,19 +273,57 @@ func AddInTotoTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(signTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		metadataFile := request.GetString("metadata_file", "")
-		args := []string{"in-toto-sign", "-f", metadataFile}
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewInTotoModule(client)
+
+		// Prepare options
+		var opts []modules.InTotoOption
 		
 		if signingKey := request.GetString("signing_key", ""); signingKey != "" {
-			args = append(args, "--signing-key", signingKey)
+			opts = append(opts, modules.WithKeyPath(signingKey))
 		}
-		if gpgKeyid := request.GetString("gpg_keyid", ""); gpgKeyid != "" {
-			args = append(args, "-g", gpgKeyid)
+
+		// If no metadata file, generate layout
+		if metadataFile := request.GetString("metadata_file", ""); metadataFile == "" {
+			// Generate layout
+			container, err := module.GenerateLayout(ctx, opts...)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("failed to generate layout: %v", err)), nil
+			}
+
+			// Get output
+			output, err := container.Stdout(ctx)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("failed to get output: %v", err)), nil
+			}
+
+			if outputFile := request.GetString("output_file", ""); outputFile != "" {
+				output += fmt.Sprintf("\n\nLayout should be saved to: %s", outputFile)
+			}
+
+			return mcp.NewToolResultText(output), nil
 		}
-		if outputFile := request.GetString("output_file", ""); outputFile != "" {
-			args = append(args, "-o", outputFile)
+
+		// Sign existing metadata - use record with the file as material
+		opts = append(opts, modules.WithMaterials([]string{request.GetString("metadata_file", "")}))
+		container, err := module.RecordMetadata(ctx, "sign-metadata", opts...)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to sign metadata: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+
+		// Get output
+		output, err := container.Stdout(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to get output: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 }

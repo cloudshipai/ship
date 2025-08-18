@@ -2,14 +2,23 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddSemgrepTools adds Semgrep (advanced static analysis for code security) MCP tool implementations using real semgrep CLI commands
+// AddSemgrepTools adds Semgrep (advanced static analysis for code security) MCP tool implementations using direct Dagger calls
 func AddSemgrepTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addSemgrepToolsDirect(s)
+}
+
+// addSemgrepToolsDirect adds Semgrep tools using direct Dagger module calls
+func addSemgrepToolsDirect(s *server.MCPServer) {
 	// Semgrep security audit scan tool
 	securityAuditScanTool := mcp.NewTool("semgrep_security_audit_scan",
 		mcp.WithDescription("Comprehensive security audit scan using Semgrep"),
@@ -42,38 +51,43 @@ func AddSemgrepTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(securityAuditScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"semgrep", "scan"}
-		
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSemgrepModule(client)
+
+		// Get parameters
 		target := request.GetString("target", ".")
-		args = append(args, target)
-		
 		ruleset := request.GetString("ruleset", "p/security-audit")
-		args = append(args, "--config", ruleset)
-		
-		if severity := request.GetString("severity", ""); severity != "" {
-			args = append(args, "--severity", severity)
-		}
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "--output", outputFormat)
-		}
-		if outputFile := request.GetString("output_file", ""); outputFile != "" {
-			args = append(args, "--output-file", outputFile)
-		}
-		if excludePaths := request.GetString("exclude_paths", ""); excludePaths != "" {
-			for _, path := range strings.Split(excludePaths, ",") {
-				if strings.TrimSpace(path) != "" {
-					args = append(args, "--exclude", strings.TrimSpace(path))
+		severity := request.GetString("severity", "")
+		outputFormat := request.GetString("output_format", "")
+		outputFile := request.GetString("output_file", "")
+		excludePathsStr := request.GetString("exclude_paths", "")
+		verbose := request.GetBool("verbose", false)
+		failOnFindings := request.GetBool("fail_on_findings", false)
+
+		// Parse exclude paths
+		var excludePaths []string
+		if excludePathsStr != "" {
+			for _, path := range strings.Split(excludePathsStr, ",") {
+				if trimmed := strings.TrimSpace(path); trimmed != "" {
+					excludePaths = append(excludePaths, trimmed)
 				}
 			}
 		}
-		if request.GetBool("verbose", false) {
-			args = append(args, "--verbose")
+
+		// Run security audit scan
+		output, err := module.SecurityAuditScan(ctx, target, ruleset, severity, outputFormat, outputFile, excludePaths, verbose, failOnFindings)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("semgrep security audit scan failed: %v", err)), nil
 		}
-		if request.GetBool("fail_on_findings", false) {
-			args = append(args, "--error")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Semgrep language-specific security scan tool
@@ -105,24 +119,31 @@ func AddSemgrepTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(languageSpecificScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSemgrepModule(client)
+
+		// Get parameters
 		target := request.GetString("target", "")
 		language := request.GetString("language", "")
-		args := []string{"semgrep", "scan", target, "--config", "p/" + language}
-		
-		if securityCategory := request.GetString("security_category", ""); securityCategory != "" {
-			args = append(args, "--config", "p/" + securityCategory)
+		securityCategory := request.GetString("security_category", "")
+		outputFormat := request.GetString("output_format", "")
+		includeExperimental := request.GetBool("include_experimental", false)
+		confidence := request.GetString("confidence", "")
+
+		// Run language-specific scan
+		output, err := module.LanguageSpecificScan(ctx, target, language, securityCategory, outputFormat, includeExperimental, confidence)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("semgrep language-specific scan failed: %v", err)), nil
 		}
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "--output", outputFormat)
-		}
-		if request.GetBool("include_experimental", false) {
-			args = append(args, "--config", "p/experimental")
-		}
-		if confidence := request.GetString("confidence", ""); confidence != "" {
-			args = append(args, "--confidence", confidence)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Semgrep CI/CD integration scan tool
@@ -159,37 +180,34 @@ func AddSemgrepTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(cicdIntegrationScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"semgrep", "scan"}
-		
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSemgrepModule(client)
+
+		// Get parameters
 		target := request.GetString("target", ".")
-		args = append(args, target)
-		
+		baselineRef := request.GetString("baseline_ref", "")
+		outputFormat := request.GetString("output_format", "")
+		outputFile := request.GetString("output_file", "")
 		configPolicy := request.GetString("config_policy", "p/ci")
-		args = append(args, "--config", configPolicy)
-		
-		if baselineRef := request.GetString("baseline_ref", ""); baselineRef != "" {
-			args = append(args, "--baseline-ref", baselineRef)
+		diffAware := request.GetBool("diff_aware", false)
+		failOpen := request.GetBool("fail_open", false)
+		timeout := request.GetString("timeout", "")
+		quiet := request.GetBool("quiet", false)
+
+		// Run CI/CD integration scan
+		output, err := module.CICDIntegrationScan(ctx, target, baselineRef, outputFormat, outputFile, configPolicy, diffAware, failOpen, timeout, quiet)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("semgrep CI/CD scan failed: %v", err)), nil
 		}
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "--output", outputFormat)
-		}
-		if outputFile := request.GetString("output_file", ""); outputFile != "" {
-			args = append(args, "--output-file", outputFile)
-		}
-		if request.GetBool("diff_aware", false) {
-			args = append(args, "--diff-depth", "1")
-		}
-		if request.GetBool("fail_open", false) {
-			args = append(args, "--disable-version-check")
-		}
-		if timeout := request.GetString("timeout", ""); timeout != "" {
-			args = append(args, "--timeout", timeout)
-		}
-		if request.GetBool("quiet", false) {
-			args = append(args, "--quiet")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Semgrep custom rule management tool
@@ -219,37 +237,41 @@ func AddSemgrepTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(customRuleManagementTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSemgrepModule(client)
+
+		// Get parameters
 		action := request.GetString("action", "")
 		rulesPath := request.GetString("rules_path", "")
-		
-		switch action {
-		case "validate":
-			args := []string{"semgrep", "validate", "--config", rulesPath}
-			if request.GetBool("strict", false) {
-				args = append(args, "--strict")
-			}
-			return executeShipCommand(args)
-		case "test":
-			args := []string{"semgrep", "test", "--config", rulesPath}
-			if testFiles := request.GetString("test_files", ""); testFiles != "" {
-				for _, file := range strings.Split(testFiles, ",") {
-					if strings.TrimSpace(file) != "" {
-						args = append(args, strings.TrimSpace(file))
-					}
+		target := request.GetString("target", ".")
+		testFilesStr := request.GetString("test_files", "")
+		outputFormat := request.GetString("output_format", "")
+		strict := request.GetBool("strict", false)
+
+		// Parse test files
+		var testFiles []string
+		if testFilesStr != "" {
+			for _, file := range strings.Split(testFilesStr, ",") {
+				if trimmed := strings.TrimSpace(file); trimmed != "" {
+					testFiles = append(testFiles, trimmed)
 				}
 			}
-			return executeShipCommand(args)
-		case "scan":
-			target := request.GetString("target", ".")
-			args := []string{"semgrep", "scan", target, "--config", rulesPath}
-			if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-				args = append(args, "--output", outputFormat)
-			}
-			return executeShipCommand(args)
-		default:
-			args := []string{"semgrep", "--help"}
-			return executeShipCommand(args)
 		}
+
+		// Run custom rule management
+		output, err := module.CustomRuleManagement(ctx, action, rulesPath, target, testFiles, outputFormat, strict)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("semgrep custom rule management failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Semgrep performance optimized scan tool
@@ -286,39 +308,44 @@ func AddSemgrepTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(performanceOptimizedScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSemgrepModule(client)
+
+		// Get parameters
 		target := request.GetString("target", "")
-		args := []string{"semgrep", "scan", target}
-		
 		configPolicy := request.GetString("config_policy", "auto")
-		args = append(args, "--config", configPolicy)
-		
-		if maxMemory := request.GetString("max_memory", ""); maxMemory != "" {
-			args = append(args, "--max-memory", maxMemory)
-		}
-		if maxTargetBytes := request.GetString("max_target_bytes", ""); maxTargetBytes != "" {
-			args = append(args, "--max-target-bytes", maxTargetBytes)
-		}
-		if jobs := request.GetString("jobs", ""); jobs != "" {
-			args = append(args, "--jobs", jobs)
-		}
-		if timeout := request.GetString("timeout", ""); timeout != "" {
-			args = append(args, "--timeout", timeout)
-		}
-		if request.GetBool("enable_metrics", false) {
-			args = append(args, "--metrics")
-		}
-		if request.GetBool("optimizations", false) {
-			args = append(args, "--optimizations")
-		}
-		if excludePatterns := request.GetString("exclude_patterns", ""); excludePatterns != "" {
-			for _, pattern := range strings.Split(excludePatterns, ",") {
-				if strings.TrimSpace(pattern) != "" {
-					args = append(args, "--exclude", strings.TrimSpace(pattern))
+		maxMemory := request.GetString("max_memory", "")
+		maxTargetBytes := request.GetString("max_target_bytes", "")
+		jobs := request.GetString("jobs", "")
+		timeout := request.GetString("timeout", "")
+		enableMetrics := request.GetBool("enable_metrics", false)
+		optimizations := request.GetBool("optimizations", false)
+		excludePatternsStr := request.GetString("exclude_patterns", "")
+
+		// Parse exclude patterns
+		var excludePatterns []string
+		if excludePatternsStr != "" {
+			for _, pattern := range strings.Split(excludePatternsStr, ",") {
+				if trimmed := strings.TrimSpace(pattern); trimmed != "" {
+					excludePatterns = append(excludePatterns, trimmed)
 				}
 			}
 		}
-		
-		return executeShipCommand(args)
+
+		// Run performance optimized scan
+		output, err := module.PerformanceOptimizedScan(ctx, target, configPolicy, maxMemory, maxTargetBytes, jobs, timeout, enableMetrics, optimizations, excludePatterns)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("semgrep performance scan failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Semgrep secrets scanning tool
@@ -337,22 +364,38 @@ func AddSemgrepTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(scanSecretsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		directory := request.GetString("directory", "")
-		args := []string{"semgrep", "scan", directory, "--config", "p/secrets"}
-		
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		if excludePatterns := request.GetString("exclude_patterns", ""); excludePatterns != "" {
-			for _, pattern := range strings.Split(excludePatterns, ",") {
-				if strings.TrimSpace(pattern) != "" {
-					args = append(args, "--exclude", strings.TrimSpace(pattern))
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSemgrepModule(client)
+
+		// Get parameters
+		directory := request.GetString("directory", "")
+		outputFormat := request.GetString("output_format", "")
+		excludePatternsStr := request.GetString("exclude_patterns", "")
+
+		// Parse exclude patterns
+		var excludePatterns []string
+		if excludePatternsStr != "" {
+			for _, pattern := range strings.Split(excludePatternsStr, ",") {
+				if trimmed := strings.TrimSpace(pattern); trimmed != "" {
+					excludePatterns = append(excludePatterns, trimmed)
 				}
 			}
 		}
-		
-		return executeShipCommand(args)
+
+		// Run secrets scan
+		output, err := module.ScanSecrets(ctx, directory, outputFormat, excludePatterns)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("semgrep secrets scan failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Semgrep OWASP Top 10 scan tool
@@ -372,18 +415,28 @@ func AddSemgrepTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(scanOWASPTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSemgrepModule(client)
+
+		// Get parameters
 		directory := request.GetString("directory", "")
-		args := []string{"semgrep", "scan", directory, "--config", "p/owasp-top-ten"}
-		
-		if format := request.GetString("output_format", ""); format != "" {
-			args = append(args, "--output", format)
+		outputFormat := request.GetString("output_format", "")
+		languageFocus := request.GetString("language_focus", "")
+
+		// Run OWASP Top 10 scan
+		output, err := module.ScanOWASPTop10(ctx, directory, outputFormat, languageFocus)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("semgrep OWASP scan failed: %v", err)), nil
 		}
-		
-		if language := request.GetString("language_focus", ""); language != "" {
-			args = append(args, "--config", "p/"+language)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Semgrep vulnerability research tool
@@ -414,40 +467,41 @@ func AddSemgrepTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(vulnerabilityResearchTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSemgrepModule(client)
+
+		// Get parameters
 		target := request.GetString("target", "")
 		researchMode := request.GetString("research_mode", "")
-		args := []string{"semgrep", "scan", target}
-		
-		// Configure research-specific rulesets
-		switch researchMode {
-		case "cve-analysis":
-			args = append(args, "--config", "p/cwe-top-25", "--config", "p/owasp-top-ten")
-		case "pattern-discovery":
-			args = append(args, "--config", "p/security-audit", "--config", "p/experimental")
-		case "exploit-detection":
-			args = append(args, "--config", "p/security-audit", "--config", "p/insecure-transport")
-		case "zero-day-hunting":
-			args = append(args, "--config", "p/r2c-security-audit", "--config", "p/experimental")
-		}
-		
-		if languageFocus := request.GetString("language_focus", ""); languageFocus != "" {
-			args = append(args, "--config", "p/"+languageFocus)
-		}
-		if vulnTypes := request.GetString("vulnerability_types", ""); vulnTypes != "" {
-			for _, vulnType := range strings.Split(vulnTypes, ",") {
-				if strings.TrimSpace(vulnType) != "" {
-					args = append(args, "--config", "p/"+strings.TrimSpace(vulnType))
+		languageFocus := request.GetString("language_focus", "")
+		vulnerabilityTypesStr := request.GetString("vulnerability_types", "")
+		includeExperimental := request.GetBool("include_experimental", false)
+		outputFormat := request.GetString("output_format", "")
+
+		// Parse vulnerability types
+		var vulnerabilityTypes []string
+		if vulnerabilityTypesStr != "" {
+			for _, vulnType := range strings.Split(vulnerabilityTypesStr, ",") {
+				if trimmed := strings.TrimSpace(vulnType); trimmed != "" {
+					vulnerabilityTypes = append(vulnerabilityTypes, trimmed)
 				}
 			}
 		}
-		if request.GetBool("include_experimental", false) {
-			args = append(args, "--config", "p/experimental")
+
+		// Run vulnerability research
+		output, err := module.VulnerabilityResearch(ctx, target, researchMode, languageFocus, vulnerabilityTypes, includeExperimental, outputFormat)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("semgrep vulnerability research failed: %v", err)), nil
 		}
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "--output", outputFormat)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Semgrep compliance scanning tool
@@ -482,27 +536,32 @@ func AddSemgrepTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(complianceScanningTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSemgrepModule(client)
+
+		// Get parameters
 		target := request.GetString("target", "")
 		complianceFramework := request.GetString("compliance_framework", "")
-		args := []string{"semgrep", "scan", target, "--config", "p/"+complianceFramework}
-		
-		if industryFocus := request.GetString("industry_focus", ""); industryFocus != "" {
-			args = append(args, "--config", "p/"+industryFocus)
+		industryFocus := request.GetString("industry_focus", "")
+		outputFormat := request.GetString("output_format", "")
+		outputFile := request.GetString("output_file", "")
+		includeRemediation := request.GetBool("include_remediation", false)
+		severityThreshold := request.GetString("severity_threshold", "")
+
+		// Run compliance scanning
+		output, err := module.ComplianceScanning(ctx, target, complianceFramework, industryFocus, outputFormat, outputFile, includeRemediation, severityThreshold)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("semgrep compliance scan failed: %v", err)), nil
 		}
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "--output", outputFormat)
-		}
-		if outputFile := request.GetString("output_file", ""); outputFile != "" {
-			args = append(args, "--output-file", outputFile)
-		}
-		if severityThreshold := request.GetString("severity_threshold", ""); severityThreshold != "" {
-			args = append(args, "--severity", severityThreshold)
-		}
-		if request.GetBool("include_remediation", false) {
-			args = append(args, "--sarif")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Semgrep comprehensive reporting tool
@@ -534,39 +593,42 @@ func AddSemgrepTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(comprehensiveReportingTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSemgrepModule(client)
+
+		// Get parameters
 		target := request.GetString("target", "")
 		reportType := request.GetString("report_type", "")
-		args := []string{"semgrep", "scan", target}
-		
-		// Configure report-specific rulesets
-		switch reportType {
-		case "executive-summary":
-			args = append(args, "--config", "p/security-audit", "--config", "p/owasp-top-ten")
-		case "detailed-technical":
-			args = append(args, "--config", "p/security-audit", "--config", "p/cwe-top-25", "--config", "p/experimental")
-		case "developer-focused":
-			args = append(args, "--config", "p/security-audit", "--config", "p/secrets")
-		case "compliance-audit":
-			args = append(args, "--config", "p/owasp-top-ten", "--config", "p/cwe-top-25")
+		outputFormatsStr := request.GetString("output_formats", "")
+		outputDirectory := request.GetString("output_directory", "")
+		includeMetrics := request.GetBool("include_metrics", false)
+		includeTrends := request.GetBool("include_trends", false)
+		baselineComparison := request.GetString("baseline_comparison", "")
+
+		// Parse output formats
+		var outputFormats []string
+		if outputFormatsStr != "" {
+			for _, format := range strings.Split(outputFormatsStr, ",") {
+				if trimmed := strings.TrimSpace(format); trimmed != "" {
+					outputFormats = append(outputFormats, trimmed)
+				}
+			}
 		}
-		
-		if outputFormats := request.GetString("output_formats", ""); outputFormats != "" {
-			args = append(args, "--output", outputFormats)
-		} else {
-			args = append(args, "--output", "json")
+
+		// Run comprehensive reporting
+		output, err := module.ComprehensiveReporting(ctx, target, reportType, outputFormats, outputDirectory, includeMetrics, includeTrends, baselineComparison)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("semgrep comprehensive reporting failed: %v", err)), nil
 		}
-		
-		if outputDirectory := request.GetString("output_directory", ""); outputDirectory != "" {
-			args = append(args, "--output-file", outputDirectory+"/semgrep-report.json")
-		}
-		if request.GetBool("include_metrics", false) {
-			args = append(args, "--metrics")
-		}
-		if baselineComparison := request.GetString("baseline_comparison", ""); baselineComparison != "" {
-			args = append(args, "--baseline-ref", baselineComparison)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Semgrep get version tool
@@ -574,7 +636,22 @@ func AddSemgrepTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		mcp.WithDescription("Get Semgrep version and configuration information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"semgrep", "--version"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSemgrepModule(client)
+
+		// Get version
+		output, err := module.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("semgrep get version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 }

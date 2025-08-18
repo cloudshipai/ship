@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddPolicySentryTools adds Policy Sentry (AWS IAM policy generator) MCP tool implementations using real CLI commands
+// AddPolicySentryTools adds Policy Sentry (AWS IAM policy generator) MCP tool implementations using direct Dagger calls
 func AddPolicySentryTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addPolicySentryToolsDirect(s)
+}
+
+// addPolicySentryToolsDirect adds Policy Sentry tools using direct Dagger module calls
+func addPolicySentryToolsDirect(s *server.MCPServer) {
 	// Policy Sentry create template tool
 	createTemplateTool := mcp.NewTool("policy_sentry_create_template",
 		mcp.WithDescription("Create IAM policy template using real policy_sentry CLI"),
@@ -22,12 +31,30 @@ func AddPolicySentryTools(s *server.MCPServer, executeShipCommand ExecuteShipCom
 		),
 	)
 	s.AddTool(createTemplateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		templateType := request.GetString("template_type", "")
-		args := []string{"policy_sentry", "create-template", "--template-type", templateType}
-		if outputFile := request.GetString("output_file", ""); outputFile != "" {
-			args = append(args, "--output-file", outputFile)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPolicySentryModule(client)
+
+		// Get parameters
+		templateType := request.GetString("template_type", "")
+		if templateType == "" {
+			return mcp.NewToolResultError("template_type is required"), nil
+		}
+		outputFile := request.GetString("output_file", "")
+
+		// Create template
+		output, err := module.CreateTemplate(ctx, templateType, outputFile)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("policy sentry create template failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Policy Sentry write policy tool
@@ -46,17 +73,34 @@ func AddPolicySentryTools(s *server.MCPServer, executeShipCommand ExecuteShipCom
 		),
 	)
 	s.AddTool(writePolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPolicySentryModule(client)
+
+		// Get parameters
 		inputFile := request.GetString("input_file", "")
-		args := []string{"policy_sentry", "write-policy", "--input-file", inputFile}
-		
-		if request.GetBool("minimize", false) {
-			args = append(args, "--minimize")
+		if inputFile == "" {
+			return mcp.NewToolResultError("input_file is required"), nil
 		}
-		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--fmt", format)
+
+		// Note: Dagger module doesn't support minimize and format options
+		if request.GetBool("minimize", false) || request.GetString("format", "") != "" {
+			return mcp.NewToolResultError("minimize and format options not supported in Dagger module"), nil
 		}
-		
-		return executeShipCommand(args)
+
+		// Write policy
+		output, err := module.WritePolicy(ctx, inputFile)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("policy sentry write policy failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Policy Sentry initialize tool
@@ -67,13 +111,9 @@ func AddPolicySentryTools(s *server.MCPServer, executeShipCommand ExecuteShipCom
 		),
 	)
 	s.AddTool(initializeTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"policy_sentry", "initialize"}
-		
-		if request.GetBool("fetch", false) {
-			args = append(args, "--fetch")
-		}
-		
-		return executeShipCommand(args)
+		// Note: Initialize function not available in Dagger module
+		// This would require persistent database initialization
+		return mcp.NewToolResultError("initialize function not supported in Dagger module - database is pre-initialized in container"), nil
 	})
 
 
@@ -104,26 +144,36 @@ func AddPolicySentryTools(s *server.MCPServer, executeShipCommand ExecuteShipCom
 		),
 	)
 	s.AddTool(queryActionTableTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPolicySentryModule(client)
+
+		// Get parameters
 		service := request.GetString("service", "")
-		args := []string{"policy_sentry", "query", "action-table", "--service", service}
-		
-		if name := request.GetString("name", ""); name != "" {
-			args = append(args, "--name", name)
+		if service == "" {
+			return mcp.NewToolResultError("service is required"), nil
 		}
-		if accessLevel := request.GetString("access_level", ""); accessLevel != "" {
-			args = append(args, "--access-level", accessLevel)
+
+		// Note: Dagger module doesn't support advanced filter options
+		if request.GetString("name", "") != "" || request.GetString("access_level", "") != "" ||
+			request.GetString("condition", "") != "" || request.GetString("resource_type", "") != "" ||
+			request.GetString("format", "") != "" {
+			return mcp.NewToolResultError("advanced query options not supported in Dagger module"), nil
 		}
-		if condition := request.GetString("condition", ""); condition != "" {
-			args = append(args, "--condition", condition)
+
+		// Query action table
+		output, err := module.QueryActionTable(ctx, service)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("policy sentry query action table failed: %v", err)), nil
 		}
-		if resourceType := request.GetString("resource_type", ""); resourceType != "" {
-			args = append(args, "--resource-type", resourceType)
-		}
-		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--fmt", format)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Policy Sentry query condition table tool
@@ -142,17 +192,34 @@ func AddPolicySentryTools(s *server.MCPServer, executeShipCommand ExecuteShipCom
 		),
 	)
 	s.AddTool(queryConditionTableTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPolicySentryModule(client)
+
+		// Get parameters
 		service := request.GetString("service", "")
-		args := []string{"policy_sentry", "query", "condition-table", "--service", service}
-		
-		if name := request.GetString("name", ""); name != "" {
-			args = append(args, "--name", name)
+		if service == "" {
+			return mcp.NewToolResultError("service is required"), nil
 		}
-		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--fmt", format)
+
+		// Note: Dagger module doesn't support name and format options
+		if request.GetString("name", "") != "" || request.GetString("format", "") != "" {
+			return mcp.NewToolResultError("name and format options not supported in Dagger module"), nil
 		}
-		
-		return executeShipCommand(args)
+
+		// Query condition table
+		output, err := module.QueryConditionTable(ctx, service)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("policy sentry query condition table failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Policy Sentry query ARN table tool
@@ -174,20 +241,9 @@ func AddPolicySentryTools(s *server.MCPServer, executeShipCommand ExecuteShipCom
 		),
 	)
 	s.AddTool(queryArnTableTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		service := request.GetString("service", "")
-		args := []string{"policy_sentry", "query", "arn-table", "--service", service}
-		
-		if name := request.GetString("name", ""); name != "" {
-			args = append(args, "--name", name)
-		}
-		if request.GetBool("list_arn_types", false) {
-			args = append(args, "--list-arn-types")
-		}
-		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--fmt", format)
-		}
-		
-		return executeShipCommand(args)
+		// Note: ARN table query not available in Dagger module
+		// Only basic action and condition table queries are supported
+		return mcp.NewToolResultError("ARN table query not supported in Dagger module"), nil
 	})
 
 	// Policy Sentry query service table tool
@@ -199,13 +255,9 @@ func AddPolicySentryTools(s *server.MCPServer, executeShipCommand ExecuteShipCom
 		),
 	)
 	s.AddTool(queryServiceTableTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"policy_sentry", "query", "service-table"}
-		
-		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--fmt", format)
-		}
-		
-		return executeShipCommand(args)
+		// Note: Service table query not available in Dagger module
+		// Only basic action and condition table queries are supported
+		return mcp.NewToolResultError("service table query not supported in Dagger module"), nil
 	})
 
 

@@ -14,6 +14,9 @@ type CheckovModule struct {
 	name   string
 }
 
+// Checkov is installed via pip in the container
+const checkovBinary = "/usr/local/bin/checkov"
+
 // NewCheckovModule creates a new Checkov module
 func NewCheckovModule(client *dagger.Client) *CheckovModule {
 	return &CheckovModule{
@@ -29,7 +32,7 @@ func (m *CheckovModule) ScanDirectory(ctx context.Context, dir string) (string, 
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			"checkov",
+			checkovBinary,
 			"--directory", ".",
 			"--output", "json",
 			"--framework", "terraform",
@@ -60,7 +63,7 @@ func (m *CheckovModule) ScanFile(ctx context.Context, filePath string) (string, 
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			"checkov",
+			checkovBinary,
 			"--file", filename,
 			"--output", "json",
 			"--framework", "terraform",
@@ -197,7 +200,7 @@ func (m *CheckovModule) ScanWithSkips(ctx context.Context, dir string, skipCheck
 
 // ScanDockerImage scans Docker container image for vulnerabilities
 func (m *CheckovModule) ScanDockerImage(ctx context.Context, dockerImage string, dockerfilePath string, output string) (string, error) {
-	args := []string{"checkov", "--docker-image", dockerImage, "--framework", "sca_image"}
+	args := []string{checkovBinary, "--docker-image", dockerImage, "--framework", "sca_image"}
 	if dockerfilePath != "" {
 		args = append(args, "--dockerfile-path", "/workspace/Dockerfile")
 	}
@@ -224,7 +227,7 @@ func (m *CheckovModule) ScanDockerImage(ctx context.Context, dockerImage string,
 
 // ScanPackages scans package dependencies for vulnerabilities
 func (m *CheckovModule) ScanPackages(ctx context.Context, dir string, output string) (string, error) {
-	args := []string{"checkov", "--directory", ".", "--framework", "sca_package"}
+	args := []string{checkovBinary, "--directory", ".", "--framework", "sca_package"}
 	if output != "" {
 		args = append(args, "--output", output)
 	}
@@ -245,7 +248,7 @@ func (m *CheckovModule) ScanPackages(ctx context.Context, dir string, output str
 
 // ScanSecrets scans for hardcoded secrets in code
 func (m *CheckovModule) ScanSecrets(ctx context.Context, dir string, output string) (string, error) {
-	args := []string{"checkov", "--directory", ".", "--framework", "secrets"}
+	args := []string{checkovBinary, "--directory", ".", "--framework", "secrets"}
 	if output != "" {
 		args = append(args, "--output", output)
 	}
@@ -271,7 +274,7 @@ func (m *CheckovModule) ScanWithConfig(ctx context.Context, dir string, configFi
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithFile("/workspace/config.yml", m.client.Host().File(configFile)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"checkov", "--directory", ".", "--config-file", "config.yml"}, dagger.ContainerWithExecOpts{Expect: "ANY"})
+		WithExec([]string{checkovBinary, "--directory", ".", "--config-file", "config.yml"}, dagger.ContainerWithExecOpts{Expect: "ANY"})
 
 	output, _ := container.Stdout(ctx)
 	if output != "" {
@@ -285,7 +288,7 @@ func (m *CheckovModule) ScanWithConfig(ctx context.Context, dir string, configFi
 func (m *CheckovModule) CreateConfig(ctx context.Context, configPath string) (string, error) {
 	container := m.client.Container().
 		From("bridgecrew/checkov:latest").
-		WithExec([]string{"checkov", "--create-config", "/workspace/config.yml"})
+		WithExec([]string{checkovBinary, "--create-config", "/workspace/config.yml"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -297,7 +300,7 @@ func (m *CheckovModule) CreateConfig(ctx context.Context, configPath string) (st
 
 // ScanWithExternalModules scans with external module downloading enabled
 func (m *CheckovModule) ScanWithExternalModules(ctx context.Context, dir string, downloadExternalModules bool) (string, error) {
-	args := []string{"checkov", "--directory", "."}
+	args := []string{checkovBinary, "--directory", "."}
 	if downloadExternalModules {
 		args = append(args, "--download-external-modules", "true")
 	}
@@ -320,7 +323,7 @@ func (m *CheckovModule) ScanWithExternalModules(ctx context.Context, dir string,
 func (m *CheckovModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("bridgecrew/checkov:latest").
-		WithExec([]string{"checkov", "--version"})
+		WithExec([]string{checkovBinary, "--version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -328,4 +331,90 @@ func (m *CheckovModule) GetVersion(ctx context.Context) (string, error) {
 	}
 
 	return output, nil
+}
+
+// ScanDirectoryWithOptions scans a directory with configurable options
+func (m *CheckovModule) ScanDirectoryWithOptions(ctx context.Context, dir string, framework string, output string, compact bool, quiet bool) (string, error) {
+	args := []string{checkovBinary, "--directory", "."}
+	
+	if framework != "" {
+		args = append(args, "--framework", framework)
+	}
+	if output != "" {
+		args = append(args, "--output", output)
+	} else {
+		args = append(args, "--output", "json")
+	}
+	if compact {
+		args = append(args, "--compact")
+	}
+	if quiet {
+		args = append(args, "--quiet")
+	}
+
+	container := m.client.Container().
+		From("bridgecrew/checkov:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(dir)).
+		WithWorkdir("/workspace").
+		WithExec(args, dagger.ContainerWithExecOpts{Expect: "ANY"})
+
+	result, _ := container.Stdout(ctx)
+	if result != "" {
+		return result, nil
+	}
+
+	return "", fmt.Errorf("failed to scan directory with options: no output received")
+}
+
+// ScanFileWithOptions scans a file with configurable options
+func (m *CheckovModule) ScanFileWithOptions(ctx context.Context, filePath string, framework string, output string) (string, error) {
+	args := []string{checkovBinary, "--file", "/workspace/input"}
+	
+	if framework != "" {
+		args = append(args, "--framework", framework)
+	}
+	if output != "" {
+		args = append(args, "--output", output)
+	} else {
+		args = append(args, "--output", "json")
+	}
+
+	container := m.client.Container().
+		From("bridgecrew/checkov:latest").
+		WithFile("/workspace/input", m.client.Host().File(filePath)).
+		WithWorkdir("/workspace").
+		WithExec(args, dagger.ContainerWithExecOpts{Expect: "ANY"})
+
+	result, _ := container.Stdout(ctx)
+	if result != "" {
+		return result, nil
+	}
+
+	return "", fmt.Errorf("failed to scan file with options: no output received")
+}
+
+// ScanWithSpecificChecks scans with specific checks enabled or disabled
+func (m *CheckovModule) ScanWithSpecificChecks(ctx context.Context, dir string, checks string, skipChecks string) (string, error) {
+	args := []string{checkovBinary, "--directory", "."}
+	
+	if checks != "" {
+		args = append(args, "--check", checks)
+	}
+	if skipChecks != "" {
+		args = append(args, "--skip-check", skipChecks)
+	}
+	args = append(args, "--output", "json")
+
+	container := m.client.Container().
+		From("bridgecrew/checkov:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(dir)).
+		WithWorkdir("/workspace").
+		WithExec(args, dagger.ContainerWithExecOpts{Expect: "ANY"})
+
+	result, _ := container.Stdout(ctx)
+	if result != "" {
+		return result, nil
+	}
+
+	return "", fmt.Errorf("failed to scan with specific checks: no output received")
 }

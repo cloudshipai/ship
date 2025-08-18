@@ -15,6 +15,8 @@ type InfracostModule struct {
 	name   string
 }
 
+const infracostBinary = "/usr/bin/infracost"
+
 // NewInfracostModule creates a new Infracost module
 func NewInfracostModule(client *dagger.Client) *InfracostModule {
 	return &InfracostModule{
@@ -28,7 +30,7 @@ func (m *InfracostModule) BreakdownDirectory(ctx context.Context, dir string) (s
 	container := m.prepareContainer(dir)
 
 	container = container.WithExec([]string{
-		"infracost",
+		infracostBinary,
 		"breakdown",
 		"--path", ".",
 		"--format", "json",
@@ -52,7 +54,7 @@ func (m *InfracostModule) BreakdownPlan(ctx context.Context, planFile string) (s
 	container = container.
 		WithFile("/tmp/plan.json", m.client.Host().File(planFile)).
 		WithExec([]string{
-			"infracost",
+			infracostBinary,
 			"breakdown",
 			"--path", "/tmp/" + filename,
 			"--format", "json",
@@ -71,7 +73,7 @@ func (m *InfracostModule) Diff(ctx context.Context, dir string) (string, error) 
 	container := m.prepareContainer(dir)
 
 	container = container.WithExec([]string{
-		"infracost",
+		infracostBinary,
 		"diff",
 		"--path", ".",
 		"--format", "json",
@@ -94,7 +96,7 @@ func (m *InfracostModule) BreakdownWithConfig(ctx context.Context, configFile st
 	container = container.
 		WithFile("/tmp/infracost.yml", m.client.Host().File(configFile)).
 		WithExec([]string{
-			"infracost",
+			infracostBinary,
 			"breakdown",
 			"--config-file", "/tmp/infracost.yml",
 			"--format", "json",
@@ -113,7 +115,7 @@ func (m *InfracostModule) GenerateHTMLReport(ctx context.Context, dir string) (s
 	container := m.prepareContainer(dir)
 
 	container = container.WithExec([]string{
-		"infracost",
+		infracostBinary,
 		"breakdown",
 		"--path", ".",
 		"--format", "html",
@@ -132,7 +134,7 @@ func (m *InfracostModule) GenerateTableReport(ctx context.Context, dir string) (
 	container := m.prepareContainer(dir)
 
 	container = container.WithExec([]string{
-		"infracost",
+		infracostBinary,
 		"breakdown",
 		"--path", ".",
 		"--format", "table",

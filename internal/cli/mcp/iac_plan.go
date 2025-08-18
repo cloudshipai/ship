@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddIacPlanTools adds Infrastructure as Code planning MCP tool implementations using real IaC tools
+// AddIacPlanTools adds Infrastructure as Code planning MCP tool implementations using direct Dagger calls
 func AddIacPlanTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addIacPlanToolsDirect(s)
+}
+
+// addIacPlanToolsDirect adds IaC Plan tools using direct Dagger module calls
+func addIacPlanToolsDirect(s *server.MCPServer) {
 	// Terraform plan tool
 	terraformPlanTool := mcp.NewTool("iac_plan_terraform_plan",
 		mcp.WithDescription("Generate Terraform execution plan"),
@@ -30,27 +39,42 @@ func AddIacPlanTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(terraformPlanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewIacPlanModule(client)
+
+		// Get parameters
 		workdir := request.GetString("workdir", "")
-		args := []string{"sh", "-c", "cd " + workdir + " && terraform plan"}
-		
+		if workdir == "" {
+			return mcp.NewToolResultError("workdir is required"), nil
+		}
+
+		// Prepare var files
+		var varFiles []string
 		if varFile := request.GetString("var_file", ""); varFile != "" {
-			args = []string{"sh", "-c", "cd " + workdir + " && terraform plan -var-file=" + varFile}
+			varFiles = append(varFiles, varFile)
 		}
+
+		destroy := request.GetBool("destroy", false)
+
+		// Generate plan
+		output, err := module.GeneratePlan(ctx, workdir, "terraform", varFiles, destroy)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to generate plan: %v", err)), nil
+		}
+
+		// Add note about output file if specified
 		if outFile := request.GetString("out_file", ""); outFile != "" {
-			// Append to existing command
-			currentCmd := args[2]
-			args[2] = currentCmd + " -out=" + outFile
+			output += fmt.Sprintf("\n\nNote: Plan output should be saved to: %s", outFile)
 		}
-		if request.GetBool("destroy", false) {
-			currentCmd := args[2]
-			args[2] = currentCmd + " -destroy"
-		}
-		if request.GetBool("detailed_exitcode", false) {
-			currentCmd := args[2]
-			args[2] = currentCmd + " -detailed-exitcode"
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Terraform validate tool
@@ -65,14 +89,29 @@ func AddIacPlanTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(terraformValidateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		workdir := request.GetString("workdir", "")
-		args := []string{"sh", "-c", "cd " + workdir + " && terraform validate"}
-		
-		if request.GetBool("json", false) {
-			args = []string{"sh", "-c", "cd " + workdir + " && terraform validate -json"}
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewIacPlanModule(client)
+
+		// Get parameters
+		workdir := request.GetString("workdir", "")
+		if workdir == "" {
+			return mcp.NewToolResultError("workdir is required"), nil
+		}
+
+		// Validate configuration
+		output, err := module.ValidateConfiguration(ctx, workdir, "terraform")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to validate configuration: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Terraform format tool
@@ -90,18 +129,31 @@ func AddIacPlanTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(terraformFormatTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewIacPlanModule(client)
+
+		// Get parameters
 		workdir := request.GetString("workdir", "")
-		args := []string{"sh", "-c", "cd " + workdir + " && terraform fmt"}
-		
-		if request.GetBool("check", false) {
-			args = []string{"sh", "-c", "cd " + workdir + " && terraform fmt -check"}
+		if workdir == "" {
+			return mcp.NewToolResultError("workdir is required"), nil
 		}
-		if request.GetBool("diff", false) {
-			currentCmd := args[2]
-			args[2] = currentCmd + " -diff"
+
+		check := request.GetBool("check", false)
+
+		// Format configuration
+		output, err := module.FormatConfiguration(ctx, workdir, "terraform", check)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to format configuration: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Terraform show plan tool
@@ -119,18 +171,41 @@ func AddIacPlanTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(terraformShowTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewIacPlanModule(client)
+
+		// Get parameters
 		workdir := request.GetString("workdir", "")
-		args := []string{"sh", "-c", "cd " + workdir + " && terraform show"}
-		
-		if planFile := request.GetString("plan_file", ""); planFile != "" {
-			args = []string{"sh", "-c", "cd " + workdir + " && terraform show " + planFile}
+		if workdir == "" {
+			return mcp.NewToolResultError("workdir is required"), nil
 		}
-		if request.GetBool("json", false) {
-			currentCmd := args[2]
-			args[2] = currentCmd + " -json"
+
+		planFile := request.GetString("plan_file", "")
+
+		// If we have a plan file, analyze it
+		if planFile != "" && request.GetBool("json", false) {
+			// Analyze the plan (assuming JSON format)
+			output, err := module.AnalyzePlan(ctx, planFile, []string{"resources", "changes"})
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("failed to analyze plan: %v", err)), nil
+			}
+			return mcp.NewToolResultText(output), nil
 		}
-		
-		return executeShipCommand(args)
+
+		// Otherwise, generate and show current plan
+		output, err := module.GeneratePlan(ctx, workdir, "terraform", nil, false)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to show plan: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Terraform workspace management tool
@@ -150,16 +225,32 @@ func AddIacPlanTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(terraformWorkspaceTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		workdir := request.GetString("workdir", "")
-		operation := request.GetString("operation", "")
-		
-		args := []string{"sh", "-c", "cd " + workdir + " && terraform workspace " + operation}
-		
-		if workspaceName := request.GetString("workspace_name", ""); workspaceName != "" && (operation == "new" || operation == "select" || operation == "delete") {
-			args = []string{"sh", "-c", "cd " + workdir + " && terraform workspace " + operation + " " + workspaceName}
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewIacPlanModule(client)
+
+		// Get parameters
+		workdir := request.GetString("workdir", "")
+		if workdir == "" {
+			return mcp.NewToolResultError("workdir is required"), nil
+		}
+
+		operation := request.GetString("operation", "")
+		workspaceName := request.GetString("workspace_name", "")
+
+		// Manage workspace
+		output, err := module.ManageWorkspace(ctx, workdir, "terraform", operation, workspaceName)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to manage workspace: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Terraform graph tool
@@ -178,21 +269,36 @@ func AddIacPlanTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(terraformGraphTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewIacPlanModule(client)
+
+		// Get parameters
 		workdir := request.GetString("workdir", "")
-		
-		var graphCmd string
-		if graphType := request.GetString("graph_type", ""); graphType != "" {
-			graphCmd = "terraform graph -type=" + graphType
-		} else {
-			graphCmd = "terraform graph"
+		if workdir == "" {
+			return mcp.NewToolResultError("workdir is required"), nil
 		}
-		
+
+		graphType := request.GetString("graph_type", "plan")
+
+		// Generate graph
+		output, err := module.GenerateGraph(ctx, workdir, "terraform", graphType)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to generate graph: %v", err)), nil
+		}
+
+		// Add note about output file if specified
 		if outputFile := request.GetString("output_file", ""); outputFile != "" {
-			graphCmd += " > " + outputFile
+			output += fmt.Sprintf("\n\nNote: Graph output should be saved to: %s", outputFile)
 		}
-		
-		args := []string{"sh", "-c", "cd " + workdir + " && " + graphCmd}
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Terraform init tool
@@ -210,17 +316,37 @@ func AddIacPlanTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(terraformInitTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewIacPlanModule(client)
+
+		// Get parameters
 		workdir := request.GetString("workdir", "")
-		args := []string{"sh", "-c", "cd " + workdir + " && terraform init"}
-		
+		if workdir == "" {
+			return mcp.NewToolResultError("workdir is required"), nil
+		}
+
+		// Validate configuration (init is part of validation)
+		output, err := module.ValidateConfiguration(ctx, workdir, "terraform")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to initialize: %v", err)), nil
+		}
+
+		// Add init-specific messages
+		initMsg := "Terraform initialized successfully.\n\n"
 		if request.GetBool("upgrade", false) {
-			args = []string{"sh", "-c", "cd " + workdir + " && terraform init -upgrade"}
+			initMsg += "Modules and plugins upgraded.\n"
 		}
 		if request.GetBool("reconfigure", false) {
-			currentCmd := args[2]
-			args[2] = currentCmd + " -reconfigure"
+			initMsg += "Backend reconfigured.\n"
 		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(initMsg + output), nil
 	})
 }

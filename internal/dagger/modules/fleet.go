@@ -13,6 +13,8 @@ type FleetModule struct {
 	name   string
 }
 
+const fleetKubectlBinary = "/usr/local/bin/kubectl"
+
 // NewFleetModule creates a new Fleet module
 func NewFleetModule(client *dagger.Client) *FleetModule {
 	return &FleetModule{
@@ -31,7 +33,7 @@ func (m *FleetModule) GetClusters(ctx context.Context, kubeconfig string) (strin
 	}
 
 	container = container.WithExec([]string{
-		"kubectl", "get", "clusters",
+		fleetKubectlBinary, "get", "clusters",
 		"--output", "json",
 	})
 
@@ -53,7 +55,7 @@ func (m *FleetModule) GetGitRepos(ctx context.Context, kubeconfig string) (strin
 	}
 
 	container = container.WithExec([]string{
-		"kubectl", "get", "gitrepos",
+		fleetKubectlBinary, "get", "gitrepos",
 		"--output", "json",
 	})
 
@@ -88,7 +90,7 @@ spec:
 	}
 
 	container = container.WithExec([]string{
-		"kubectl", "apply", "-f", "/gitrepo.yaml",
+		fleetKubectlBinary, "apply", "-f", "/gitrepo.yaml",
 		"--output", "json",
 	})
 
@@ -202,6 +204,128 @@ func (m *FleetModule) Install(ctx context.Context, namespace string, kubeconfig 
 	output, err := container.Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to install fleet: %w", err)
+	}
+
+	return output, nil
+}
+
+// ApplyGitRepo applies Fleet GitRepo configuration using kubectl (MCP compatible)
+func (m *FleetModule) ApplyGitRepo(ctx context.Context, gitrepoFile string, namespace string) (string, error) {
+	gitrepoFileObj := m.client.Host().File(gitrepoFile)
+	
+	args := []string{"kubectl", "apply", "-f", "/gitrepo.yaml"}
+	if namespace != "" {
+		args = append(args, "-n", namespace)
+	}
+
+	container := m.client.Container().
+		From("bitnami/kubectl:latest").
+		WithFile("/gitrepo.yaml", gitrepoFileObj).
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to apply gitrepo: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetGitReposSimple lists Git repositories managed by Fleet (MCP compatible)
+func (m *FleetModule) GetGitReposSimple(ctx context.Context, namespace string) (string, error) {
+	if namespace == "" {
+		namespace = "fleet-local"
+	}
+
+	container := m.client.Container().
+		From("bitnami/kubectl:latest").
+		WithExec([]string{"kubectl", "get", "gitrepo", "-n", namespace})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get gitrepos: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetBundlesSimple lists Fleet bundles (MCP compatible)
+func (m *FleetModule) GetBundlesSimple(ctx context.Context, namespace string) (string, error) {
+	args := []string{"kubectl", "get", "bundles"}
+	if namespace != "" {
+		args = append(args, "-n", namespace)
+	} else {
+		args = append(args, "--all-namespaces")
+	}
+
+	container := m.client.Container().
+		From("bitnami/kubectl:latest").
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get bundles: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetBundleDeploymentsSimple lists Fleet bundle deployments (MCP compatible)
+func (m *FleetModule) GetBundleDeploymentsSimple(ctx context.Context, namespace string) (string, error) {
+	args := []string{"kubectl", "get", "bundledeployments"}
+	if namespace != "" {
+		args = append(args, "-n", namespace)
+	} else {
+		args = append(args, "--all-namespaces")
+	}
+
+	container := m.client.Container().
+		From("bitnami/kubectl:latest").
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get bundle deployments: %w", err)
+	}
+
+	return output, nil
+}
+
+// DescribeGitRepoSimple describes a Fleet GitRepo (MCP compatible)
+func (m *FleetModule) DescribeGitRepoSimple(ctx context.Context, gitrepoName string, namespace string) (string, error) {
+	if namespace == "" {
+		namespace = "fleet-local"
+	}
+
+	container := m.client.Container().
+		From("bitnami/kubectl:latest").
+		WithExec([]string{"kubectl", "describe", "gitrepo", gitrepoName, "-n", namespace})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to describe gitrepo: %w", err)
+	}
+
+	return output, nil
+}
+
+// InstallWithVersion installs Fleet using Helm with specific version (MCP compatible)
+func (m *FleetModule) InstallWithVersion(ctx context.Context, version string) (string, error) {
+	if version == "" {
+		version = "v0.13.0"
+	}
+
+	// Install Fleet CRD first
+	container := m.client.Container().
+		From("alpine/helm:latest").
+		WithExec([]string{
+			"helm", "-n", "cattle-fleet-system", "install", "--create-namespace", "--wait",
+			"fleet-crd", "https://github.com/rancher/fleet/releases/download/" + version + "/fleet-crd-" + version[1:] + ".tgz",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to install fleet with version: %w", err)
 	}
 
 	return output, nil

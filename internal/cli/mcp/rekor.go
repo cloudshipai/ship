@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddRekorTools adds Rekor (transparency log) MCP tool implementations using real rekor-cli commands
+// AddRekorTools adds Rekor (transparency log) MCP tool implementations using direct Dagger calls
 func AddRekorTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addRekorToolsDirect(s)
+}
+
+// addRekorToolsDirect adds Rekor tools using direct Dagger module calls
+func addRekorToolsDirect(s *server.MCPServer) {
 	// Rekor upload artifact tool
 	uploadTool := mcp.NewTool("rekor_upload_artifact",
 		mcp.WithDescription("Upload artifact to Rekor transparency log using real rekor-cli"),
@@ -21,35 +30,43 @@ func AddRekorTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 			mcp.Required(),
 		),
 		mcp.WithString("public_key",
-			mcp.Description("Path or URL to public key file"),
-			mcp.Required(),
+			mcp.Description("Path or URL to public key file - NOTE: not supported in current Dagger module"),
 		),
 		mcp.WithString("type",
-			mcp.Description("Type of entry"),
+			mcp.Description("Type of entry - NOTE: not supported in current Dagger module"),
 		),
 		mcp.WithString("pki_format",
-			mcp.Description("Format of signature/public key"),
+			mcp.Description("Format of signature/public key - NOTE: not supported in current Dagger module"),
 			mcp.Enum("pgp", "minisign", "x509", "ssh", "tuf"),
 		),
 	)
 	s.AddTool(uploadTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"rekor-cli", "upload"}
-		if artifact := request.GetString("artifact", ""); artifact != "" {
-			args = append(args, "--artifact", artifact)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if signature := request.GetString("signature", ""); signature != "" {
-			args = append(args, "--signature", signature)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewRekorModule(client)
+
+		// Get parameters
+		artifact := request.GetString("artifact", "")
+		signature := request.GetString("signature", "")
+
+		// Check for unsupported parameters
+		if request.GetString("public_key", "") != "" || request.GetString("type", "") != "" || request.GetString("pki_format", "") != "" {
+			return mcp.NewToolResultError("public_key, type, and pki_format options not supported in current Dagger module"), nil
 		}
-		if publicKey := request.GetString("public_key", ""); publicKey != "" {
-			args = append(args, "--public-key", publicKey)
+
+		// Upload artifact
+		output, err := module.Upload(ctx, artifact, signature)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("rekor upload failed: %v", err)), nil
 		}
-		if entryType := request.GetString("type", ""); entryType != "" {
-			args = append(args, "--type", entryType)
-		}
-		if pkiFormat := request.GetString("pki_format", ""); pkiFormat != "" {
-			args = append(args, "--pki-format", pkiFormat)
-		}
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Rekor search transparency log tool
@@ -59,44 +76,54 @@ func AddRekorTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 			mcp.Description("Path or URL to artifact file"),
 		),
 		mcp.WithString("public_key",
-			mcp.Description("Path or URL to public key file"),
+			mcp.Description("Path or URL to public key file - NOTE: not supported in current Dagger module"),
 		),
 		mcp.WithString("sha",
-			mcp.Description("SHA512, SHA256, or SHA1 sum of artifact"),
+			mcp.Description("SHA512, SHA256, or SHA1 sum of artifact - NOTE: not supported in current Dagger module"),
 		),
 		mcp.WithString("email",
-			mcp.Description("Email associated with public key"),
+			mcp.Description("Email associated with public key - NOTE: not supported in current Dagger module"),
 		),
 		mcp.WithString("pki_format",
-			mcp.Description("Format of public key (required when using public-key)"),
+			mcp.Description("Format of public key (required when using public-key) - NOTE: not supported in current Dagger module"),
 			mcp.Enum("pgp", "minisign", "x509", "ssh", "tuf"),
 		),
 		mcp.WithString("operator",
-			mcp.Description("Search operator"),
+			mcp.Description("Search operator - NOTE: not supported in current Dagger module"),
 			mcp.Enum("and", "or"),
 		),
 	)
 	s.AddTool(searchTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"rekor-cli", "search"}
-		if artifact := request.GetString("artifact", ""); artifact != "" {
-			args = append(args, "--artifact", artifact)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if publicKey := request.GetString("public_key", ""); publicKey != "" {
-			args = append(args, "--public-key", publicKey)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewRekorModule(client)
+
+		// Get parameters
+		query := request.GetString("artifact", "")
+		if query == "" {
+			return mcp.NewToolResultError("artifact parameter is required"), nil
 		}
-		if sha := request.GetString("sha", ""); sha != "" {
-			args = append(args, "--sha", sha)
+
+		// Check for unsupported parameters
+		if request.GetString("public_key", "") != "" || request.GetString("sha", "") != "" ||
+			request.GetString("email", "") != "" || request.GetString("pki_format", "") != "" ||
+			request.GetString("operator", "") != "" {
+			return mcp.NewToolResultError("only artifact search supported in current Dagger module"), nil
 		}
-		if email := request.GetString("email", ""); email != "" {
-			args = append(args, "--email", email)
+
+		// Search transparency log
+		output, err := module.Search(ctx, query)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("rekor search failed: %v", err)), nil
 		}
-		if pkiFormat := request.GetString("pki_format", ""); pkiFormat != "" {
-			args = append(args, "--pki-format", pkiFormat)
-		}
-		if operator := request.GetString("operator", ""); operator != "" {
-			args = append(args, "--operator", operator)
-		}
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Rekor get entry by UUID tool
@@ -107,17 +134,36 @@ func AddRekorTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 			mcp.Required(),
 		),
 		mcp.WithString("format",
-			mcp.Description("Output format"),
+			mcp.Description("Output format - NOTE: only json supported in current Dagger module"),
 			mcp.Enum("", "tle"),
 		),
 	)
 	s.AddTool(getByUuidTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		uuid := request.GetString("uuid", "")
-		args := []string{"rekor-cli", "get", "--uuid", uuid}
-		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--format", format)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewRekorModule(client)
+
+		// Get parameters
+		uuid := request.GetString("uuid", "")
+
+		// Check for unsupported format
+		if format := request.GetString("format", ""); format != "" && format != "json" {
+			return mcp.NewToolResultError("only json format supported in current Dagger module"), nil
+		}
+
+		// Get entry by UUID
+		output, err := module.GetByUUID(ctx, uuid)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("rekor get by UUID failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Rekor get entry by log index tool
@@ -128,17 +174,36 @@ func AddRekorTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 			mcp.Required(),
 		),
 		mcp.WithString("format",
-			mcp.Description("Output format"),
+			mcp.Description("Output format - NOTE: only json supported in current Dagger module"),
 			mcp.Enum("", "tle"),
 		),
 	)
 	s.AddTool(getByIndexTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		logIndex := request.GetString("log_index", "")
-		args := []string{"rekor-cli", "get", "--log-index", logIndex}
-		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--format", format)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewRekorModule(client)
+
+		// Get parameters
+		logIndex := request.GetString("log_index", "")
+
+		// Check for unsupported format
+		if format := request.GetString("format", ""); format != "" && format != "json" {
+			return mcp.NewToolResultError("only json format supported in current Dagger module"), nil
+		}
+
+		// Get entry by log index
+		output, err := module.Get(ctx, logIndex)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("rekor get by index failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Rekor verify entry by UUID tool
@@ -150,9 +215,26 @@ func AddRekorTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 		),
 	)
 	s.AddTool(verifyByUuidTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewRekorModule(client)
+
+		// Get parameters
 		uuid := request.GetString("uuid", "")
-		args := []string{"rekor-cli", "verify", "--uuid", uuid}
-		return executeShipCommand(args)
+
+		// Verify entry by UUID
+		output, err := module.VerifyByUUID(ctx, uuid)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("rekor verify by UUID failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Rekor verify entry by log index tool
@@ -164,9 +246,26 @@ func AddRekorTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 		),
 	)
 	s.AddTool(verifyByIndexTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewRekorModule(client)
+
+		// Get parameters
 		logIndex := request.GetString("log_index", "")
-		args := []string{"rekor-cli", "verify", "--log-index", logIndex}
-		return executeShipCommand(args)
+
+		// Verify entry by log index
+		output, err := module.VerifyByIndex(ctx, logIndex)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("rekor verify by index failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Rekor verify artifact tool
@@ -178,35 +277,45 @@ func AddRekorTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 		),
 		mcp.WithString("signature",
 			mcp.Description("Path or URL to signature file"),
+			mcp.Required(),
 		),
 		mcp.WithString("public_key",
-			mcp.Description("Path or URL to public key file"),
+			mcp.Description("Path or URL to public key file - NOTE: not supported in current Dagger module"),
 		),
 		mcp.WithString("type",
-			mcp.Description("Type of entry to verify"),
+			mcp.Description("Type of entry to verify - NOTE: not supported in current Dagger module"),
 		),
 		mcp.WithString("pki_format",
-			mcp.Description("Format of signature/public key"),
+			mcp.Description("Format of signature/public key - NOTE: not supported in current Dagger module"),
 			mcp.Enum("pgp", "minisign", "x509", "ssh", "tuf"),
 		),
 	)
 	s.AddTool(verifyArtifactTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"rekor-cli", "verify"}
-		if artifact := request.GetString("artifact", ""); artifact != "" {
-			args = append(args, "--artifact", artifact)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if signature := request.GetString("signature", ""); signature != "" {
-			args = append(args, "--signature", signature)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewRekorModule(client)
+
+		// Get parameters
+		artifact := request.GetString("artifact", "")
+		signature := request.GetString("signature", "")
+
+		// Check for unsupported parameters
+		if request.GetString("public_key", "") != "" || request.GetString("type", "") != "" || request.GetString("pki_format", "") != "" {
+			return mcp.NewToolResultError("public_key, type, and pki_format options not supported in current Dagger module"), nil
 		}
-		if publicKey := request.GetString("public_key", ""); publicKey != "" {
-			args = append(args, "--public-key", publicKey)
+
+		// Verify artifact
+		output, err := module.Verify(ctx, artifact, signature)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("rekor verify artifact failed: %v", err)), nil
 		}
-		if entryType := request.GetString("type", ""); entryType != "" {
-			args = append(args, "--type", entryType)
-		}
-		if pkiFormat := request.GetString("pki_format", ""); pkiFormat != "" {
-			args = append(args, "--pki-format", pkiFormat)
-		}
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 }

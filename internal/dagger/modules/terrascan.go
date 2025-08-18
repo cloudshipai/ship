@@ -13,11 +13,13 @@ type TerrascanModule struct {
 	name   string
 }
 
+const terrascanBinary = "/usr/local/bin/terrascan"
+
 // NewTerrascanModule creates a new Terrascan module
 func NewTerrascanModule(client *dagger.Client) *TerrascanModule {
 	return &TerrascanModule{
 		client: client,
-		name:   "terrascan",
+		name:   terrascanBinary,
 	}
 }
 
@@ -27,7 +29,7 @@ func (m *TerrascanModule) ScanDirectory(ctx context.Context, dir string) (string
 		From("tenable/terrascan:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"terrascan", "scan", "-d", ".", "-o", "json"})
+		WithExec([]string{terrascanBinary, "scan", "-d", ".", "-o", "json"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -48,7 +50,7 @@ func (m *TerrascanModule) ScanTerraform(ctx context.Context, dir string) (string
 		From("tenable/terrascan:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"terrascan", "scan", "-i", "terraform", "-d", ".", "-o", "json"})
+		WithExec([]string{terrascanBinary, "scan", "-i", "terraform", "-d", ".", "-o", "json"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -68,7 +70,7 @@ func (m *TerrascanModule) ScanKubernetes(ctx context.Context, dir string) (strin
 		From("tenable/terrascan:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"terrascan", "scan", "-i", "k8s", "-d", ".", "-o", "json"})
+		WithExec([]string{terrascanBinary, "scan", "-i", "k8s", "-d", ".", "-o", "json"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -88,7 +90,7 @@ func (m *TerrascanModule) ScanCloudFormation(ctx context.Context, dir string) (s
 		From("tenable/terrascan:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"terrascan", "scan", "-i", "cloudformation", "-d", ".", "-o", "json"})
+		WithExec([]string{terrascanBinary, "scan", "-i", "cloudformation", "-d", ".", "-o", "json"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -108,7 +110,7 @@ func (m *TerrascanModule) ScanDockerfiles(ctx context.Context, dir string) (stri
 		From("tenable/terrascan:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"terrascan", "scan", "-i", "docker", "-d", ".", "-o", "json"})
+		WithExec([]string{terrascanBinary, "scan", "-i", "docker", "-d", ".", "-o", "json"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -124,7 +126,7 @@ func (m *TerrascanModule) ScanDockerfiles(ctx context.Context, dir string) (stri
 
 // ScanWithSeverity scans with a specific severity threshold
 func (m *TerrascanModule) ScanWithSeverity(ctx context.Context, dir string, severity string, iacType string) (string, error) {
-	args := []string{"terrascan", "scan", "-d", ".", "-o", "json"}
+	args := []string{terrascanBinary, "scan", "-d", ".", "-o", "json"}
 	
 	if iacType != "" {
 		args = append(args, "-i", iacType)
@@ -154,7 +156,7 @@ func (m *TerrascanModule) ScanWithSeverity(ctx context.Context, dir string, seve
 
 // ScanRemote scans remote repository
 func (m *TerrascanModule) ScanRemote(ctx context.Context, repoURL string, repoType string, outputFormat string) (string, error) {
-	args := []string{"terrascan", "scan", "-r", repoURL}
+	args := []string{terrascanBinary, "scan", "-r", repoURL}
 	if repoType != "" {
 		args = append(args, "--remote-type", repoType)
 	}
@@ -186,7 +188,7 @@ func (m *TerrascanModule) ScanWithPolicy(ctx context.Context, dir string, policy
 		WithDirectory("/policies", m.client.Host().Directory(policyPath)).
 		WithWorkdir("/workspace")
 
-	args := []string{"terrascan", "scan", "-d", ".", "--policy-path", "/policies"}
+	args := []string{terrascanBinary, "scan", "-d", ".", "--policy-path", "/policies"}
 	if outputFormat != "" {
 		args = append(args, "--output", outputFormat)
 	}
@@ -212,7 +214,7 @@ func (m *TerrascanModule) ComprehensiveIaCScan(ctx context.Context, target strin
 		WithDirectory("/workspace", m.client.Host().Directory(target)).
 		WithWorkdir("/workspace")
 
-	args := []string{"terrascan", "scan", "-i", iacType, "-d", "."}
+	args := []string{terrascanBinary, "scan", "-i", iacType, "-d", "."}
 	if outputFormat != "" {
 		args = append(args, "-o", outputFormat)
 	}
@@ -256,7 +258,7 @@ func (m *TerrascanModule) ComplianceFrameworkScan(ctx context.Context, target st
 		WithDirectory("/workspace", m.client.Host().Directory(target)).
 		WithWorkdir("/workspace")
 
-	args := []string{"terrascan", "scan", "-i", iacType, "-d", ".", "--policy-type", complianceFramework}
+	args := []string{terrascanBinary, "scan", "-i", iacType, "-d", ".", "--policy-type", complianceFramework}
 	if outputFormat != "" {
 		args = append(args, "-o", outputFormat)
 	}
@@ -293,7 +295,7 @@ func (m *TerrascanModule) RemoteRepositoryScan(ctx context.Context, repoURL stri
 		container = container.WithFile("/config.yaml", m.client.Host().File(configPath))
 	}
 
-	args := []string{"terrascan", "scan", "-r", repoURL, "-t", repoType, "-i", iacType}
+	args := []string{terrascanBinary, "scan", "-r", repoURL, "-t", repoType, "-i", iacType}
 	if branch != "" {
 		args = append(args, "--remote-branch", branch)
 	}
@@ -342,13 +344,13 @@ func (m *TerrascanModule) CustomPolicyManagement(ctx context.Context, action str
 	var args []string
 	switch action {
 	case "validate":
-		args = []string{"terrascan", "init", "--policy-path", "/policies"}
+		args = []string{terrascanBinary, "init", "--policy-path", "/policies"}
 	case "test":
-		args = []string{"terrascan", "scan", "--policy-path", "/policies", "-d", "/testdata"}
+		args = []string{terrascanBinary, "scan", "--policy-path", "/policies", "-d", "/testdata"}
 	case "scan-with-custom":
-		args = []string{"terrascan", "scan", "-i", iacType, "-d", "/workspace", "--policy-path", "/policies"}
+		args = []string{terrascanBinary, "scan", "-i", iacType, "-d", "/workspace", "--policy-path", "/policies"}
 	default:
-		args = []string{"terrascan", "--help"}
+		args = []string{terrascanBinary, "--help"}
 	}
 
 	container = container.WithExec(args)
@@ -376,7 +378,7 @@ func (m *TerrascanModule) CICDPipelineIntegration(ctx context.Context, target st
 		container = container.WithFile("/baseline.json", m.client.Host().File(baselineFile))
 	}
 
-	args := []string{"terrascan", "scan", "-i", iacType, "-d", "."}
+	args := []string{terrascanBinary, "scan", "-i", iacType, "-d", "."}
 
 	// Configure based on pipeline stage and gate policy
 	switch pipelineStage {
@@ -425,7 +427,7 @@ func (m *TerrascanModule) CICDPipelineIntegration(ctx context.Context, target st
 func (m *TerrascanModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("tenable/terrascan:latest").
-		WithExec([]string{"terrascan", "version"})
+		WithExec([]string{terrascanBinary, "version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

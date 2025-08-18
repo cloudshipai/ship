@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddPMapperTools adds PMapper (AWS IAM privilege escalation analysis) MCP tool implementations using real CLI commands
+// AddPMapperTools adds PMapper (AWS IAM privilege escalation analysis) MCP tool implementations using direct Dagger calls
 func AddPMapperTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addPMapperToolsDirect(s)
+}
+
+// addPMapperToolsDirect adds PMapper tools using direct Dagger module calls
+func addPMapperToolsDirect(s *server.MCPServer) {
 	// PMapper create graph tool
 	createGraphTool := mcp.NewTool("pmapper_graph_create",
 		mcp.WithDescription("Create IAM privilege graph using real pmapper CLI"),
@@ -20,17 +29,31 @@ func AddPMapperTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(createGraphTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"pmapper"}
-		
-		if profile := request.GetString("profile", ""); profile != "" {
-			args = append(args, "--profile", profile)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if account := request.GetString("account", ""); account != "" {
-			args = append(args, "--account", account)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPMapperModule(client)
+
+		// Get parameters
+		profile := request.GetString("profile", "")
+
+		// Note: Dagger module doesn't support account parameter
+		if request.GetString("account", "") != "" {
+			return mcp.NewToolResultError("account parameter not supported in Dagger module"), nil
 		}
-		
-		args = append(args, "graph", "create")
-		return executeShipCommand(args)
+
+		// Create graph
+		output, err := module.CreateGraph(ctx, profile)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("pmapper create graph failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// PMapper query tool
@@ -48,18 +71,15 @@ func AddPMapperTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(queryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Get parameters
 		queryString := request.GetString("query_string", "")
-		args := []string{"pmapper"}
-		
-		if profile := request.GetString("profile", ""); profile != "" {
-			args = append(args, "--profile", profile)
+		if queryString == "" {
+			return mcp.NewToolResultError("query_string is required"), nil
 		}
-		if account := request.GetString("account", ""); account != "" {
-			args = append(args, "--account", account)
-		}
-		
-		args = append(args, "query", queryString)
-		return executeShipCommand(args)
+
+		// Note: Generic query not directly supported in Dagger module
+		// Dagger module has specific methods for different query types
+		return mcp.NewToolResultError("generic query not supported in Dagger module - use specific query functions instead"), nil
 	})
 
 	// PMapper privilege escalation query tool
@@ -77,19 +97,35 @@ func AddPMapperTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(privEscTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPMapperModule(client)
+
+		// Get parameters
 		target := request.GetString("target", "")
-		args := []string{"pmapper"}
-		
-		if profile := request.GetString("profile", ""); profile != "" {
-			args = append(args, "--profile", profile)
+		if target == "" {
+			return mcp.NewToolResultError("target is required"), nil
 		}
-		if account := request.GetString("account", ""); account != "" {
-			args = append(args, "--account", account)
+		profile := request.GetString("profile", "")
+
+		// Note: Dagger module doesn't support account parameter
+		if request.GetString("account", "") != "" {
+			return mcp.NewToolResultError("account parameter not supported in Dagger module"), nil
 		}
-		
-		queryString := "preset privesc " + target
-		args = append(args, "query", queryString)
-		return executeShipCommand(args)
+
+		// Find privilege escalation
+		output, err := module.FindPrivilegeEscalation(ctx, profile, target)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("pmapper privilege escalation query failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// PMapper visualize tool
@@ -106,22 +142,32 @@ func AddPMapperTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(visualizeTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"pmapper"}
-		
-		if profile := request.GetString("profile", ""); profile != "" {
-			args = append(args, "--profile", profile)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if account := request.GetString("account", ""); account != "" {
-			args = append(args, "--account", account)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPMapperModule(client)
+
+		// Get parameters
+		profile := request.GetString("profile", "")
+		filetype := request.GetString("filetype", "")
+
+		// Note: Dagger module doesn't support account parameter
+		if request.GetString("account", "") != "" {
+			return mcp.NewToolResultError("account parameter not supported in Dagger module"), nil
 		}
-		
-		args = append(args, "visualize")
-		
-		if filetype := request.GetString("filetype", ""); filetype != "" {
-			args = append(args, "--filetype", filetype)
+
+		// Visualize graph
+		output, err := module.VisualizeGraph(ctx, profile, filetype)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("pmapper visualize failed: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// PMapper query who can do action tool
@@ -139,19 +185,31 @@ func AddPMapperTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(queryWhoCanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPMapperModule(client)
+
+		// Get parameters
 		action := request.GetString("action", "")
-		args := []string{"pmapper"}
-		
-		if profile := request.GetString("profile", ""); profile != "" {
-			args = append(args, "--profile", profile)
+		if action == "" {
+			return mcp.NewToolResultError("action is required"), nil
 		}
-		if account := request.GetString("account", ""); account != "" {
-			args = append(args, "--account", account)
+		profile := request.GetString("profile", "")
+
+		// Note: "who can do" query not directly supported in Dagger module
+		// Use QueryAccess with wildcard principal instead
+		output, err := module.QueryAccess(ctx, profile, "*", action, "")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("pmapper who can query failed: %v", err)), nil
 		}
-		
-		queryString := "who can do " + action
-		args = append(args, "query", queryString)
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// PMapper advanced query tool
@@ -175,29 +233,36 @@ func AddPMapperTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(argqueryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPMapperModule(client)
+
+		// Get parameters
 		action := request.GetString("action", "")
-		args := []string{"pmapper"}
-		
-		if profile := request.GetString("profile", ""); profile != "" {
-			args = append(args, "--profile", profile)
+		if action == "" {
+			return mcp.NewToolResultError("action is required"), nil
 		}
-		if account := request.GetString("account", ""); account != "" {
-			args = append(args, "--account", account)
+		profile := request.GetString("profile", "")
+		condition := request.GetString("condition", "")
+
+		// Note: Dagger module doesn't support advanced argquery with conditions and skip_admin
+		if request.GetString("account", "") != "" || request.GetBool("skip_admin", false) || condition != "" {
+			return mcp.NewToolResultError("advanced argquery options not supported in Dagger module"), nil
 		}
-		
-		args = append(args, "argquery")
-		
-		if request.GetBool("skip_admin", false) {
-			args = append(args, "-s")
+
+		// Use QueryAccess as a fallback for basic action queries
+		output, err := module.QueryAccess(ctx, profile, "*", action, "")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("pmapper argquery failed: %v", err)), nil
 		}
-		
-		args = append(args, "--action", action)
-		
-		if condition := request.GetString("condition", ""); condition != "" {
-			args = append(args, "--condition", condition)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 

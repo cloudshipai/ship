@@ -13,6 +13,8 @@ type OpenSCAPModule struct {
 	name   string
 }
 
+const oscapBinary = "/usr/bin/oscap"
+
 // NewOpenSCAPModule creates a new OpenSCAP module
 func NewOpenSCAPModule(client *dagger.Client) *OpenSCAPModule {
 	return &OpenSCAPModule{
@@ -27,7 +29,7 @@ func (m *OpenSCAPModule) EvaluateProfile(ctx context.Context, contentPath string
 		From("cloudshipai/openscap:latest").
 		WithFile("/content.xml", m.client.Host().File(contentPath)).
 		WithExec([]string{
-			"oscap",
+			oscapBinary,
 			"xccdf", "eval",
 			"--profile", profile,
 			"--results", "/results.xml",
@@ -70,7 +72,7 @@ func (m *OpenSCAPModule) GenerateReport(ctx context.Context, resultsPath string)
 		From("cloudshipai/openscap:latest").
 		WithFile("/results.xml", m.client.Host().File(resultsPath)).
 		WithExec([]string{
-			"oscap",
+			oscapBinary,
 			"xccdf", "generate", "report",
 			"/results.xml",
 		})
@@ -89,7 +91,7 @@ func (m *OpenSCAPModule) OvalEvaluate(ctx context.Context, ovalFile string, resu
 		From("cloudshipai/openscap:latest").
 		WithFile("/oval.xml", m.client.Host().File(ovalFile))
 
-	args := []string{"oscap", "oval", "eval"}
+	args := []string{oscapBinary, "oval", "eval"}
 	if resultsFile != "" {
 		args = append(args, "--results", "/results.xml")
 	}
@@ -118,7 +120,7 @@ func (m *OpenSCAPModule) GenerateGuide(ctx context.Context, xccdfFile string, pr
 		From("cloudshipai/openscap:latest").
 		WithFile("/xccdf.xml", m.client.Host().File(xccdfFile))
 
-	args := []string{"oscap", "xccdf", "generate", "guide"}
+	args := []string{oscapBinary, "xccdf", "generate", "guide"}
 	if profile != "" {
 		args = append(args, "--profile", profile)
 	}
@@ -139,7 +141,7 @@ func (m *OpenSCAPModule) ValidateDataStream(ctx context.Context, datastreamFile 
 	container := m.client.Container().
 		From("cloudshipai/openscap:latest").
 		WithFile("/datastream.xml", m.client.Host().File(datastreamFile)).
-		WithExec([]string{"oscap", "ds", "sds-validate", "/datastream.xml"})
+		WithExec([]string{oscapBinary, "ds", "sds-validate", "/datastream.xml"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -157,12 +159,12 @@ func (m *OpenSCAPModule) ValidateContent(ctx context.Context, contentFile string
 
 	var args []string
 	if contentType != "" {
-		args = []string{"oscap", contentType, "validate"}
+		args = []string{oscapBinary, contentType, "validate"}
 		if contentType == "oval" && schematron {
 			args = append(args, "--schematron")
 		}
 	} else {
-		args = []string{"oscap", "info", "/content.xml"}
+		args = []string{oscapBinary, "info", "/content.xml"}
 	}
 	args = append(args, "/content.xml")
 
@@ -181,7 +183,7 @@ func (m *OpenSCAPModule) GetInfo(ctx context.Context, contentFile string) (strin
 	container := m.client.Container().
 		From("cloudshipai/openscap:latest").
 		WithFile("/content.xml", m.client.Host().File(contentFile)).
-		WithExec([]string{"oscap", "info", "/content.xml"})
+		WithExec([]string{oscapBinary, "info", "/content.xml"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -196,7 +198,7 @@ func (m *OpenSCAPModule) RemediateXCCDF(ctx context.Context, resultsFile string)
 	container := m.client.Container().
 		From("cloudshipai/openscap:latest").
 		WithFile("/results.xml", m.client.Host().File(resultsFile)).
-		WithExec([]string{"oscap", "xccdf", "remediate", "/results.xml"})
+		WithExec([]string{oscapBinary, "xccdf", "remediate", "/results.xml"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -211,7 +213,7 @@ func (m *OpenSCAPModule) GenerateOvalReport(ctx context.Context, ovalResultsFile
 	container := m.client.Container().
 		From("cloudshipai/openscap:latest").
 		WithFile("/oval_results.xml", m.client.Host().File(ovalResultsFile)).
-		WithExec([]string{"oscap", "oval", "generate", "report", "/oval_results.xml"})
+		WithExec([]string{oscapBinary, "oval", "generate", "report", "/oval_results.xml"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -227,7 +229,7 @@ func (m *OpenSCAPModule) SplitDataStream(ctx context.Context, datastreamFile str
 		From("cloudshipai/openscap:latest").
 		WithFile("/datastream.xml", m.client.Host().File(datastreamFile))
 
-	args := []string{"oscap", "ds", "sds-split"}
+	args := []string{oscapBinary, "ds", "sds-split"}
 	if outputDir != "" {
 		args = append(args, "--output-dir", "/output")
 	}

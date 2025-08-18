@@ -13,11 +13,13 @@ type TerraformDocsModule struct {
 	name   string
 }
 
+const terraformDocsBinary = "/usr/local/bin/terraform-docs"
+
 // NewTerraformDocsModule creates a new terraform-docs module
 func NewTerraformDocsModule(client *dagger.Client) *TerraformDocsModule {
 	return &TerraformDocsModule{
 		client: client,
-		name:   "terraform-docs",
+		name:   terraformDocsBinary,
 	}
 }
 
@@ -28,7 +30,7 @@ func (m *TerraformDocsModule) GenerateMarkdown(ctx context.Context, dir string) 
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			"terraform-docs",
+			terraformDocsBinary,
 			"markdown",
 			".",
 		})
@@ -48,7 +50,7 @@ func (m *TerraformDocsModule) GenerateJSON(ctx context.Context, dir string) (str
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			"terraform-docs",
+			terraformDocsBinary,
 			"json",
 			".",
 		})
@@ -71,14 +73,14 @@ func (m *TerraformDocsModule) GenerateWithConfig(ctx context.Context, dir string
 	if configFile != "" {
 		container = container.WithFile("/.terraform-docs.yml", m.client.Host().File(configFile))
 		container = container.WithExec([]string{
-			"terraform-docs",
+			terraformDocsBinary,
 			"--config", "/.terraform-docs.yml",
 			"markdown",
 			"/workspace",
 		})
 	} else {
 		container = container.WithExec([]string{
-			"terraform-docs",
+			terraformDocsBinary,
 			"markdown",
 			"/workspace",
 		})
@@ -99,7 +101,7 @@ func (m *TerraformDocsModule) GenerateTable(ctx context.Context, dir string) (st
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			"terraform-docs",
+			terraformDocsBinary,
 			"markdown", "table",
 			".",
 		})
@@ -116,7 +118,7 @@ func (m *TerraformDocsModule) GenerateTable(ctx context.Context, dir string) (st
 func (m *TerraformDocsModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("quay.io/terraform-docs/terraform-docs:latest").
-		WithExec([]string{"terraform-docs", "--version"})
+		WithExec([]string{terraformDocsBinary, "--version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
+	"dagger.io/dagger"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // AddCheckovTools adds Checkov (Infrastructure as Code static analysis) MCP tool implementations
 func AddCheckovTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addCheckovToolsDirect(s)
+}
+
+// addCheckovToolsDirect implements direct Dagger calls for Checkov tools
+func addCheckovToolsDirect(s *server.MCPServer) {
 	// Checkov scan directory tool
 	scanDirectoryTool := mcp.NewTool("checkov_scan_directory",
 		mcp.WithDescription("Scan directory for security issues using Checkov"),
@@ -31,23 +40,28 @@ func AddCheckovTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(scanDirectoryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		directory := request.GetString("directory", "")
-		args := []string{"checkov", "--directory", directory}
-		
-		if framework := request.GetString("framework", ""); framework != "" {
-			args = append(args, "--framework", framework)
+		framework := request.GetString("framework", "")
+		output := request.GetString("output", "")
+		compact := request.GetBool("compact", false)
+		quiet := request.GetBool("quiet", false)
+
+		// Create Checkov module and scan directory
+		checkovModule := modules.NewCheckovModule(client)
+		result, err := checkovModule.ScanDirectoryWithOptions(ctx, directory, framework, output, compact, quiet)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("checkov directory scan failed: %v", err)), nil
 		}
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "--output", output)
-		}
-		if request.GetBool("compact", false) {
-			args = append(args, "--compact")
-		}
-		if request.GetBool("quiet", false) {
-			args = append(args, "--quiet")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Checkov scan file tool
@@ -66,17 +80,26 @@ func AddCheckovTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(scanFileTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		file := request.GetString("file", "")
-		args := []string{"checkov", "--file", file}
-		
-		if framework := request.GetString("framework", ""); framework != "" {
-			args = append(args, "--framework", framework)
+		framework := request.GetString("framework", "")
+		output := request.GetString("output", "")
+
+		// Create Checkov module and scan file
+		checkovModule := modules.NewCheckovModule(client)
+		result, err := checkovModule.ScanFileWithOptions(ctx, file, framework, output)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("checkov file scan failed: %v", err)), nil
 		}
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "--output", output)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Checkov scan with specific checks tool
@@ -94,17 +117,26 @@ func AddCheckovTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(scanWithChecksTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		directory := request.GetString("directory", "")
-		args := []string{"checkov", "--directory", directory}
-		
-		if check := request.GetString("check", ""); check != "" {
-			args = append(args, "--check", check)
+		check := request.GetString("check", "")
+		skipCheck := request.GetString("skip_check", "")
+
+		// Create Checkov module and scan with specific checks
+		checkovModule := modules.NewCheckovModule(client)
+		result, err := checkovModule.ScanWithSpecificChecks(ctx, directory, check, skipCheck)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("checkov scan with checks failed: %v", err)), nil
 		}
-		if skipCheck := request.GetString("skip_check", ""); skipCheck != "" {
-			args = append(args, "--skip-check", skipCheck)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Checkov scan Docker image tool
@@ -123,17 +155,26 @@ func AddCheckovTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(scanDockerImageTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		dockerImage := request.GetString("docker_image", "")
-		args := []string{"checkov", "--docker-image", dockerImage, "--framework", "sca_image"}
-		
-		if dockerfilePath := request.GetString("dockerfile_path", ""); dockerfilePath != "" {
-			args = append(args, "--dockerfile-path", dockerfilePath)
+		dockerfilePath := request.GetString("dockerfile_path", "")
+		output := request.GetString("output", "")
+
+		// Create Checkov module and scan Docker image
+		checkovModule := modules.NewCheckovModule(client)
+		result, err := checkovModule.ScanDockerImage(ctx, dockerImage, dockerfilePath, output)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("checkov Docker image scan failed: %v", err)), nil
 		}
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "--output", output)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Checkov scan packages tool
@@ -149,14 +190,25 @@ func AddCheckovTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(scanPackagesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		directory := request.GetString("directory", "")
-		args := []string{"checkov", "--directory", directory, "--framework", "sca_package"}
-		
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "--output", output)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		directory := request.GetString("directory", "")
+		output := request.GetString("output", "")
+
+		// Create Checkov module and scan packages
+		checkovModule := modules.NewCheckovModule(client)
+		result, err := checkovModule.ScanPackages(ctx, directory, output)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("checkov package scan failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Checkov scan secrets tool
@@ -172,14 +224,25 @@ func AddCheckovTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(scanSecretsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		directory := request.GetString("directory", "")
-		args := []string{"checkov", "--directory", directory, "--framework", "secrets"}
-		
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "--output", output)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		directory := request.GetString("directory", "")
+		output := request.GetString("output", "")
+
+		// Create Checkov module and scan secrets
+		checkovModule := modules.NewCheckovModule(client)
+		result, err := checkovModule.ScanSecrets(ctx, directory, output)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("checkov secrets scan failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Checkov scan with config file tool
@@ -195,11 +258,25 @@ func AddCheckovTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(scanWithConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		directory := request.GetString("directory", "")
 		configFile := request.GetString("config_file", "")
-		args := []string{"checkov", "--directory", directory, "--config-file", configFile}
-		
-		return executeShipCommand(args)
+
+		// Create Checkov module and scan with config
+		checkovModule := modules.NewCheckovModule(client)
+		result, err := checkovModule.ScanWithConfig(ctx, directory, configFile)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("checkov scan with config failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Checkov create config tool
@@ -211,10 +288,24 @@ func AddCheckovTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(createConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		configPath := request.GetString("config_path", "")
-		args := []string{"checkov", "--create-config", configPath}
-		
-		return executeShipCommand(args)
+
+		// Create Checkov module and create config
+		checkovModule := modules.NewCheckovModule(client)
+		result, err := checkovModule.CreateConfig(ctx, configPath)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("checkov create config failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Checkov download external modules tool
@@ -229,14 +320,25 @@ func AddCheckovTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(downloadModulesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		directory := request.GetString("directory", "")
-		args := []string{"checkov", "--directory", directory}
-		
-		if request.GetBool("download_external_modules", false) {
-			args = append(args, "--download-external-modules", "true")
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		directory := request.GetString("directory", "")
+		downloadExternalModules := request.GetBool("download_external_modules", false)
+
+		// Create Checkov module and scan with external modules
+		checkovModule := modules.NewCheckovModule(client)
+		result, err := checkovModule.ScanWithExternalModules(ctx, directory, downloadExternalModules)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("checkov scan with external modules failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Checkov get version tool
@@ -244,7 +346,20 @@ func AddCheckovTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		mcp.WithDescription("Get Checkov version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"checkov", "--version"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create Checkov module and get version
+		checkovModule := modules.NewCheckovModule(client)
+		result, err := checkovModule.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("checkov get version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 }

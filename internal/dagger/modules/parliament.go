@@ -12,11 +12,13 @@ type ParliamentModule struct {
 	name   string
 }
 
+const parliamentBinary = "/usr/local/bin/parliament"
+
 // NewParliamentModule creates a new Parliament module
 func NewParliamentModule(client *dagger.Client) *ParliamentModule {
 	return &ParliamentModule{
 		client: client,
-		name:   "parliament",
+		name:   parliamentBinary,
 	}
 }
 
@@ -26,7 +28,7 @@ func (m *ParliamentModule) LintPolicyFile(ctx context.Context, policyPath string
 		From("cloudshipai/parliament:latest").
 		WithFile("/workspace/policy.json", m.client.Host().File(policyPath)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"parliament", "--file", "policy.json"})
+		WithExec([]string{parliamentBinary, "--file", "policy.json"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -47,7 +49,7 @@ func (m *ParliamentModule) LintPolicyDirectory(ctx context.Context, dir string) 
 		From("cloudshipai/parliament:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"parliament", "--directory", "."})
+		WithExec([]string{parliamentBinary, "--directory", "."})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -67,7 +69,7 @@ func (m *ParliamentModule) LintPolicyString(ctx context.Context, policyJSON stri
 		From("cloudshipai/parliament:latest").
 		WithNewFile("/workspace/policy.json", policyJSON).
 		WithWorkdir("/workspace").
-		WithExec([]string{"parliament", "--file", "policy.json"})
+		WithExec([]string{parliamentBinary, "--file", "policy.json"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -87,7 +89,7 @@ func (m *ParliamentModule) LintWithCommunityAuditors(ctx context.Context, policy
 		From("cloudshipai/parliament:latest").
 		WithFile("/workspace/policy.json", m.client.Host().File(policyPath)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"parliament", "--file", "policy.json", "--include-community-auditors"})
+		WithExec([]string{parliamentBinary, "--file", "policy.json", "--include-community-auditors"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -108,7 +110,7 @@ func (m *ParliamentModule) LintWithPrivateAuditors(ctx context.Context, policyPa
 		WithFile("/workspace/policy.json", m.client.Host().File(policyPath)).
 		WithDirectory("/workspace/auditors", m.client.Host().Directory(auditorsPath)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"parliament", "--file", "policy.json", "--private-auditors-dir", "auditors"})
+		WithExec([]string{parliamentBinary, "--file", "policy.json", "--private-auditors-dir", "auditors"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -124,7 +126,7 @@ func (m *ParliamentModule) LintWithPrivateAuditors(ctx context.Context, policyPa
 
 // LintWithSeverityFilter lints and filters by severity level
 func (m *ParliamentModule) LintWithSeverityFilter(ctx context.Context, policyPath string, minSeverity string) (string, error) {
-	args := []string{"parliament", "--file", "policy.json"}
+	args := []string{parliamentBinary, "--file", "policy.json"}
 	
 	if minSeverity != "" {
 		args = append(args, "--minimum-severity", minSeverity)
@@ -153,7 +155,7 @@ func (m *ParliamentModule) LintAWSManagedPolicies(ctx context.Context, config st
 	container := m.client.Container().
 		From("cloudshipai/parliament:latest")
 
-	args := []string{"parliament", "--aws-managed-policies"}
+	args := []string{parliamentBinary, "--aws-managed-policies"}
 	if config != "" {
 		container = container.WithFile("/workspace/config.yaml", m.client.Host().File(config))
 		args = append(args, "--config", "/workspace/config.yaml")
@@ -182,7 +184,7 @@ func (m *ParliamentModule) LintAuthDetailsFile(ctx context.Context, authDetailsF
 		From("cloudshipai/parliament:latest").
 		WithFile("/workspace/auth_details.json", m.client.Host().File(authDetailsFile))
 
-	args := []string{"parliament", "--auth-details-file", "/workspace/auth_details.json"}
+	args := []string{parliamentBinary, "--auth-details-file", "/workspace/auth_details.json"}
 	if config != "" {
 		container = container.WithFile("/workspace/config.yaml", m.client.Host().File(config))
 		args = append(args, "--config", "/workspace/config.yaml")
@@ -218,7 +220,7 @@ func (m *ParliamentModule) ComprehensiveAnalysis(ctx context.Context, policyPath
 		container = container.WithFile("/workspace/config.yaml", m.client.Host().File(config))
 	}
 
-	args := []string{"parliament", "--file", "/workspace/policy.json", "--include-community-auditors"}
+	args := []string{parliamentBinary, "--file", "/workspace/policy.json", "--include-community-auditors"}
 	if privateAuditors != "" {
 		args = append(args, "--private_auditors", "/workspace/auditors")
 	}
@@ -256,7 +258,7 @@ func (m *ParliamentModule) BatchDirectoryAnalysis(ctx context.Context, baseDirec
 		container = container.WithFile("/workspace/config.yaml", m.client.Host().File(config))
 	}
 
-	args := []string{"parliament", "--directory", "/workspace", "--include-community-auditors"}
+	args := []string{parliamentBinary, "--directory", "/workspace", "--include-community-auditors"}
 	if privateAuditors != "" {
 		args = append(args, "--private_auditors", "/workspace/auditors")
 	}

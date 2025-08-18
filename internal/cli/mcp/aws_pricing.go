@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
+	"dagger.io/dagger"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // AddAWSPricingTools adds AWS Pricing (official AWS CLI pricing commands) MCP tool implementations
 func AddAWSPricingTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addAWSPricingToolsDirect(s)
+}
+
+// addAWSPricingToolsDirect implements direct Dagger calls for AWS pricing tools
+func addAWSPricingToolsDirect(s *server.MCPServer) {
 	// AWS pricing describe services tool
 	describeServicesTool := mcp.NewTool("aws_pricing_describe_services",
 		mcp.WithDescription("Get metadata for AWS services and their pricing attributes"),
@@ -23,17 +32,26 @@ func AddAWSPricingTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(describeServicesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"aws", "pricing", "describe-services"}
-		if serviceCode := request.GetString("service_code", ""); serviceCode != "" {
-			args = append(args, "--service-code", serviceCode)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if profile := request.GetString("profile", ""); profile != "" {
-			args = append(args, "--profile", profile)
+		defer client.Close()
+
+		// Get parameters
+		serviceCode := request.GetString("service_code", "")
+		maxItems := request.GetString("max_items", "")
+		// Note: profile parameter ignored - AWS CLI in container handles auth via env vars
+
+		// Create AWS pricing module and describe services
+		awsModule := modules.NewAWSPricingModule(client)
+		result, err := awsModule.DescribeServices(ctx, serviceCode, maxItems)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("describe services failed: %v", err)), nil
 		}
-		if maxItemsStr := request.GetString("max_items", ""); maxItemsStr != "" {
-			args = append(args, "--max-items", maxItemsStr)
-		}
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// AWS pricing get attribute values tool
@@ -55,16 +73,27 @@ func AddAWSPricingTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(getAttributeValuesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		serviceCode := request.GetString("service_code", "")
 		attributeName := request.GetString("attribute_name", "")
-		args := []string{"aws", "pricing", "get-attribute-values", "--service-code", serviceCode, "--attribute-name", attributeName}
-		if profile := request.GetString("profile", ""); profile != "" {
-			args = append(args, "--profile", profile)
+		maxItems := request.GetString("max_items", "")
+		// Note: profile parameter ignored - AWS CLI in container handles auth via env vars
+
+		// Create AWS pricing module and get attribute values
+		awsModule := modules.NewAWSPricingModule(client)
+		result, err := awsModule.GetAttributeValues(ctx, serviceCode, attributeName, maxItems)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("get attribute values failed: %v", err)), nil
 		}
-		if maxItemsStr := request.GetString("max_items", ""); maxItemsStr != "" {
-			args = append(args, "--max-items", maxItemsStr)
-		}
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// AWS pricing get products tool
@@ -89,21 +118,28 @@ func AddAWSPricingTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(getProductsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		serviceCode := request.GetString("service_code", "")
-		args := []string{"aws", "pricing", "get-products", "--service-code", serviceCode}
-		if filters := request.GetString("filters", ""); filters != "" {
-			args = append(args, "--filters", filters)
+		filters := request.GetString("filters", "")
+		formatVersion := request.GetString("format_version", "")
+		maxItems := request.GetString("max_items", "")
+		// Note: profile parameter ignored - AWS CLI in container handles auth via env vars
+
+		// Create AWS pricing module and get products
+		awsModule := modules.NewAWSPricingModule(client)
+		result, err := awsModule.GetProducts(ctx, serviceCode, filters, formatVersion, maxItems)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("get products failed: %v", err)), nil
 		}
-		if formatVersion := request.GetString("format_version", ""); formatVersion != "" {
-			args = append(args, "--format-version", formatVersion)
-		}
-		if profile := request.GetString("profile", ""); profile != "" {
-			args = append(args, "--profile", profile)
-		}
-		if maxItemsStr := request.GetString("max_items", ""); maxItemsStr != "" {
-			args = append(args, "--max-items", maxItemsStr)
-		}
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// AWS CLI version tool
@@ -111,7 +147,20 @@ func AddAWSPricingTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		mcp.WithDescription("Get AWS CLI version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"aws", "--version"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create AWS pricing module and get version
+		awsModule := modules.NewAWSPricingModule(client)
+		result, err := awsModule.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("get AWS CLI version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 }

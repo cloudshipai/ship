@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddPackerTools adds Packer (machine image building) MCP tool implementations using real CLI commands
+// AddPackerTools adds Packer (machine image building) MCP tool implementations using direct Dagger calls
 func AddPackerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addPackerToolsDirect(s)
+}
+
+// addPackerToolsDirect adds Packer tools using direct Dagger module calls
+func addPackerToolsDirect(s *server.MCPServer) {
 	// Packer build tool
 	buildTool := mcp.NewTool("packer_build",
 		mcp.WithDescription("Build machine images using real packer CLI"),
@@ -43,36 +52,38 @@ func AddPackerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(buildTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPackerModule(client)
+
+		// Get parameters
 		templateFile := request.GetString("template_file", "")
-		args := []string{"packer", "build"}
-		
-		if vars := request.GetString("var", ""); vars != "" {
-			args = append(args, "-var", vars)
+		if templateFile == "" {
+			return mcp.NewToolResultError("template_file is required"), nil
 		}
-		if varFile := request.GetString("var_file", ""); varFile != "" {
-			args = append(args, "-var-file", varFile)
+		varFile := request.GetString("var_file", "")
+
+		// Note: Dagger module only supports basic build with template and var-file
+		// Advanced options like only/except/force/debug are not supported
+		if request.GetString("only", "") != "" || request.GetString("except", "") != "" ||
+			request.GetBool("force", false) || request.GetBool("debug", false) ||
+			request.GetString("parallel_builds", "") != "" || request.GetString("on_error", "") != "" {
+			return mcp.NewToolResultError("advanced build options not supported in Dagger module"), nil
 		}
-		if only := request.GetString("only", ""); only != "" {
-			args = append(args, "-only", only)
+
+		// Build image
+		output, err := module.BuildImage(ctx, templateFile, varFile)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("packer build failed: %v", err)), nil
 		}
-		if except := request.GetString("except", ""); except != "" {
-			args = append(args, "-except", except)
-		}
-		if request.GetBool("force", false) {
-			args = append(args, "-force")
-		}
-		if request.GetBool("debug", false) {
-			args = append(args, "-debug")
-		}
-		if parallelBuilds := request.GetString("parallel_builds", ""); parallelBuilds != "" {
-			args = append(args, "-parallel-builds", parallelBuilds)
-		}
-		if onError := request.GetString("on_error", ""); onError != "" {
-			args = append(args, "-on-error", onError)
-		}
-		
-		args = append(args, templateFile)
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Packer validate tool
@@ -102,30 +113,37 @@ func AddPackerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(validateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPackerModule(client)
+
+		// Get parameters
 		templateFile := request.GetString("template_file", "")
-		args := []string{"packer", "validate"}
-		
-		if vars := request.GetString("var", ""); vars != "" {
-			args = append(args, "-var", vars)
+		if templateFile == "" {
+			return mcp.NewToolResultError("template_file is required"), nil
 		}
-		if varFile := request.GetString("var_file", ""); varFile != "" {
-			args = append(args, "-var-file", varFile)
+
+		// Note: Dagger module only supports basic validate
+		// Advanced options like vars/only/except/syntax_only are not supported
+		if request.GetString("var", "") != "" || request.GetString("var_file", "") != "" ||
+			request.GetString("only", "") != "" || request.GetString("except", "") != "" ||
+			request.GetBool("syntax_only", false) || request.GetBool("evaluate_datasources", false) {
+			return mcp.NewToolResultError("advanced validate options not supported in Dagger module"), nil
 		}
-		if only := request.GetString("only", ""); only != "" {
-			args = append(args, "-only", only)
+
+		// Validate template
+		output, err := module.ValidateTemplate(ctx, templateFile)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("packer validate failed: %v", err)), nil
 		}
-		if except := request.GetString("except", ""); except != "" {
-			args = append(args, "-except", except)
-		}
-		if request.GetBool("syntax_only", false) {
-			args = append(args, "-syntax-only")
-		}
-		if request.GetBool("evaluate_datasources", false) {
-			args = append(args, "-evaluate-datasources")
-		}
-		
-		args = append(args, templateFile)
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Packer inspect tool
@@ -140,15 +158,30 @@ func AddPackerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(inspectTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		templateFile := request.GetString("template_file", "")
-		args := []string{"packer", "inspect"}
-		
-		if request.GetBool("machine_readable", false) {
-			args = append(args, "-machine-readable")
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		args = append(args, templateFile)
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPackerModule(client)
+
+		// Get parameters
+		templateFile := request.GetString("template_file", "")
+		if templateFile == "" {
+			return mcp.NewToolResultError("template_file is required"), nil
+		}
+		machineReadable := request.GetBool("machine_readable", false)
+
+		// Inspect template
+		output, err := module.InspectTemplate(ctx, templateFile, machineReadable)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("packer inspect failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Packer fix tool
@@ -163,15 +196,30 @@ func AddPackerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(fixTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		templateFile := request.GetString("template_file", "")
-		args := []string{"packer", "fix"}
-		
-		if request.GetBool("validate", false) {
-			args = append(args, "-validate")
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		args = append(args, templateFile)
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPackerModule(client)
+
+		// Get parameters
+		templateFile := request.GetString("template_file", "")
+		if templateFile == "" {
+			return mcp.NewToolResultError("template_file is required"), nil
+		}
+		validateFlag := request.GetBool("validate", false)
+
+		// Fix template
+		output, err := module.FixTemplate(ctx, templateFile, validateFlag)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("packer fix failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Packer console tool
@@ -189,18 +237,31 @@ func AddPackerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(consoleTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPackerModule(client)
+
+		// Get parameters
 		templateFile := request.GetString("template_file", "")
-		args := []string{"packer", "console"}
-		
-		if vars := request.GetString("var", ""); vars != "" {
-			args = append(args, "-var", vars)
+		if templateFile == "" {
+			return mcp.NewToolResultError("template_file is required"), nil
 		}
-		if varFile := request.GetString("var_file", ""); varFile != "" {
-			args = append(args, "-var-file", varFile)
+		vars := request.GetString("var", "")
+		varFile := request.GetString("var_file", "")
+
+		// Open console
+		output, err := module.Console(ctx, templateFile, vars, varFile)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("packer console failed: %v", err)), nil
 		}
-		
-		args = append(args, templateFile)
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Packer fmt tool
@@ -223,25 +284,33 @@ func AddPackerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(fmtTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"packer", "fmt"}
-		
-		if request.GetBool("check", false) {
-			args = append(args, "-check")
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if request.GetBool("diff", false) {
-			args = append(args, "-diff")
-		}
-		if request.GetBool("write", true) {
-			args = append(args, "-write")
-		}
-		if request.GetBool("recursive", false) {
-			args = append(args, "-recursive")
-		}
-		
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPackerModule(client)
+
+		// Get parameters
 		path := request.GetString("path", ".")
-		args = append(args, path)
-		
-		return executeShipCommand(args)
+
+		// Note: Dagger module only supports basic format
+		// Advanced options like check/diff/write/recursive are not supported
+		if request.GetBool("check", false) || request.GetBool("diff", false) ||
+			request.GetBool("write", true) || request.GetBool("recursive", false) {
+			return mcp.NewToolResultError("advanced format options not supported in Dagger module"), nil
+		}
+
+		// Format template (assuming path is a file)
+		output, err := module.FormatTemplate(ctx, path)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("packer fmt failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Packer init tool
@@ -256,15 +325,30 @@ func AddPackerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(initTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		configFile := request.GetString("config_file", "")
-		args := []string{"packer", "init"}
-		
-		if request.GetBool("upgrade", false) {
-			args = append(args, "-upgrade")
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		args = append(args, configFile)
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPackerModule(client)
+
+		// Get parameters
+		configFile := request.GetString("config_file", "")
+		if configFile == "" {
+			return mcp.NewToolResultError("config_file is required"), nil
+		}
+		upgrade := request.GetBool("upgrade", false)
+
+		// Initialize configuration
+		output, err := module.InitConfiguration(ctx, configFile, upgrade)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("packer init failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Packer plugins tool
@@ -286,24 +370,32 @@ func AddPackerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(pluginsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		subcommand := request.GetString("subcommand", "")
-		args := []string{"packer", "plugins", subcommand}
-		
-		switch subcommand {
-		case "install", "remove":
-			if pluginName := request.GetString("plugin_name", ""); pluginName != "" {
-				args = append(args, pluginName)
-			}
-			if version := request.GetString("version", ""); version != "" {
-				args = append(args, version)
-			}
-		case "required":
-			if configFile := request.GetString("config_file", ""); configFile != "" {
-				args = append(args, configFile)
-			}
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPackerModule(client)
+
+		// Get parameters
+		subcommand := request.GetString("subcommand", "")
+		if subcommand == "" {
+			return mcp.NewToolResultError("subcommand is required"), nil
+		}
+		pluginName := request.GetString("plugin_name", "")
+		version := request.GetString("version", "")
+		configFile := request.GetString("config_file", "")
+
+		// Manage plugins
+		output, err := module.ManagePlugins(ctx, subcommand, pluginName, version, configFile)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("packer plugins failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Packer hcl2_upgrade tool
@@ -321,18 +413,31 @@ func AddPackerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(hcl2UpgradeTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPackerModule(client)
+
+		// Get parameters
 		templateFile := request.GetString("template_file", "")
-		args := []string{"packer", "hcl2_upgrade"}
-		
-		if outputFile := request.GetString("output_file", ""); outputFile != "" {
-			args = append(args, "-output-file", outputFile)
+		if templateFile == "" {
+			return mcp.NewToolResultError("template_file is required"), nil
 		}
-		if request.GetBool("with_annotations", false) {
-			args = append(args, "-with-annotations")
+		outputFile := request.GetString("output_file", "")
+		withAnnotations := request.GetBool("with_annotations", false)
+
+		// Upgrade to HCL2
+		output, err := module.HCL2Upgrade(ctx, templateFile, outputFile, withAnnotations)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("packer hcl2_upgrade failed: %v", err)), nil
 		}
-		
-		args = append(args, templateFile)
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Packer version tool
@@ -343,12 +448,27 @@ func AddPackerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(versionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"packer", "version"}
-		
-		if request.GetBool("machine_readable", false) {
-			args = []string{"packer", "-machine-readable", "version"}
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPackerModule(client)
+
+		// Note: machine_readable option not supported in Dagger module
+		if request.GetBool("machine_readable", false) {
+			return mcp.NewToolResultError("machine_readable option not supported in Dagger module"), nil
+		}
+
+		// Get version
+		output, err := module.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("packer version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 }

@@ -14,6 +14,8 @@ type ActionlintModule struct {
 	name   string
 }
 
+const actionlintBinary = "/usr/local/bin/actionlint"
+
 // NewActionlintModule creates a new actionlint module
 func NewActionlintModule(client *dagger.Client) *ActionlintModule {
 	return &ActionlintModule{
@@ -180,7 +182,7 @@ func (m *ActionlintModule) ScanWithExternalTools(ctx context.Context, dir, shell
 
 // ScanSpecificFiles scans specific workflow files with options
 func (m *ActionlintModule) ScanSpecificFiles(ctx context.Context, dir string, workflowFiles []string, formatTemplate, ignorePatterns string, color bool) (string, error) {
-	args := []string{"/go/bin/actionlint"}
+	args := []string{actionlintBinary}
 
 	if formatTemplate != "" {
 		args = append(args, "-format", formatTemplate)

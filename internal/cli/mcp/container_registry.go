@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
+	"dagger.io/dagger"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // AddContainerRegistryTools adds container registry operations using Docker CLI
 func AddContainerRegistryTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addContainerRegistryToolsDirect(s)
+}
+
+// addContainerRegistryToolsDirect implements direct Dagger calls for container registry tools
+func addContainerRegistryToolsDirect(s *server.MCPServer) {
 	// Docker login to registry
 	loginTool := mcp.NewTool("docker_login",
 		mcp.WithDescription("Login to container registry using Docker"),
@@ -23,19 +32,26 @@ func AddContainerRegistryTools(s *server.MCPServer, executeShipCommand ExecuteSh
 		),
 	)
 	s.AddTool(loginTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"docker", "login"}
-		
-		if registry := request.GetString("registry", ""); registry != "" {
-			args = append(args, registry)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if username := request.GetString("username", ""); username != "" {
-			args = append(args, "--username", username)
+		defer client.Close()
+
+		// Get parameters
+		registry := request.GetString("registry", "")
+		username := request.GetString("username", "")
+		password := request.GetString("password", "")
+
+		// Create container registry module and login
+		registryModule := modules.NewContainerRegistryModule(client)
+		result, err := registryModule.Login(ctx, registry, username, password)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("docker login failed: %v", err)), nil
 		}
-		if password := request.GetString("password", ""); password != "" {
-			args = append(args, "--password", password)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Docker push image
@@ -47,9 +63,24 @@ func AddContainerRegistryTools(s *server.MCPServer, executeShipCommand ExecuteSh
 		),
 	)
 	s.AddTool(pushTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		image := request.GetString("image", "")
-		args := []string{"docker", "push", image}
-		return executeShipCommand(args)
+
+		// Create container registry module and push image
+		registryModule := modules.NewContainerRegistryModule(client)
+		result, err := registryModule.PushImage(ctx, image)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("docker push failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Docker pull image
@@ -61,9 +92,24 @@ func AddContainerRegistryTools(s *server.MCPServer, executeShipCommand ExecuteSh
 		),
 	)
 	s.AddTool(pullTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		image := request.GetString("image", "")
-		args := []string{"docker", "pull", image}
-		return executeShipCommand(args)
+
+		// Create container registry module and pull image
+		registryModule := modules.NewContainerRegistryModule(client)
+		result, err := registryModule.PullImage(ctx, image)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("docker pull failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Docker images list
@@ -77,16 +123,25 @@ func AddContainerRegistryTools(s *server.MCPServer, executeShipCommand ExecuteSh
 		),
 	)
 	s.AddTool(imagesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"docker", "images"}
-		
-		if repository := request.GetString("repository", ""); repository != "" {
-			args = append(args, repository)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if request.GetBool("all", false) {
-			args = append(args, "--all")
+		defer client.Close()
+
+		// Get parameters
+		repository := request.GetString("repository", "")
+		all := request.GetBool("all", false)
+
+		// Create container registry module and list images
+		registryModule := modules.NewContainerRegistryModule(client)
+		result, err := registryModule.ListImages(ctx, repository, all)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("docker images failed: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Docker tag image
@@ -102,10 +157,25 @@ func AddContainerRegistryTools(s *server.MCPServer, executeShipCommand ExecuteSh
 		),
 	)
 	s.AddTool(tagTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		sourceImage := request.GetString("source_image", "")
 		targetImage := request.GetString("target_image", "")
-		args := []string{"docker", "tag", sourceImage, targetImage}
-		return executeShipCommand(args)
+
+		// Create container registry module and tag image
+		registryModule := modules.NewContainerRegistryModule(client)
+		result, err := registryModule.TagImage(ctx, sourceImage, targetImage)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("docker tag failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Docker logout
@@ -116,12 +186,23 @@ func AddContainerRegistryTools(s *server.MCPServer, executeShipCommand ExecuteSh
 		),
 	)
 	s.AddTool(logoutTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"docker", "logout"}
-		
-		if registry := request.GetString("registry", ""); registry != "" {
-			args = append(args, registry)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		registry := request.GetString("registry", "")
+
+		// Create container registry module and logout
+		registryModule := modules.NewContainerRegistryModule(client)
+		result, err := registryModule.Logout(ctx, registry)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("docker logout failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 }

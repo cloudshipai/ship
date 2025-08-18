@@ -2,170 +2,127 @@ package modules
 
 import (
 	"context"
+	"fmt"
 
 	"dagger.io/dagger"
 )
 
+// SLSAVerifierModule runs SLSA Verifier for provenance verification
 type SLSAVerifierModule struct {
 	client *dagger.Client
+	name   string
 }
 
+const slsaVerifierBinary = "/usr/local/bin/slsa-verifier"
+
+// NewSLSAVerifierModule creates a new SLSA Verifier module
 func NewSLSAVerifierModule(client *dagger.Client) *SLSAVerifierModule {
 	return &SLSAVerifierModule{
 		client: client,
+		name:   slsaVerifierBinary,
 	}
 }
 
-// VerifyProvenance verifies SLSA provenance for artifacts
-func (m *SLSAVerifierModule) VerifyProvenance(ctx context.Context, artifactPath, provenancePath string, opts ...SLSAVerifierOption) (*dagger.Container, error) {
-	config := &SLSAVerifierConfig{
-		PrintProvenance: false,
-		VerifierVersion: "v2.6.0",
-	}
-
-	for _, opt := range opts {
-		opt(config)
-	}
-
+// VerifyArtifact verifies SLSA provenance for binary artifacts
+func (m *SLSAVerifierModule) VerifyArtifact(ctx context.Context, artifactPath string, provenancePath string, sourceURI string, sourceTag string, sourceBranch string, builderID string, printProvenance bool) (string, error) {
 	container := m.client.Container().
-		From("ghcr.io/slsa-framework/slsa-verifier:" + config.VerifierVersion).
+		From("ghcr.io/slsa-framework/slsa-verifier:latest").
+		WithFile("/workspace/artifact", m.client.Host().File(artifactPath)).
+		WithFile("/workspace/provenance", m.client.Host().File(provenancePath)).
 		WithWorkdir("/workspace")
 
-	// Mount artifact and provenance files
-	if artifactPath != "" {
-		container = container.WithMountedFile("/workspace/artifact", m.client.Host().File(artifactPath))
-	}
-	if provenancePath != "" {
-		container = container.WithMountedFile("/workspace/provenance", m.client.Host().File(provenancePath))
-	}
+	args := []string{slsaVerifierBinary, "verify-artifact", "/workspace/artifact", "--provenance-path", "/workspace/provenance", "--source-uri", sourceURI}
 
-	args := []string{"verify-artifact"}
-
-	if artifactPath != "" {
-		args = append(args, "/workspace/artifact")
+	if sourceTag != "" {
+		args = append(args, "--source-tag", sourceTag)
 	}
-
-	if provenancePath != "" {
-		args = append(args, "--provenance-path", "/workspace/provenance")
+	if sourceBranch != "" {
+		args = append(args, "--source-branch", sourceBranch)
 	}
-
-	if config.SourceURI != "" {
-		args = append(args, "--source-uri", config.SourceURI)
+	if builderID != "" {
+		args = append(args, "--builder-id", builderID)
 	}
-
-	if config.SourceTag != "" {
-		args = append(args, "--source-tag", config.SourceTag)
-	}
-
-	if config.BuilderID != "" {
-		args = append(args, "--builder-id", config.BuilderID)
-	}
-
-	if config.PrintProvenance {
+	if printProvenance {
 		args = append(args, "--print-provenance")
 	}
 
-	return container.WithExec(args), nil
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to run SLSA verifier artifact verification: %w", err)
+	}
+
+	return output, nil
 }
 
 // VerifyImage verifies SLSA provenance for container images
-func (m *SLSAVerifierModule) VerifyImage(ctx context.Context, imageRef string, opts ...SLSAVerifierOption) (*dagger.Container, error) {
-	config := &SLSAVerifierConfig{
-		PrintProvenance: false,
-		VerifierVersion: "v2.6.0",
-	}
-
-	for _, opt := range opts {
-		opt(config)
-	}
-
+func (m *SLSAVerifierModule) VerifyImage(ctx context.Context, image string, sourceURI string, sourceTag string, sourceBranch string, builderID string, printProvenance bool) (string, error) {
 	container := m.client.Container().
-		From("ghcr.io/slsa-framework/slsa-verifier:" + config.VerifierVersion)
+		From("ghcr.io/slsa-framework/slsa-verifier:latest")
 
-	args := []string{"verify-image", imageRef}
+	args := []string{slsaVerifierBinary, "verify-image", image, "--source-uri", sourceURI}
 
-	if config.SourceURI != "" {
-		args = append(args, "--source-uri", config.SourceURI)
+	if sourceTag != "" {
+		args = append(args, "--source-tag", sourceTag)
 	}
-
-	if config.SourceTag != "" {
-		args = append(args, "--source-tag", config.SourceTag)
+	if sourceBranch != "" {
+		args = append(args, "--source-branch", sourceBranch)
 	}
-
-	if config.BuilderID != "" {
-		args = append(args, "--builder-id", config.BuilderID)
+	if builderID != "" {
+		args = append(args, "--builder-id", builderID)
 	}
-
-	if config.PrintProvenance {
+	if printProvenance {
 		args = append(args, "--print-provenance")
 	}
 
-	return container.WithExec(args), nil
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to run SLSA verifier image verification: %w", err)
+	}
+
+	return output, nil
 }
 
-// GeneratePolicy generates SLSA policy configuration
-func (m *SLSAVerifierModule) GeneratePolicy(ctx context.Context, opts ...SLSAVerifierOption) (*dagger.Container, error) {
-	config := &SLSAVerifierConfig{
-		VerifierVersion: "v2.6.0",
-	}
-
-	for _, opt := range opts {
-		opt(config)
-	}
-
+// VerifyNpmPackage verifies SLSA provenance for npm packages (experimental)
+func (m *SLSAVerifierModule) VerifyNpmPackage(ctx context.Context, packageTarball string, attestationsPath string, packageName string, packageVersion string, sourceURI string, printProvenance bool) (string, error) {
 	container := m.client.Container().
-		From("ghcr.io/slsa-framework/slsa-verifier:" + config.VerifierVersion).
+		From("ghcr.io/slsa-framework/slsa-verifier:latest").
+		WithFile("/workspace/package.tgz", m.client.Host().File(packageTarball)).
+		WithFile("/workspace/attestations", m.client.Host().File(attestationsPath)).
 		WithWorkdir("/workspace")
 
-	args := []string{"policy", "generate"}
+	args := []string{slsaVerifierBinary, "verify-npm-package", "/workspace/package.tgz", "--attestations-path", "/workspace/attestations", "--package-name", packageName, "--package-version", packageVersion}
 
-	if config.SourceURI != "" {
-		args = append(args, "--source-uri", config.SourceURI)
+	if sourceURI != "" {
+		args = append(args, "--source-uri", sourceURI)
+	}
+	if printProvenance {
+		args = append(args, "--print-provenance")
 	}
 
-	if config.BuilderID != "" {
-		args = append(args, "--builder-id", config.BuilderID)
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to run SLSA verifier npm package verification: %w", err)
 	}
 
-	return container.WithExec(args), nil
+	return output, nil
 }
 
-type SLSAVerifierConfig struct {
-	SourceURI       string
-	SourceTag       string
-	BuilderID       string
-	PrintProvenance bool
-	VerifierVersion string
-}
+// GetVersion returns the version of SLSA Verifier
+func (m *SLSAVerifierModule) GetVersion(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("ghcr.io/slsa-framework/slsa-verifier:latest").
+		WithExec([]string{slsaVerifierBinary, "version"})
 
-type SLSAVerifierOption func(*SLSAVerifierConfig)
-
-func WithSourceURI(uri string) SLSAVerifierOption {
-	return func(c *SLSAVerifierConfig) {
-		c.SourceURI = uri
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get SLSA verifier version: %w", err)
 	}
-}
 
-func WithSourceTag(tag string) SLSAVerifierOption {
-	return func(c *SLSAVerifierConfig) {
-		c.SourceTag = tag
-	}
-}
-
-func WithBuilderID(id string) SLSAVerifierOption {
-	return func(c *SLSAVerifierConfig) {
-		c.BuilderID = id
-	}
-}
-
-func WithPrintProvenance(print bool) SLSAVerifierOption {
-	return func(c *SLSAVerifierConfig) {
-		c.PrintProvenance = print
-	}
-}
-
-func WithVerifierVersion(version string) SLSAVerifierOption {
-	return func(c *SLSAVerifierConfig) {
-		c.VerifierVersion = version
-	}
+	return output, nil
 }

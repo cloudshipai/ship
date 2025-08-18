@@ -7,6 +7,9 @@ import (
 	"dagger.io/dagger"
 )
 
+// kyvernoBinary is the path to the kyverno binary in the container
+const kyvernoBinary = "/usr/local/bin/kyverno"
+
 // KyvernoModule runs Kyverno for Kubernetes policy management
 type KyvernoModule struct {
 	client *dagger.Client
@@ -32,7 +35,7 @@ func (m *KyvernoModule) ApplyPolicies(ctx context.Context, policiesPath string, 
 	}
 
 	container = container.WithExec([]string{
-		"kyverno",
+		kyvernoBinary,
 		"apply",
 		"/policies",
 		"--output", "json",
@@ -52,7 +55,7 @@ func (m *KyvernoModule) ValidatePolicies(ctx context.Context, policiesPath strin
 		From("ghcr.io/kyverno/kyverno-cli:latest").
 		WithDirectory("/policies", m.client.Host().Directory(policiesPath)).
 		WithExec([]string{
-			"kyverno",
+			kyvernoBinary,
 			"validate",
 			"/policies",
 			"--output", "json",
@@ -73,7 +76,7 @@ func (m *KyvernoModule) TestPolicies(ctx context.Context, policiesPath string, r
 		WithDirectory("/policies", m.client.Host().Directory(policiesPath)).
 		WithDirectory("/resources", m.client.Host().Directory(resourcesPath)).
 		WithExec([]string{
-			"kyverno",
+			kyvernoBinary,
 			"test",
 			"/policies",
 			"--resource", "/resources",
@@ -92,7 +95,7 @@ func (m *KyvernoModule) TestPolicies(ctx context.Context, policiesPath string, r
 func (m *KyvernoModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("ghcr.io/kyverno/kyverno-cli:latest").
-		WithExec([]string{"kyverno", "version"})
+		WithExec([]string{kyvernoBinary, "version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -245,6 +248,37 @@ subjects:
 	output, err := container.Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to create cluster role: %w", err)
+	}
+
+	return output, nil
+}
+
+// ApplyPolicyFile applies a specific Kyverno policy YAML file using kubectl
+func (m *KyvernoModule) ApplyPolicyFile(ctx context.Context, filePath string, namespace string, kubeconfig string, dryRun bool) (string, error) {
+	container := m.client.Container().
+		From("bitnami/kubectl:latest").
+		WithFile("/policy.yaml", m.client.Host().File(filePath))
+
+	if kubeconfig != "" {
+		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
+	}
+
+	args := []string{"kubectl", "apply", "-f", "/policy.yaml"}
+	
+	if namespace != "" {
+		args = append(args, "-n", namespace)
+	}
+	
+	if dryRun {
+		args = append(args, "--dry-run=client")
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		return "", fmt.Errorf("failed to apply policy file: %w\nStderr: %s", err, stderr)
 	}
 
 	return output, nil

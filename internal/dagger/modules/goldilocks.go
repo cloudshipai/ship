@@ -13,6 +13,8 @@ type GoldilocksModule struct {
 	name   string
 }
 
+const goldilocksBinary = "/goldilocks"
+
 // NewGoldilocksModule creates a new Goldilocks module
 func NewGoldilocksModule(client *dagger.Client) *GoldilocksModule {
 	return &GoldilocksModule{
@@ -31,7 +33,7 @@ func (m *GoldilocksModule) GetRecommendations(ctx context.Context, namespace str
 	}
 
 	container = container.WithExec([]string{
-		"goldilocks",
+		goldilocksBinary,
 		"recommendations",
 		"--namespace", namespace,
 		"--output", "json",
@@ -55,7 +57,7 @@ func (m *GoldilocksModule) CreateVPA(ctx context.Context, namespace string, kube
 	}
 
 	container = container.WithExec([]string{
-		"goldilocks",
+		goldilocksBinary,
 		"create-vpas",
 		"--namespace", namespace,
 	})

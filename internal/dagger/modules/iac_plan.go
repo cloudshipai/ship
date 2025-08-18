@@ -13,6 +13,20 @@ type IacPlanModule struct {
 	name   string
 }
 
+const (
+	terraformBinary = "/bin/terraform"
+	tofuBinary = "/usr/local/bin/tofu"
+)
+
+func getBinaryPath(tool string) string {
+	switch tool {
+	case "tofu":
+		return tofuBinary
+	default:
+		return terraformBinary
+	}
+}
+
 // NewIacPlanModule creates a new IaC plan module
 func NewIacPlanModule(client *dagger.Client) *IacPlanModule {
 	return &IacPlanModule{
@@ -76,8 +90,8 @@ func (m *IacPlanModule) ValidateConfiguration(ctx context.Context, workdir strin
 		From(image).
 		WithDirectory("/workspace", m.client.Host().Directory(workdir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{tool, "init"}).
-		WithExec([]string{tool, "validate", "-json"})
+		WithExec([]string{getBinaryPath(tool), "init"}).
+		WithExec([]string{getBinaryPath(tool), "validate", "-json"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -190,7 +204,7 @@ func (m *IacPlanModule) ManageWorkspace(ctx context.Context, workdir string, too
 		From(image).
 		WithDirectory("/workspace", m.client.Host().Directory(workdir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{tool, "init"})
+		WithExec([]string{getBinaryPath(tool), "init"})
 
 	cmd := []string{tool, "workspace", operation}
 	if workspaceName != "" {
@@ -221,7 +235,7 @@ func (m *IacPlanModule) GenerateGraph(ctx context.Context, workdir string, tool 
 		From(image).
 		WithDirectory("/workspace", m.client.Host().Directory(workdir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{tool, "init"})
+		WithExec([]string{getBinaryPath(tool), "init"})
 
 	cmd := []string{tool, "graph"}
 	if graphType == "plan" {

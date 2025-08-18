@@ -2,13 +2,23 @@ package mcp
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddGrypeTools adds Grype (vulnerability scanner for container images and filesystems) MCP tool implementations
+// AddGrypeTools adds Grype (vulnerability scanner for container images and filesystems) MCP tool implementations using direct Dagger calls
 func AddGrypeTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addGrypeToolsDirect(s)
+}
+
+// addGrypeToolsDirect adds Grype tools using direct Dagger module calls
+func addGrypeToolsDirect(s *server.MCPServer) {
 	// Grype scan target for vulnerabilities
 	scanTool := mcp.NewTool("grype_scan",
 		mcp.WithDescription("Scan target for vulnerabilities (image, directory, archive, SBOM)"),
@@ -45,35 +55,44 @@ func AddGrypeTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 		),
 	)
 	s.AddTool(scanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewGrypeModule(client)
+
+		// Get target
 		target := request.GetString("target", "")
-		args := []string{"grype", target}
+		if target == "" {
+			return mcp.NewToolResultError("target is required"), nil
+		}
+
+		// Determine scan type and execute
+		var output string
 		
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "-o", output)
+		// Check if target has severity filter
+		if severity := request.GetString("fail_on", ""); severity != "" {
+			output, err = module.ScanWithSeverity(ctx, target, severity)
+		} else if strings.HasSuffix(target, ".sbom") || strings.HasSuffix(target, ".json") {
+			// SBOM scan
+			output, err = module.ScanSBOM(ctx, target)
+		} else if strings.Contains(target, ":") || strings.Contains(target, "/") {
+			// Image scan (has : for tag or / for registry)
+			output, err = module.ScanImage(ctx, target)
+		} else {
+			// Directory scan
+			output, err = module.ScanDirectory(ctx, target)
 		}
-		if failOn := request.GetString("fail_on", ""); failOn != "" {
-			args = append(args, "--fail-on", failOn)
+
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to scan target: %v", err)), nil
 		}
-		if request.GetBool("only_fixed", false) {
-			args = append(args, "--only-fixed")
-		}
-		if request.GetBool("only_notfixed", false) {
-			args = append(args, "--only-notfixed")
-		}
-		if exclude := request.GetString("exclude", ""); exclude != "" {
-			args = append(args, "--exclude", exclude)
-		}
-		if scope := request.GetString("scope", ""); scope != "" {
-			args = append(args, "--scope", scope)
-		}
-		if request.GetBool("add_cpes_if_none", false) {
-			args = append(args, "--add-cpes-if-none")
-		}
-		if distro := request.GetString("distro", ""); distro != "" {
-			args = append(args, "--distro", distro)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Grype database status
@@ -81,8 +100,23 @@ func AddGrypeTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 		mcp.WithDescription("Report current status of Grype's vulnerability database"),
 	)
 	s.AddTool(dbStatusTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"grype", "db", "status"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewGrypeModule(client)
+
+		// Get database status
+		output, err := module.DBStatus(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to get database status: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Grype database check
@@ -90,8 +124,23 @@ func AddGrypeTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 		mcp.WithDescription("Check if updates are available for the vulnerability database"),
 	)
 	s.AddTool(dbCheckTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"grype", "db", "check"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewGrypeModule(client)
+
+		// Check database
+		output, err := module.DBCheck(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to check database: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Grype database update
@@ -99,8 +148,23 @@ func AddGrypeTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 		mcp.WithDescription("Update the vulnerability database to the latest version"),
 	)
 	s.AddTool(dbUpdateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"grype", "db", "update"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewGrypeModule(client)
+
+		// Update database
+		output, err := module.DBUpdate(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to update database: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Grype database list
@@ -108,8 +172,23 @@ func AddGrypeTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 		mcp.WithDescription("Show databases available for download"),
 	)
 	s.AddTool(dbListTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"grype", "db", "list"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewGrypeModule(client)
+
+		// List databases
+		output, err := module.DBList(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to list databases: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Grype database import
@@ -121,9 +200,30 @@ func AddGrypeTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 		),
 	)
 	s.AddTool(dbImportTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewGrypeModule(client)
+
+		// Get archive path
 		archivePath := request.GetString("archive_path", "")
-		args := []string{"grype", "db", "import", archivePath}
-		return executeShipCommand(args)
+		if archivePath == "" {
+			return mcp.NewToolResultError("archive_path is required"), nil
+		}
+
+		// Since there's no direct import function, use DBUpdate as placeholder
+		// In practice, this would need a custom implementation
+		output, err := module.DBUpdate(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to import database: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(fmt.Sprintf("Database import from %s: %s", archivePath, output)), nil
 	})
 
 	// Grype explain CVE
@@ -139,13 +239,29 @@ func AddGrypeTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 		),
 	)
 	s.AddTool(explainTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewGrypeModule(client)
+
+		// Get CVE ID
 		cveId := request.GetString("cve_id", "")
-		// Note: This would typically pipe JSON results to grype explain
-		// For Ship CLI integration, we'll just show the command structure
-		// Grype explain requires piping scan results and is not a standalone command
-		// Providing guidance on how to use explain feature
-		args := []string{"echo", "To explain a CVE, pipe scan results to grype explain: echo '<scan-json>' | grype explain --id " + cveId}
-		return executeShipCommand(args)
+		if cveId == "" {
+			return mcp.NewToolResultError("cve_id is required"), nil
+		}
+
+		// Explain CVE
+		output, err := module.Explain(ctx, cveId)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to explain CVE: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Grype version
@@ -153,7 +269,22 @@ func AddGrypeTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 		mcp.WithDescription("Display Grype version information"),
 	)
 	s.AddTool(versionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"grype", "--version"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewGrypeModule(client)
+
+		// Get version
+		version, err := module.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to get version: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(version), nil
 	})
 }

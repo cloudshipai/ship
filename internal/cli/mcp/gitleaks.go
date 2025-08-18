@@ -2,13 +2,23 @@ package mcp
 
 import (
 	"context"
+	"fmt"
+	"path/filepath"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddGitleaksTools adds Gitleaks (secret detection in code and git history) MCP tool implementations using real gitleaks CLI commands
+// AddGitleaksTools adds Gitleaks (secret detection in code and git history) MCP tool implementations using direct Dagger calls
 func AddGitleaksTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addGitleaksToolsDirect(s)
+}
+
+// addGitleaksToolsDirect adds Gitleaks tools using direct Dagger module calls
+func addGitleaksToolsDirect(s *server.MCPServer) {
 	// Gitleaks scan git repository for secrets
 	gitScanTool := mcp.NewTool("gitleaks_git",
 		mcp.WithDescription("Scan git repositories for secrets"),
@@ -39,34 +49,38 @@ func AddGitleaksTools(s *server.MCPServer, executeShipCommand ExecuteShipCommand
 		),
 	)
 	s.AddTool(gitScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"gitleaks", "git"}
-		
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewGitleaksModule(client)
+
+		// Get path
+		path := request.GetString("path", ".")
+		if path == "" {
+			path = "."
+		}
+
+		// If config is specified, use ScanWithConfig
 		if config := request.GetString("config", ""); config != "" {
-			args = append(args, "-c", config)
+			output, err := module.ScanWithConfig(ctx, path, config)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("failed to scan with config: %v", err)), nil
+			}
+			return mcp.NewToolResultText(output), nil
 		}
-		if baselinePath := request.GetString("baseline_path", ""); baselinePath != "" {
-			args = append(args, "-b", baselinePath)
+
+		// Use ScanGitRepo for git repositories
+		output, err := module.ScanGitRepo(ctx, path)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to scan git repository: %v", err)), nil
 		}
-		if reportFormat := request.GetString("report_format", ""); reportFormat != "" {
-			args = append(args, "-f", reportFormat)
-		}
-		if reportPath := request.GetString("report_path", ""); reportPath != "" {
-			args = append(args, "-r", reportPath)
-		}
-		if logOpts := request.GetString("log_opts", ""); logOpts != "" {
-			args = append(args, "--log-opts", logOpts)
-		}
-		if request.GetBool("verbose", false) {
-			args = append(args, "-v")
-		}
-		if exitCode := request.GetString("exit_code", ""); exitCode != "" {
-			args = append(args, "--exit-code", exitCode)
-		}
-		if path := request.GetString("path", ""); path != "" {
-			args = append(args, path)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Gitleaks scan directories or files for secrets
@@ -96,36 +110,54 @@ func AddGitleaksTools(s *server.MCPServer, executeShipCommand ExecuteShipCommand
 		),
 	)
 	s.AddTool(dirScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"gitleaks", "dir"}
-		
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewGitleaksModule(client)
+
+		// Get path
+		path := request.GetString("path", ".")
+		if path == "" {
+			path = "."
+		}
+
+		// If config is specified, use ScanWithConfig
 		if config := request.GetString("config", ""); config != "" {
-			args = append(args, "-c", config)
+			output, err := module.ScanWithConfig(ctx, path, config)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("failed to scan with config: %v", err)), nil
+			}
+			return mcp.NewToolResultText(output), nil
 		}
-		if baselinePath := request.GetString("baseline_path", ""); baselinePath != "" {
-			args = append(args, "-b", baselinePath)
-		}
-		if reportFormat := request.GetString("report_format", ""); reportFormat != "" {
-			args = append(args, "-f", reportFormat)
-		}
-		if reportPath := request.GetString("report_path", ""); reportPath != "" {
-			args = append(args, "-r", reportPath)
-		}
-		if request.GetBool("verbose", false) {
-			args = append(args, "-v")
-		}
-		if exitCode := request.GetString("exit_code", ""); exitCode != "" {
-			args = append(args, "--exit-code", exitCode)
-		}
-		if path := request.GetString("path", ""); path != "" {
-			args = append(args, path)
-		}
+
+		// Check if it's a file or directory
+		absPath, _ := filepath.Abs(path)
 		
-		return executeShipCommand(args)
+		// Try as directory first, then as file
+		output, err := module.ScanDirectory(ctx, path)
+		if err != nil {
+			// Try as file
+			output, err = module.ScanFile(ctx, absPath)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("failed to scan path: %v", err)), nil
+			}
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Gitleaks detect secrets from stdin
 	stdinScanTool := mcp.NewTool("gitleaks_stdin",
 		mcp.WithDescription("Detect secrets from standard input"),
+		mcp.WithString("input",
+			mcp.Description("Input text to scan for secrets"),
+			mcp.Required(),
+		),
 		mcp.WithString("config",
 			mcp.Description("Config file path"),
 		),
@@ -147,28 +179,29 @@ func AddGitleaksTools(s *server.MCPServer, executeShipCommand ExecuteShipCommand
 		),
 	)
 	s.AddTool(stdinScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"gitleaks", "stdin"}
-		
-		if config := request.GetString("config", ""); config != "" {
-			args = append(args, "-c", config)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if baselinePath := request.GetString("baseline_path", ""); baselinePath != "" {
-			args = append(args, "-b", baselinePath)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewGitleaksModule(client)
+
+		// Get input text
+		input := request.GetString("input", "")
+		if input == "" {
+			return mcp.NewToolResultError("input text is required"), nil
 		}
-		if reportFormat := request.GetString("report_format", ""); reportFormat != "" {
-			args = append(args, "-f", reportFormat)
+
+		// Scan stdin
+		output, err := module.ScanStdin(ctx, input)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to scan stdin: %v", err)), nil
 		}
-		if reportPath := request.GetString("report_path", ""); reportPath != "" {
-			args = append(args, "-r", reportPath)
-		}
-		if request.GetBool("verbose", false) {
-			args = append(args, "-v")
-		}
-		if exitCode := request.GetString("exit_code", ""); exitCode != "" {
-			args = append(args, "--exit-code", exitCode)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Gitleaks version information
@@ -176,7 +209,22 @@ func AddGitleaksTools(s *server.MCPServer, executeShipCommand ExecuteShipCommand
 		mcp.WithDescription("Display Gitleaks version"),
 	)
 	s.AddTool(versionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"gitleaks", "version"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewGitleaksModule(client)
+
+		// Get version
+		version, err := module.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to get version: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(version), nil
 	})
 }

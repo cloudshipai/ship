@@ -13,6 +13,8 @@ type StepCAModule struct {
 	name   string
 }
 
+const stepBinary = "/usr/local/bin/step"
+
 // NewStepCAModule creates a new Step CA module
 func NewStepCAModule(client *dagger.Client) *StepCAModule {
 	return &StepCAModule{
@@ -26,7 +28,7 @@ func (m *StepCAModule) InitCA(ctx context.Context, name string, dnsName string) 
 	container := m.client.Container().
 		From("smallstep/step-ca:latest").
 		WithExec([]string{
-			"step", "ca", "init",
+			stepBinary, "ca", "init",
 			"--name", name,
 			"--dns", dnsName,
 			"--provisioner", "admin",
@@ -51,7 +53,7 @@ func (m *StepCAModule) CreateCertificate(ctx context.Context, subject string, ca
 	}
 
 	container = container.WithExec([]string{
-		"step", "ca", "certificate",
+		stepBinary, "ca", "certificate",
 		subject,
 		"/tmp/cert.crt",
 		"/tmp/cert.key",
@@ -75,7 +77,7 @@ func (m *StepCAModule) RenewCertificate(ctx context.Context, certPath string, ke
 		WithFile("/cert.crt", m.client.Host().File(certPath)).
 		WithFile("/cert.key", m.client.Host().File(keyPath)).
 		WithExec([]string{
-			"step", "ca", "renew",
+			stepBinary, "ca", "renew",
 			"/cert.crt",
 			"/cert.key",
 			"--ca-url", caURL,
@@ -93,7 +95,7 @@ func (m *StepCAModule) RenewCertificate(ctx context.Context, certPath string, ke
 func (m *StepCAModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("smallstep/step-ca:latest").
-		WithExec([]string{"step", "version"})
+		WithExec([]string{stepBinary, "version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -105,7 +107,7 @@ func (m *StepCAModule) GetVersion(ctx context.Context) (string, error) {
 
 // AddProvisioner adds a new provisioner to the CA
 func (m *StepCAModule) AddProvisioner(ctx context.Context, name string, provisionerType string, caConfig string) (string, error) {
-	args := []string{"step", "ca", "provisioner", "add", name, "--type", provisionerType}
+	args := []string{stepBinary, "ca", "provisioner", "add", name, "--type", provisionerType}
 	if caConfig != "" {
 		args = append(args, "--ca-config", "/config/ca.json")
 	}
@@ -129,7 +131,7 @@ func (m *StepCAModule) AddProvisioner(ctx context.Context, name string, provisio
 
 // RevokeCertificate revokes a certificate
 func (m *StepCAModule) RevokeCertificate(ctx context.Context, certPath string, keyPath string, caURL string, reason string) (string, error) {
-	args := []string{"step", "ca", "revoke"}
+	args := []string{stepBinary, "ca", "revoke"}
 	if certPath != "" {
 		args = append(args, "--cert", "/cert.pem")
 	}

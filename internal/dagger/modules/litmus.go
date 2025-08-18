@@ -7,6 +7,9 @@ import (
 	"dagger.io/dagger"
 )
 
+// litmusctlBinary is the path to the litmusctl binary in the container
+const litmusctlBinary = "/usr/local/bin/litmusctl"
+
 // LitmusModule runs Litmus for chaos engineering
 type LitmusModule struct {
 	client *dagger.Client
@@ -32,7 +35,7 @@ func (m *LitmusModule) CreateExperiment(ctx context.Context, experimentPath stri
 	}
 
 	container = container.WithExec([]string{
-		"litmusctl",
+		litmusctlBinary,
 		"create",
 		"experiment",
 		"-f", "/experiment.yaml",
@@ -57,7 +60,7 @@ func (m *LitmusModule) GetExperiments(ctx context.Context, kubeconfig string) (s
 	}
 
 	container = container.WithExec([]string{
-		"litmusctl",
+		litmusctlBinary,
 		"get",
 		"experiments",
 		"--output", "json",
@@ -81,7 +84,7 @@ func (m *LitmusModule) GetChaosResults(ctx context.Context, experimentName strin
 	}
 
 	container = container.WithExec([]string{
-		"litmusctl",
+		litmusctlBinary,
 		"get",
 		"chaosresults",
 		experimentName,
@@ -100,7 +103,7 @@ func (m *LitmusModule) GetChaosResults(ctx context.Context, experimentName strin
 func (m *LitmusModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("litmuschaos/litmusctl:latest").
-		WithExec([]string{"litmusctl", "version"})
+		WithExec([]string{litmusctlBinary, "version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -147,7 +150,7 @@ func (m *LitmusModule) ConnectChaosInfra(ctx context.Context, projectID string) 
 	container := m.client.Container().
 		From("litmuschaos/litmusctl:latest")
 
-	args := []string{"litmusctl", "connect", "chaos-infra"}
+	args := []string{litmusctlBinary, "connect", "chaos-infra"}
 	if projectID != "" {
 		args = append(args, "--project-id", projectID)
 	}
@@ -166,7 +169,7 @@ func (m *LitmusModule) ConnectChaosInfra(ctx context.Context, projectID string) 
 func (m *LitmusModule) CreateProject(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("litmuschaos/litmusctl:latest").
-		WithExec([]string{"litmusctl", "create", "project"})
+		WithExec([]string{litmusctlBinary, "create", "project"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -182,7 +185,7 @@ func (m *LitmusModule) CreateChaosExperiment(ctx context.Context, manifestFile s
 		From("litmuschaos/litmusctl:latest").
 		WithFile("/manifest.yaml", m.client.Host().File(manifestFile))
 
-	args := []string{"litmusctl", "create", "chaos-experiment", "-f", "/manifest.yaml"}
+	args := []string{litmusctlBinary, "create", "chaos-experiment", "-f", "/manifest.yaml"}
 	if projectID != "" {
 		args = append(args, "--project-id", projectID)
 	}
@@ -205,7 +208,7 @@ func (m *LitmusModule) RunChaosExperiment(ctx context.Context, experimentID stri
 	container := m.client.Container().
 		From("litmuschaos/litmusctl:latest")
 
-	args := []string{"litmusctl", "run", "chaos-experiment", experimentID}
+	args := []string{litmusctlBinary, "run", "chaos-experiment", experimentID}
 	if projectID != "" {
 		args = append(args, "--project-id", projectID)
 	}
@@ -224,7 +227,7 @@ func (m *LitmusModule) RunChaosExperiment(ctx context.Context, experimentID stri
 func (m *LitmusModule) GetProjects(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("litmuschaos/litmusctl:latest").
-		WithExec([]string{"litmusctl", "get", "projects"})
+		WithExec([]string{litmusctlBinary, "get", "projects"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -239,7 +242,7 @@ func (m *LitmusModule) GetChaosInfra(ctx context.Context, projectID string) (str
 	container := m.client.Container().
 		From("litmuschaos/litmusctl:latest")
 
-	args := []string{"litmusctl", "get", "chaos-infra"}
+	args := []string{litmusctlBinary, "get", "chaos-infra"}
 	if projectID != "" {
 		args = append(args, "--project-id", projectID)
 	}
@@ -258,7 +261,7 @@ func (m *LitmusModule) GetChaosInfra(ctx context.Context, projectID string) (str
 func (m *LitmusModule) ConfigSetAccount(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("litmuschaos/litmusctl:latest").
-		WithExec([]string{"litmusctl", "config", "set-account"})
+		WithExec([]string{litmusctlBinary, "config", "set-account"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

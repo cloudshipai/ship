@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
+	"dagger.io/dagger"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // AddAWSIAMRotationTools adds AWS IAM rotation MCP tool implementations
 func AddAWSIAMRotationTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addAWSIAMRotationToolsDirect(s)
+}
+
+// addAWSIAMRotationToolsDirect implements direct Dagger calls for AWS IAM rotation tools
+func addAWSIAMRotationToolsDirect(s *server.MCPServer) {
 	// AWS IAM list access keys tool
 	listAccessKeysTool := mcp.NewTool("aws_iam_list_access_keys",
 		mcp.WithDescription("List access keys for an IAM user"),
@@ -21,12 +30,25 @@ func AddAWSIAMRotationTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(listAccessKeysTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		username := request.GetString("user_name", "")
-		args := []string{"aws", "iam", "list-access-keys", "--user-name", username}
-		if profile := request.GetString("profile", ""); profile != "" {
-			args = append(args, "--profile", profile)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		username := request.GetString("user_name", "")
+		profile := request.GetString("profile", "")
+
+		// Create AWS IAM rotation module and list access keys
+		awsModule := modules.NewAWSIAMRotationModule(client)
+		result, err := awsModule.ListAccessKeys(ctx, username, profile)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("list access keys failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// AWS IAM create access key tool
@@ -41,12 +63,25 @@ func AddAWSIAMRotationTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(createAccessKeyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		username := request.GetString("user_name", "")
-		args := []string{"aws", "iam", "create-access-key", "--user-name", username}
-		if profile := request.GetString("profile", ""); profile != "" {
-			args = append(args, "--profile", profile)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		username := request.GetString("user_name", "")
+		profile := request.GetString("profile", "")
+
+		// Create AWS IAM rotation module and create access key (using RotateAccessKeys function)
+		awsModule := modules.NewAWSIAMRotationModule(client)
+		result, err := awsModule.RotateAccessKeys(ctx, username, profile)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("create access key failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// AWS IAM update access key tool
@@ -70,14 +105,27 @@ func AddAWSIAMRotationTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(updateAccessKeyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		accessKeyId := request.GetString("access_key_id", "")
 		status := request.GetString("status", "")
 		username := request.GetString("user_name", "")
-		args := []string{"aws", "iam", "update-access-key", "--access-key-id", accessKeyId, "--status", status, "--user-name", username}
-		if profile := request.GetString("profile", ""); profile != "" {
-			args = append(args, "--profile", profile)
+		profile := request.GetString("profile", "")
+
+		// Create AWS IAM rotation module and update access key
+		awsModule := modules.NewAWSIAMRotationModule(client)
+		result, err := awsModule.UpdateAccessKey(ctx, username, accessKeyId, status, profile)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("update access key failed: %v", err)), nil
 		}
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// AWS IAM delete access key tool
@@ -96,13 +144,26 @@ func AddAWSIAMRotationTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(deleteAccessKeyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		accessKeyId := request.GetString("access_key_id", "")
 		username := request.GetString("user_name", "")
-		args := []string{"aws", "iam", "delete-access-key", "--access-key-id", accessKeyId, "--user-name", username}
-		if profile := request.GetString("profile", ""); profile != "" {
-			args = append(args, "--profile", profile)
+		profile := request.GetString("profile", "")
+
+		// Create AWS IAM rotation module and delete access key
+		awsModule := modules.NewAWSIAMRotationModule(client)
+		result, err := awsModule.DeleteAccessKey(ctx, username, accessKeyId, profile)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("delete access key failed: %v", err)), nil
 		}
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// AWS IAM get access key last used tool
@@ -117,12 +178,25 @@ func AddAWSIAMRotationTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(getAccessKeyLastUsedTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		accessKeyId := request.GetString("access_key_id", "")
-		args := []string{"aws", "iam", "get-access-key-last-used", "--access-key-id", accessKeyId}
-		if profile := request.GetString("profile", ""); profile != "" {
-			args = append(args, "--profile", profile)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		accessKeyId := request.GetString("access_key_id", "")
+		profile := request.GetString("profile", "")
+
+		// Create AWS IAM rotation module and get access key last used info
+		awsModule := modules.NewAWSIAMRotationModule(client)
+		result, err := awsModule.GetAccessKeyLastUsed(ctx, accessKeyId, profile)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("get access key last used failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// AWS CLI version tool
@@ -130,7 +204,20 @@ func AddAWSIAMRotationTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		mcp.WithDescription("Get AWS CLI version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"aws", "--version"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create AWS IAM rotation module and get version
+		awsModule := modules.NewAWSIAMRotationModule(client)
+		result, err := awsModule.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("get AWS CLI version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 }

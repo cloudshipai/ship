@@ -13,11 +13,13 @@ type TrivyModule struct {
 	name   string
 }
 
+const trivyBinaryMain = "/usr/local/bin/trivy"
+
 // NewTrivyModule creates a new Trivy module
 func NewTrivyModule(client *dagger.Client) *TrivyModule {
 	return &TrivyModule{
 		client: client,
-		name:   "trivy",
+		name:   trivyBinaryMain,
 	}
 }
 
@@ -26,7 +28,7 @@ func (m *TrivyModule) ScanImage(ctx context.Context, imageName string) (string, 
 	container := m.client.Container().
 		From("aquasec/trivy:latest").
 		WithExec([]string{
-			"trivy",
+			trivyBinaryMain,
 			"image",
 			"--format", "json",
 			"--severity", "HIGH,CRITICAL",
@@ -48,7 +50,7 @@ func (m *TrivyModule) ScanFilesystem(ctx context.Context, dir string) (string, e
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			"trivy",
+			trivyBinaryMain,
 			"fs",
 			"--format", "json",
 			"--severity", "HIGH,CRITICAL",
@@ -68,7 +70,7 @@ func (m *TrivyModule) ScanRepository(ctx context.Context, repoURL string) (strin
 	container := m.client.Container().
 		From("aquasec/trivy:latest").
 		WithExec([]string{
-			"trivy",
+			trivyBinaryMain,
 			"repo",
 			"--format", "json",
 			"--severity", "HIGH,CRITICAL",
@@ -90,7 +92,7 @@ func (m *TrivyModule) ScanConfig(ctx context.Context, dir string) (string, error
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			"trivy",
+			trivyBinaryMain,
 			"config",
 			"--format", "json",
 			"--severity", "HIGH,CRITICAL",
@@ -109,7 +111,7 @@ func (m *TrivyModule) ScanConfig(ctx context.Context, dir string) (string, error
 func (m *TrivyModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("aquasec/trivy:latest").
-		WithExec([]string{"trivy", "--version"})
+		WithExec([]string{trivyBinaryMain, "--version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -125,7 +127,7 @@ func (m *TrivyModule) ScanSBOM(ctx context.Context, sbomPath string, severity st
 		From("aquasec/trivy:latest").
 		WithFile("/sbom.json", m.client.Host().File(sbomPath))
 
-	args := []string{"trivy", "sbom", "/sbom.json"}
+	args := []string{trivyBinaryMain, "sbom", "/sbom.json"}
 	if severity != "" {
 		args = append(args, "--severity", severity)
 	}
@@ -158,7 +160,7 @@ func (m *TrivyModule) ScanKubernetes(ctx context.Context, target string, cluster
 		target = "cluster"
 	}
 
-	args := []string{"trivy", "k8s", target}
+	args := []string{trivyBinaryMain, "k8s", target}
 	if clusterContext != "" {
 		args = append(args, "--context", clusterContext)
 	}
@@ -199,7 +201,7 @@ func (m *TrivyModule) GenerateSBOM(ctx context.Context, target string, targetTyp
 		target = "."
 	}
 
-	args := []string{"trivy", targetType, "--format", sbomFormat, target}
+	args := []string{trivyBinaryMain, targetType, "--format", sbomFormat, target}
 	if outputFile != "" {
 		args = append(args, "--output", outputFile)
 	}
@@ -231,7 +233,7 @@ func (m *TrivyModule) ScanWithFilters(ctx context.Context, target string, target
 		container = container.WithFile("/.trivyignore", m.client.Host().File(ignoreFile))
 	}
 
-	args := []string{"trivy", targetType, target}
+	args := []string{trivyBinaryMain, targetType, target}
 	if severity != "" {
 		args = append(args, "--severity", severity)
 	}
@@ -266,17 +268,17 @@ func (m *TrivyModule) DatabaseUpdate(ctx context.Context, operation string, skip
 	var args []string
 	switch operation {
 	case "download", "update":
-		args = []string{"trivy", "image", "--download-db-only", "alpine"}
+		args = []string{trivyBinaryMain, "image", "--download-db-only", "alpine"}
 		if cacheDir != "" {
 			args = append(args, "--cache-dir", cacheDir)
 		}
 	case "reset", "clean":
-		args = []string{"trivy", "clean", "--all"}
+		args = []string{trivyBinaryMain, "clean", "--all"}
 		if cacheDir != "" {
 			args = append(args, "--cache-dir", cacheDir)
 		}
 	default:
-		args = []string{"trivy", "--help"}
+		args = []string{trivyBinaryMain, "--help"}
 	}
 
 	container = container.WithExec(args)
@@ -294,7 +296,7 @@ func (m *TrivyModule) ServerMode(ctx context.Context, listenPort string, listenA
 	container := m.client.Container().
 		From("aquasec/trivy:latest")
 
-	args := []string{"trivy", "server"}
+	args := []string{trivyBinaryMain, "server"}
 	if listenPort != "" {
 		args = append(args, "--listen", "0.0.0.0:"+listenPort)
 	}
@@ -329,7 +331,7 @@ func (m *TrivyModule) ClientScan(ctx context.Context, target string, targetType 
 		target = "."
 	}
 
-	args := []string{"trivy", targetType, "--server", serverURL, target}
+	args := []string{trivyBinaryMain, targetType, "--server", serverURL, target}
 	if token != "" {
 		args = append(args, "--token", token)
 	}
@@ -352,7 +354,7 @@ func (m *TrivyModule) PluginManagement(ctx context.Context, action string, plugi
 	container := m.client.Container().
 		From("aquasec/trivy:latest")
 
-	args := []string{"trivy", "plugin", action}
+	args := []string{trivyBinaryMain, "plugin", action}
 	if pluginName != "" && action != "list" {
 		args = append(args, pluginName)
 	}
@@ -373,7 +375,7 @@ func (m *TrivyModule) ConvertSBOM(ctx context.Context, inputSBOM string, outputF
 		From("aquasec/trivy:latest").
 		WithFile("/input.sbom", m.client.Host().File(inputSBOM))
 
-	args := []string{"trivy", "convert", "--format", outputFormat, "/input.sbom"}
+	args := []string{trivyBinaryMain, "convert", "--format", outputFormat, "/input.sbom"}
 	if outputFile != "" {
 		args = append(args, "--output", outputFile)
 	}

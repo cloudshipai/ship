@@ -13,17 +13,19 @@ type PolicySentryModule struct {
 	name   string
 }
 
+const policySentryBinary = "/usr/local/bin/policy-sentry"
+
 // NewPolicySentryModule creates a new Policy Sentry module
 func NewPolicySentryModule(client *dagger.Client) *PolicySentryModule {
 	return &PolicySentryModule{
 		client: client,
-		name:   "policy-sentry",
+		name:   policySentryBinary,
 	}
 }
 
 // CreateTemplate creates a policy template
 func (m *PolicySentryModule) CreateTemplate(ctx context.Context, templateType string, outputFile string) (string, error) {
-	args := []string{"policy-sentry", "create-template", "--template-type", templateType}
+	args := []string{policySentryBinary, "create-template", "--template-type", templateType}
 	
 	if outputFile != "" {
 		args = append(args, "--output-file", outputFile)
@@ -52,7 +54,7 @@ func (m *PolicySentryModule) WritePolicy(ctx context.Context, inputFile string) 
 		From("cloudshipai/policy-sentry:latest").
 		WithFile("/workspace/input.yml", m.client.Host().File(inputFile)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"policy-sentry", "write-policy", "--input-file", "input.yml"})
+		WithExec([]string{policySentryBinary, "write-policy", "--input-file", "input.yml"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -72,7 +74,7 @@ func (m *PolicySentryModule) WritePolicyFromTemplate(ctx context.Context, templa
 		From("cloudshipai/policy-sentry:latest").
 		WithNewFile("/workspace/template.yml", templateYAML).
 		WithWorkdir("/workspace").
-		WithExec([]string{"policy-sentry", "write-policy", "--input-file", "template.yml"})
+		WithExec([]string{policySentryBinary, "write-policy", "--input-file", "template.yml"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -108,7 +110,7 @@ actions:
 		From("cloudshipai/policy-sentry:latest").
 		WithNewFile("/workspace/actions.yml", template).
 		WithWorkdir("/workspace").
-		WithExec([]string{"policy-sentry", "write-policy", "--input-file", "actions.yml"})
+		WithExec([]string{policySentryBinary, "write-policy", "--input-file", "actions.yml"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -140,7 +142,7 @@ crud:
 		From("cloudshipai/policy-sentry:latest").
 		WithNewFile("/workspace/crud.yml", template).
 		WithWorkdir("/workspace").
-		WithExec([]string{"policy-sentry", "write-policy", "--input-file", "crud.yml"})
+		WithExec([]string{policySentryBinary, "write-policy", "--input-file", "crud.yml"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -158,7 +160,7 @@ crud:
 func (m *PolicySentryModule) QueryActionTable(ctx context.Context, service string) (string, error) {
 	container := m.client.Container().
 		From("cloudshipai/policy-sentry:latest").
-		WithExec([]string{"policy-sentry", "query", "action-table", "--service", service})
+		WithExec([]string{policySentryBinary, "query", "action-table", "--service", service})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -176,7 +178,7 @@ func (m *PolicySentryModule) QueryActionTable(ctx context.Context, service strin
 func (m *PolicySentryModule) QueryConditionTable(ctx context.Context, service string) (string, error) {
 	container := m.client.Container().
 		From("cloudshipai/policy-sentry:latest").
-		WithExec([]string{"policy-sentry", "query", "condition-table", "--service", service})
+		WithExec([]string{policySentryBinary, "query", "condition-table", "--service", service})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

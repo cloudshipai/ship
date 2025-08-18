@@ -13,6 +13,8 @@ type InfraMapModule struct {
 	client *dagger.Client
 }
 
+const inframapBinary = "/usr/local/bin/inframap"
+
 // NewInfraMapModule creates a new InfraMap module instance
 func NewInfraMapModule(client *dagger.Client) *InfraMapModule {
 	return &InfraMapModule{
@@ -41,7 +43,7 @@ func (m *InfraMapModule) GenerateFromState(ctx context.Context, stateFile string
 	case "png", "svg", "pdf":
 		// Generate dot format first, then convert
 		result := container.
-			WithExec([]string{"inframap", "generate", stateFile})
+			WithExec([]string{inframapBinary, "generate", stateFile})
 
 		output, err = result.Stdout(ctx)
 		if err != nil {
@@ -52,7 +54,7 @@ func (m *InfraMapModule) GenerateFromState(ctx context.Context, stateFile string
 	case "dot":
 		// Generate raw dot format
 		result := container.
-			WithExec([]string{"inframap", "generate", stateFile})
+			WithExec([]string{inframapBinary, "generate", stateFile})
 
 		output, err = result.Stdout(ctx)
 		if err != nil {
@@ -88,7 +90,7 @@ func (m *InfraMapModule) GenerateFromHCL(ctx context.Context, directory string, 
 	case "png", "svg", "pdf":
 		// For HCL, we need to specify all .tf files
 		result := container.
-			WithExec([]string{"inframap", "generate", "--hcl", "."})
+			WithExec([]string{inframapBinary, "generate", "--hcl", "."})
 
 		output, err = result.Stdout(ctx)
 		if err != nil {
@@ -98,7 +100,7 @@ func (m *InfraMapModule) GenerateFromHCL(ctx context.Context, directory string, 
 
 	case "dot":
 		result := container.
-			WithExec([]string{"inframap", "generate", "--hcl", "."})
+			WithExec([]string{inframapBinary, "generate", "--hcl", "."})
 
 		output, err = result.Stdout(ctx)
 		if err != nil {
@@ -124,7 +126,7 @@ func (m *InfraMapModule) GenerateWithOptions(ctx context.Context, input string, 
 		WithWorkdir("/workspace")
 
 	// Build command with options
-	args := []string{"inframap", "generate"}
+	args := []string{inframapBinary, "generate"}
 
 	if options.Raw {
 		args = append(args, "--raw")
@@ -169,7 +171,7 @@ func (m *InfraMapModule) PruneState(ctx context.Context, stateFile string) (stri
 		WithWorkdir("/workspace")
 
 	result := container.
-		WithExec([]string{"inframap", "prune", stateFile})
+		WithExec([]string{inframapBinary, "prune", stateFile})
 
 	output, err := result.Stdout(ctx)
 	if err != nil {

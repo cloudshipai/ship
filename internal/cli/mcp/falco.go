@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
+	"dagger.io/dagger"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // AddFalcoTools adds Falco (runtime security monitoring) MCP tool implementations
 func AddFalcoTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addFalcoToolsDirect(s)
+}
+
+// addFalcoToolsDirect implements direct Dagger calls for Falco tools
+func addFalcoToolsDirect(s *server.MCPServer) {
 	// Falco start monitoring tool
 	startMonitoringTool := mcp.NewTool("falco_start_monitoring",
 		mcp.WithDescription("Start Falco runtime security monitoring"),
@@ -24,14 +33,26 @@ func AddFalcoTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 		),
 	)
 	s.AddTool(startMonitoringTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"falco"}
-		if configPath := request.GetString("config_path", ""); configPath != "" {
-			args = append(args, "-c", configPath)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if rulesPath := request.GetString("rules_path", ""); rulesPath != "" {
-			args = append(args, "-r", rulesPath)
+		defer client.Close()
+
+		// Get parameters
+		configPath := request.GetString("config_path", "")
+		rulesPath := request.GetString("rules_path", "")
+		outputFormat := request.GetString("output_format", "")
+
+		// Create Falco module and start monitoring
+		falcoModule := modules.NewFalcoModule(client)
+		result, err := falcoModule.StartMonitoring(ctx, configPath, rulesPath, outputFormat)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("falco start monitoring failed: %v", err)), nil
 		}
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Falco validate rules tool
@@ -43,9 +64,24 @@ func AddFalcoTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 		),
 	)
 	s.AddTool(validateRulesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		rulesPath := request.GetString("rules_path", "")
-		args := []string{"falco", "-V", rulesPath}
-		return executeShipCommand(args)
+
+		// Create Falco module and validate rules
+		falcoModule := modules.NewFalcoModule(client)
+		result, err := falcoModule.ValidateRulesSimple(ctx, rulesPath)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("falco validate rules failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Falco dry run tool
@@ -59,14 +95,25 @@ func AddFalcoTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 		),
 	)
 	s.AddTool(dryRunTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"falco", "--dry-run"}
-		if configPath := request.GetString("config_path", ""); configPath != "" {
-			args = append(args, "-c", configPath)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if rulesPath := request.GetString("rules_path", ""); rulesPath != "" {
-			args = append(args, "-r", rulesPath)
+		defer client.Close()
+
+		// Get parameters
+		configPath := request.GetString("config_path", "")
+		rulesPath := request.GetString("rules_path", "")
+
+		// Create Falco module and run dry run
+		falcoModule := modules.NewFalcoModule(client)
+		result, err := falcoModule.DryRunSimple(ctx, configPath, rulesPath)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("falco dry run failed: %v", err)), nil
 		}
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Falco list supported fields tool
@@ -78,11 +125,24 @@ func AddFalcoTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 		),
 	)
 	s.AddTool(listFieldsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"falco", "--list"}
-		if source := request.GetString("source", ""); source != "" {
-			args = append(args, source)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		source := request.GetString("source", "")
+
+		// Create Falco module and list fields
+		falcoModule := modules.NewFalcoModule(client)
+		result, err := falcoModule.ListFieldsWithSource(ctx, source)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("falco list fields failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Falco get version tool
@@ -90,8 +150,21 @@ func AddFalcoTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 		mcp.WithDescription("Get Falco version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"falco", "--version"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create Falco module and get version
+		falcoModule := modules.NewFalcoModule(client)
+		result, err := falcoModule.GetVersionSimple(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("falco get version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Falco list rules tool
@@ -102,11 +175,24 @@ func AddFalcoTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 		),
 	)
 	s.AddTool(listRulesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"falco", "-L"}
-		if rulesPath := request.GetString("rules_path", ""); rulesPath != "" {
-			args = append(args, "-r", rulesPath)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		rulesPath := request.GetString("rules_path", "")
+
+		// Create Falco module and list rules
+		falcoModule := modules.NewFalcoModule(client)
+		result, err := falcoModule.ListRulesSimple(ctx, rulesPath)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("falco list rules failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Falco describe rule tool
@@ -121,11 +207,24 @@ func AddFalcoTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 		),
 	)
 	s.AddTool(describeRuleTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		ruleName := request.GetString("rule_name", "")
-		args := []string{"falco", "-l", ruleName}
-		if rulesPath := request.GetString("rules_path", ""); rulesPath != "" {
-			args = append(args, "-r", rulesPath)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		ruleName := request.GetString("rule_name", "")
+		rulesPath := request.GetString("rules_path", "")
+
+		// Create Falco module and describe rule
+		falcoModule := modules.NewFalcoModule(client)
+		result, err := falcoModule.DescribeRuleSimple(ctx, ruleName, rulesPath)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("falco describe rule failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 }

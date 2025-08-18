@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
+	"dagger.io/dagger"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // AddCosignAdvancedTools adds advanced Cosign workflows using real CLI capabilities
 func AddCosignAdvancedTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addCosignAdvancedToolsDirect(s)
+}
+
+// addCosignAdvancedToolsDirect implements direct Dagger calls for advanced Cosign tools
+func addCosignAdvancedToolsDirect(s *server.MCPServer) {
 	// Cosign keyless signing with OIDC
 	signKeylessTool := mcp.NewTool("cosign_advanced_sign_keyless",
 		mcp.WithDescription("Sign container image using keyless signing with OIDC"),
@@ -24,9 +33,26 @@ func AddCosignAdvancedTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(signKeylessTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		imageRef := request.GetString("image_ref", "")
-		args := []string{"cosign", "sign", imageRef}
-		return executeShipCommand(args)
+		identityRegex := request.GetString("identity_regex", "")
+		issuer := request.GetString("issuer", "")
+
+		// Create Cosign Golden module and sign keyless
+		cosignModule := modules.NewCosignGoldenModule(client)
+		result, err := cosignModule.SignKeyless(ctx, imageRef, identityRegex, issuer)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cosign advanced sign keyless failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cosign verify with certificate identity
@@ -47,21 +73,27 @@ func AddCosignAdvancedTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(verifyIdentityTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		imageRef := request.GetString("image_ref", "")
-		args := []string{"cosign", "verify"}
-		
-		if certIdentity := request.GetString("certificate_identity", ""); certIdentity != "" {
-			args = append(args, "--certificate-identity", certIdentity)
+		certIdentity := request.GetString("certificate_identity", "")
+		certIdentityRegexp := request.GetString("certificate_identity_regexp", "")
+		certOidcIssuer := request.GetString("certificate_oidc_issuer", "")
+
+		// Create Cosign Golden module and verify identity
+		cosignModule := modules.NewCosignGoldenModule(client)
+		result, err := cosignModule.VerifyIdentity(ctx, imageRef, certIdentity, certIdentityRegexp, certOidcIssuer)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cosign advanced verify identity failed: %v", err)), nil
 		}
-		if certIdentityRegexp := request.GetString("certificate_identity_regexp", ""); certIdentityRegexp != "" {
-			args = append(args, "--certificate-identity-regexp", certIdentityRegexp)
-		}
-		if certOidcIssuer := request.GetString("certificate_oidc_issuer", ""); certOidcIssuer != "" {
-			args = append(args, "--certificate-oidc-issuer", certOidcIssuer)
-		}
-		
-		args = append(args, imageRef)
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cosign upload eBPF program
@@ -77,10 +109,25 @@ func AddCosignAdvancedTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(uploadEbpfTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		ebpfPath := request.GetString("ebpf_path", "")
-		registryUrl := request.GetString("registry_url", "")
-		args := []string{"cosign", "upload", "blob", "-f", ebpfPath, registryUrl}
-		return executeShipCommand(args)
+		registryURL := request.GetString("registry_url", "")
+
+		// Create Cosign Golden module and upload eBPF
+		cosignModule := modules.NewCosignGoldenModule(client)
+		result, err := cosignModule.UploadEBPF(ctx, ebpfPath, registryURL)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cosign advanced upload ebpf failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cosign attest with predicate type
@@ -103,18 +150,27 @@ func AddCosignAdvancedTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(attestWithTypeTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		imageRef := request.GetString("image_ref", "")
 		predicateType := request.GetString("predicate_type", "")
 		predicateFile := request.GetString("predicate_file", "")
-		
-		args := []string{"cosign", "attest", "--predicate", predicateFile, "--type", predicateType}
-		
-		if key := request.GetString("key", ""); key != "" {
-			args = append(args, "--key", key)
+		key := request.GetString("key", "")
+
+		// Create Cosign Golden module and attest with type
+		cosignModule := modules.NewCosignGoldenModule(client)
+		result, err := cosignModule.AttestWithType(ctx, imageRef, predicateType, predicateFile, key)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cosign advanced attest type failed: %v", err)), nil
 		}
-		
-		args = append(args, imageRef)
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cosign verify attestation with type and policy
@@ -135,21 +191,27 @@ func AddCosignAdvancedTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(verifyAttestationAdvancedTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		imageRef := request.GetString("image_ref", "")
-		args := []string{"cosign", "verify-attestation"}
-		
-		if attestationType := request.GetString("type", ""); attestationType != "" {
-			args = append(args, "--type", attestationType)
+		attestationType := request.GetString("type", "")
+		policy := request.GetString("policy", "")
+		key := request.GetString("key", "")
+
+		// Create Cosign Golden module and verify attestation advanced
+		cosignModule := modules.NewCosignGoldenModule(client)
+		result, err := cosignModule.VerifyAttestationAdvanced(ctx, imageRef, attestationType, policy, key)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cosign advanced verify attestation failed: %v", err)), nil
 		}
-		if policy := request.GetString("policy", ""); policy != "" {
-			args = append(args, "--policy", policy)
-		}
-		if key := request.GetString("key", ""); key != "" {
-			args = append(args, "--key", key)
-		}
-		
-		args = append(args, imageRef)
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cosign verify with offline bundle
@@ -171,20 +233,27 @@ func AddCosignAdvancedTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(verifyOfflineTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		imageRef := request.GetString("image_ref", "")
 		bundle := request.GetString("bundle", "")
-		
-		args := []string{"cosign", "verify", "--bundle", bundle}
-		
-		if certIdentity := request.GetString("certificate_identity", ""); certIdentity != "" {
-			args = append(args, "--certificate-identity", certIdentity)
+		certIdentity := request.GetString("certificate_identity", "")
+		certOidcIssuer := request.GetString("certificate_oidc_issuer", "")
+
+		// Create Cosign Golden module and verify offline
+		cosignModule := modules.NewCosignGoldenModule(client)
+		result, err := cosignModule.VerifyOffline(ctx, imageRef, bundle, certIdentity, certOidcIssuer)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cosign advanced verify offline failed: %v", err)), nil
 		}
-		if certOidcIssuer := request.GetString("certificate_oidc_issuer", ""); certOidcIssuer != "" {
-			args = append(args, "--certificate-oidc-issuer", certOidcIssuer)
-		}
-		
-		args = append(args, imageRef)
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cosign triangulate signatures
@@ -196,9 +265,24 @@ func AddCosignAdvancedTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(triangulateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		imageRef := request.GetString("image_ref", "")
-		args := []string{"cosign", "triangulate", imageRef}
-		return executeShipCommand(args)
+
+		// Create Cosign Golden module and triangulate
+		cosignModule := modules.NewCosignGoldenModule(client)
+		result, err := cosignModule.Triangulate(ctx, imageRef)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cosign advanced triangulate failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cosign clean signatures
@@ -214,14 +298,24 @@ func AddCosignAdvancedTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(cleanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		imageRef := request.GetString("image_ref", "")
-		args := []string{"cosign", "clean"}
-		
-		if cleanType := request.GetString("type", ""); cleanType != "" {
-			args = append(args, "--type", cleanType)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		args = append(args, imageRef)
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		imageRef := request.GetString("image_ref", "")
+		cleanType := request.GetString("type", "")
+
+		// Create Cosign Golden module and clean
+		cosignModule := modules.NewCosignGoldenModule(client)
+		result, err := cosignModule.Clean(ctx, imageRef, cleanType)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cosign advanced clean failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 }

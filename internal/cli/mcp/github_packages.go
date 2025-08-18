@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
+	"dagger.io/dagger"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // AddGitHubPackagesTools adds GitHub Packages management MCP tool implementations using gh CLI
 func AddGitHubPackagesTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addGitHubPackagesToolsDirect(s)
+}
+
+// addGitHubPackagesToolsDirect implements direct Dagger calls for GitHub Packages tools
+func addGitHubPackagesToolsDirect(s *server.MCPServer) {
 	// GitHub packages list packages in organization
 	listPackagesTool := mcp.NewTool("github_packages_list_packages",
 		mcp.WithDescription("List GitHub Packages in organization using gh API"),
@@ -22,15 +31,25 @@ func AddGitHubPackagesTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(listPackagesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		organization := request.GetString("organization", "")
-		endpoint := "orgs/" + organization + "/packages"
-		args := []string{"gh", "api", endpoint}
-		
-		if packageType := request.GetString("package_type", ""); packageType != "" {
-			args = append(args, "--field", "package_type=" + packageType)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		organization := request.GetString("organization", "")
+		packageType := request.GetString("package_type", "")
+
+		// Create GitHub Packages module and list packages
+		githubPackagesModule := modules.NewGitHubPackagesModule(client)
+		result, err := githubPackagesModule.ListPackagesSimple(ctx, organization, packageType)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("github packages list packages failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// GitHub packages audit dependencies tool
@@ -49,10 +68,26 @@ func AddGitHubPackagesTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(auditDependenciesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		// GitHub doesn't have a dedicated dependency audit API for packages
-		// This provides informational message about using GitHub's security features
-		args := []string{"echo", "GitHub Packages dependency auditing is available through GitHub's security tab in the web interface and dependabot alerts. Use gh security commands or check the repository's security tab for vulnerability information."}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
+		organization := request.GetString("organization", "")
+		packageName := request.GetString("package_name", "")
+		version := request.GetString("version", "")
+
+		// Create GitHub Packages module and audit dependencies
+		githubPackagesModule := modules.NewGitHubPackagesModule(client)
+		result, err := githubPackagesModule.AuditDependenciesSimple(ctx, organization, packageName, version)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("github packages audit dependencies failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// GitHub packages check signatures tool
@@ -72,9 +107,26 @@ func AddGitHubPackagesTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(checkSignaturesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		// GitHub uses sigstore/cosign for package signing - provide guidance
-		args := []string{"echo", "GitHub Packages signature verification uses cosign. To verify signatures: 1) Get package manifest, 2) Use cosign verify with appropriate keys/certificates. See cosign documentation for details."}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
+		organization := request.GetString("organization", "")
+		packageName := request.GetString("package_name", "")
+		version := request.GetString("version", "")
+
+		// Create GitHub Packages module and check signatures
+		githubPackagesModule := modules.NewGitHubPackagesModule(client)
+		result, err := githubPackagesModule.CheckSignaturesSimple(ctx, organization, packageName, version)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("github packages check signatures failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// GitHub packages enforce policies tool
@@ -90,9 +142,25 @@ func AddGitHubPackagesTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(enforcePolicesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		// GitHub package policies are managed through organization settings
-		args := []string{"echo", "GitHub Packages policies are configured through organization settings in the web interface. Go to Organization Settings > Packages to configure package visibility, access, and deletion policies."}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
+		organization := request.GetString("organization", "")
+		policyFile := request.GetString("policy_file", "")
+
+		// Create GitHub Packages module and enforce policies
+		githubPackagesModule := modules.NewGitHubPackagesModule(client)
+		result, err := githubPackagesModule.EnforcePoliciesSimple(ctx, organization, policyFile)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("github packages enforce policies failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// GitHub packages generate SBOM tool
@@ -111,10 +179,26 @@ func AddGitHubPackagesTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(generateSBOMTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		// SBOM generation is not directly available through GitHub Packages API
-		// Suggest using external SBOM tools like syft or cyclonedx
-		args := []string{"echo", "GitHub Packages doesn't provide direct SBOM generation. Use tools like syft, cyclonedx-cli, or other SBOM generators to create SBOMs from package artifacts."}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
+		organization := request.GetString("organization", "")
+		packageName := request.GetString("package_name", "")
+		outputFormat := request.GetString("output_format", "")
+
+		// Create GitHub Packages module and generate SBOM
+		githubPackagesModule := modules.NewGitHubPackagesModule(client)
+		result, err := githubPackagesModule.GenerateSBOMSimple(ctx, organization, packageName, outputFormat)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("github packages generate SBOM failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// GitHub packages get version tool
@@ -122,7 +206,20 @@ func AddGitHubPackagesTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		mcp.WithDescription("Get GitHub Packages security tool version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"gh", "--version"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create GitHub Packages module and get version
+		githubPackagesModule := modules.NewGitHubPackagesModule(client)
+		result, err := githubPackagesModule.GetVersionSimple(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("github packages get version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 }

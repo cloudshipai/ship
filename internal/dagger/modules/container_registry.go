@@ -13,6 +13,8 @@ type ContainerRegistryModule struct {
 	name   string
 }
 
+const dockerBinary = "/usr/local/bin/docker"
+
 // NewContainerRegistryModule creates a new container registry module
 func NewContainerRegistryModule(client *dagger.Client) *ContainerRegistryModule {
 	return &ContainerRegistryModule{
@@ -23,7 +25,7 @@ func NewContainerRegistryModule(client *dagger.Client) *ContainerRegistryModule 
 
 // Login to container registry
 func (m *ContainerRegistryModule) Login(ctx context.Context, registry, username, password string) (string, error) {
-	args := []string{"docker", "login"}
+	args := []string{dockerBinary, "login"}
 	if registry != "" {
 		args = append(args, registry)
 	}
@@ -50,7 +52,7 @@ func (m *ContainerRegistryModule) Login(ctx context.Context, registry, username,
 func (m *ContainerRegistryModule) PushImage(ctx context.Context, image string) (string, error) {
 	container := m.client.Container().
 		From("docker:latest").
-		WithExec([]string{"docker", "push", image})
+		WithExec([]string{dockerBinary, "push", image})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -64,7 +66,7 @@ func (m *ContainerRegistryModule) PushImage(ctx context.Context, image string) (
 func (m *ContainerRegistryModule) PullImage(ctx context.Context, image string) (string, error) {
 	container := m.client.Container().
 		From("docker:latest").
-		WithExec([]string{"docker", "pull", image})
+		WithExec([]string{dockerBinary, "pull", image})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -76,7 +78,7 @@ func (m *ContainerRegistryModule) PullImage(ctx context.Context, image string) (
 
 // ListImages lists local Docker images
 func (m *ContainerRegistryModule) ListImages(ctx context.Context, repository string, all bool) (string, error) {
-	args := []string{"docker", "images"}
+	args := []string{dockerBinary, "images"}
 	if repository != "" {
 		args = append(args, repository)
 	}
@@ -100,7 +102,7 @@ func (m *ContainerRegistryModule) ListImages(ctx context.Context, repository str
 func (m *ContainerRegistryModule) TagImage(ctx context.Context, sourceImage, targetImage string) (string, error) {
 	container := m.client.Container().
 		From("docker:latest").
-		WithExec([]string{"docker", "tag", sourceImage, targetImage})
+		WithExec([]string{dockerBinary, "tag", sourceImage, targetImage})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -112,7 +114,7 @@ func (m *ContainerRegistryModule) TagImage(ctx context.Context, sourceImage, tar
 
 // Logout from container registry
 func (m *ContainerRegistryModule) Logout(ctx context.Context, registry string) (string, error) {
-	args := []string{"docker", "logout"}
+	args := []string{dockerBinary, "logout"}
 	if registry != "" {
 		args = append(args, registry)
 	}

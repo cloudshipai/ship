@@ -13,11 +13,13 @@ type SyftModule struct {
 	name   string
 }
 
+const syftBinary = "/usr/local/bin/syft"
+
 // NewSyftModule creates a new Syft module
 func NewSyftModule(client *dagger.Client) *SyftModule {
 	return &SyftModule{
 		client: client,
-		name:   "syft",
+		name:   syftBinary,
 	}
 }
 
@@ -31,7 +33,7 @@ func (m *SyftModule) GenerateSBOMFromDirectory(ctx context.Context, dir string, 
 		From("anchore/syft:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"syft", "dir:.", "-o", format})
+		WithExec([]string{syftBinary, "dir:.", "-o", format})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -49,7 +51,7 @@ func (m *SyftModule) GenerateSBOMFromImage(ctx context.Context, imageName string
 
 	container := m.client.Container().
 		From("anchore/syft:latest").
-		WithExec([]string{"syft", imageName, "-o", format})
+		WithExec([]string{syftBinary, imageName, "-o", format})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -83,7 +85,7 @@ func (m *SyftModule) GenerateSBOMFromPackage(ctx context.Context, dir string, pa
 		From("anchore/syft:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"syft", source, "-o", format})
+		WithExec([]string{syftBinary, source, "-o", format})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -106,10 +108,10 @@ func (m *SyftModule) GenerateAttestations(ctx context.Context, target string, fo
 		container = container.
 			WithDirectory("/workspace", m.client.Host().Directory(target)).
 			WithWorkdir("/workspace").
-			WithExec([]string{"syft", "dir:.", "-o", format, "--source-name", target})
+			WithExec([]string{syftBinary, "dir:.", "-o", format, "--source-name", target})
 	} else {
 		// It's an image
-		container = container.WithExec([]string{"syft", target, "-o", format})
+		container = container.WithExec([]string{syftBinary, target, "-o", format})
 	}
 
 	output, err := container.Stdout(ctx)
@@ -152,7 +154,7 @@ func (m *SyftModule) LanguageSpecificCataloging(ctx context.Context, target stri
 		}
 	}
 
-	args := []string{"syft", "dir:.", "-o", outputFormat}
+	args := []string{syftBinary, "dir:.", "-o", outputFormat}
 	if len(catalogers) > 0 {
 		args = append(args, "--catalogers", fmt.Sprintf("%s", catalogers[0]))
 	}
@@ -177,7 +179,7 @@ func (m *SyftModule) SupplyChainAnalysis(ctx context.Context, target string, ana
 		WithDirectory("/workspace", m.client.Host().Directory(target)).
 		WithWorkdir("/workspace")
 
-	args := []string{"syft", "dir:."}
+	args := []string{syftBinary, "dir:."}
 
 	// Configure analysis depth
 	switch analysisDepth {
@@ -225,7 +227,7 @@ func (m *SyftModule) SBOMComparison(ctx context.Context, baselineTarget string, 
 		container = container.WithDirectory("/comparison", m.client.Host().Directory(comparisonTarget))
 	}
 
-	args := []string{"syft", "/baseline", "-o", "syft-json", "--file", "/tmp/baseline-sbom.json"}
+	args := []string{syftBinary, "/baseline", "-o", "syft-json", "--file", "/tmp/baseline-sbom.json"}
 	if outputFormat != "" {
 		args = append(args, "-o", outputFormat)
 	}
@@ -247,7 +249,7 @@ func (m *SyftModule) ComplianceAttestation(ctx context.Context, target string, c
 		WithDirectory("/workspace", m.client.Host().Directory(target)).
 		WithWorkdir("/workspace")
 
-	args := []string{"syft", "dir:."}
+	args := []string{syftBinary, "dir:."}
 
 	// Configure output format based on compliance framework
 	switch complianceFramework {
@@ -287,7 +289,7 @@ func (m *SyftModule) ArchiveAnalysis(ctx context.Context, archivePath string, ar
 		From("anchore/syft:latest").
 		WithFile("/archive", m.client.Host().File(archivePath))
 
-	args := []string{"syft", "/archive"}
+	args := []string{syftBinary, "/archive"}
 	if outputFormat != "" {
 		args = append(args, "-o", outputFormat)
 	}
@@ -318,7 +320,7 @@ func (m *SyftModule) CICDPipelineIntegration(ctx context.Context, target string,
 		WithDirectory("/workspace", m.client.Host().Directory(target)).
 		WithWorkdir("/workspace")
 
-	args := []string{"syft", "dir:."}
+	args := []string{syftBinary, "dir:."}
 
 	// Configure based on pipeline stage
 	switch pipelineStage {
@@ -372,7 +374,7 @@ func (m *SyftModule) MetadataExtraction(ctx context.Context, target string, meta
 		outputFormat = "syft-json"
 	}
 
-	args := []string{"syft", "dir:.", "-o", outputFormat}
+	args := []string{syftBinary, "dir:.", "-o", outputFormat}
 
 	// Enable all catalogers for comprehensive metadata
 	args = append(args, "--catalogers", "all", "--scope", "AllLayers")

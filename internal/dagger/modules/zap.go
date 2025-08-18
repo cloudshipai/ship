@@ -13,6 +13,8 @@ type ZapModule struct {
 	name   string
 }
 
+const zapBinary = "/zap/zap.sh"
+
 // NewZapModule creates a new ZAP module
 func NewZapModule(client *dagger.Client) *ZapModule {
 	return &ZapModule{
@@ -107,7 +109,7 @@ func (m *ZapModule) ScanWithContext(ctx context.Context, target string, contextP
 func (m *ZapModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("ghcr.io/zaproxy/zaproxy:stable").
-		WithExec([]string{"zap.sh", "-version"})
+		WithExec([]string{zapBinary, "-version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

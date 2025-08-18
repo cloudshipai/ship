@@ -10,6 +10,9 @@ type SigstorePolicyControllerModule struct {
 	Client *dagger.Client
 }
 
+const policyTesterBinary = "/usr/local/bin/policy-tester"
+const kubectlBinary = "/usr/bin/kubectl"
+
 // NewSigstorePolicyControllerModule creates a new Sigstore Policy Controller module
 func NewSigstorePolicyControllerModule(client *dagger.Client) *SigstorePolicyControllerModule {
 	return &SigstorePolicyControllerModule{
@@ -152,6 +155,91 @@ func (m *SigstorePolicyControllerModule) AuditImages(ctx context.Context, namesp
 			"--namespace", namespace,
 			"--policy", "/app/policy.yaml",
 		})
+
+	return result.Stdout(ctx)
+}
+
+// GetVersion gets the policy-tester version
+func (m *SigstorePolicyControllerModule) GetVersion(ctx context.Context) (string, error) {
+	result := m.Client.Container().
+		From("ghcr.io/sigstore/policy-controller:latest").
+		WithExec([]string{policyTesterBinary, "--version"})
+
+	return result.Stdout(ctx)
+}
+
+// CreatePolicy creates a ClusterImagePolicy using kubectl
+func (m *SigstorePolicyControllerModule) CreatePolicy(ctx context.Context, policyPath string, namespace string) (string, error) {
+	policyFile := m.Client.Host().File(policyPath)
+	
+	args := []string{kubectlBinary, "apply", "-f", "/app/policy.yaml"}
+	if namespace != "" {
+		args = append(args, "-n", namespace)
+	}
+
+	result := m.Client.Container().
+		From("bitnami/kubectl:latest").
+		WithFile("/app/policy.yaml", policyFile).
+		WithExec(args)
+
+	return result.Stdout(ctx)
+}
+
+// ListClusterImagePolicies lists ClusterImagePolicies using kubectl
+func (m *SigstorePolicyControllerModule) ListClusterImagePolicies(ctx context.Context, outputFormat string) (string, error) {
+	args := []string{kubectlBinary, "get", "clusterimagepolicy"}
+	if outputFormat != "" {
+		args = append(args, "-o", outputFormat)
+	}
+
+	result := m.Client.Container().
+		From("bitnami/kubectl:latest").
+		WithExec(args)
+
+	return result.Stdout(ctx)
+}
+
+// DeletePolicy deletes a ClusterImagePolicy using kubectl
+func (m *SigstorePolicyControllerModule) DeletePolicy(ctx context.Context, policyName string) (string, error) {
+	result := m.Client.Container().
+		From("bitnami/kubectl:latest").
+		WithExec([]string{kubectlBinary, "delete", "clusterimagepolicy", policyName})
+
+	return result.Stdout(ctx)
+}
+
+// EnableNamespace enables Sigstore policy enforcement for namespace using kubectl
+func (m *SigstorePolicyControllerModule) EnableNamespace(ctx context.Context, namespace string) (string, error) {
+	result := m.Client.Container().
+		From("bitnami/kubectl:latest").
+		WithExec([]string{kubectlBinary, "label", "namespace", namespace, "policy.sigstore.dev/include=true"})
+
+	return result.Stdout(ctx)
+}
+
+// DisableNamespace disables Sigstore policy enforcement for namespace using kubectl
+func (m *SigstorePolicyControllerModule) DisableNamespace(ctx context.Context, namespace string) (string, error) {
+	result := m.Client.Container().
+		From("bitnami/kubectl:latest").
+		WithExec([]string{kubectlBinary, "label", "namespace", namespace, "policy.sigstore.dev/exclude=true"})
+
+	return result.Stdout(ctx)
+}
+
+// GetNamespaceStatus gets Sigstore policy enforcement status for namespace using kubectl
+func (m *SigstorePolicyControllerModule) GetNamespaceStatus(ctx context.Context, namespace string) (string, error) {
+	result := m.Client.Container().
+		From("bitnami/kubectl:latest").
+		WithExec([]string{kubectlBinary, "get", "namespace", namespace, "--show-labels"})
+
+	return result.Stdout(ctx)
+}
+
+// DescribePolicy describes a ClusterImagePolicy using kubectl
+func (m *SigstorePolicyControllerModule) DescribePolicy(ctx context.Context, policyName string) (string, error) {
+	result := m.Client.Container().
+		From("bitnami/kubectl:latest").
+		WithExec([]string{kubectlBinary, "describe", "clusterimagepolicy", policyName})
 
 	return result.Stdout(ctx)
 }

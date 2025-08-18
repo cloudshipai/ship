@@ -10,6 +10,8 @@ type GuacModule struct {
 	Client *dagger.Client
 }
 
+const guaconeBinary = "/usr/local/bin/guacone"
+
 // NewGuacModule creates a new GUAC module
 func NewGuacModule(client *dagger.Client) *GuacModule {
 	return &GuacModule{
@@ -25,7 +27,7 @@ func (m *GuacModule) IngestSBOM(ctx context.Context, sbomPath string) (string, e
 		From("ghcr.io/guacsec/guac:latest").
 		WithFile("/app/sbom.json", sbomFile).
 		WithExec([]string{
-			"guacone", "collect", "files", "/app/sbom.json",
+			guaconeBinary, "collect", "files", "/app/sbom.json",
 		})
 
 	return result.Stdout(ctx)
@@ -39,7 +41,7 @@ func (m *GuacModule) AnalyzeArtifact(ctx context.Context, artifactPath string) (
 		From("ghcr.io/guacsec/guac:latest").
 		WithFile("/app/artifact", artifactFile).
 		WithExec([]string{
-			"guacone", "collect", "image", "/app/artifact",
+			guaconeBinary, "collect", "image", "/app/artifact",
 		})
 
 	return result.Stdout(ctx)
@@ -50,7 +52,7 @@ func (m *GuacModule) QueryDependencies(ctx context.Context, packageName string) 
 	result := m.Client.Container().
 		From("ghcr.io/guacsec/guac:latest").
 		WithExec([]string{
-			"guacone", "query", "dependencies", packageName,
+			guaconeBinary, "query", "dependencies", packageName,
 		})
 
 	return result.Stdout(ctx)
@@ -61,7 +63,7 @@ func (m *GuacModule) QueryVulnerabilities(ctx context.Context, packageName strin
 	result := m.Client.Container().
 		From("ghcr.io/guacsec/guac:latest").
 		WithExec([]string{
-			"guacone", "query", "vulnerabilities", packageName,
+			guaconeBinary, "query", "vulnerabilities", packageName,
 		})
 
 	return result.Stdout(ctx)
@@ -76,10 +78,10 @@ func (m *GuacModule) GenerateGraph(ctx context.Context, projectPath string) (str
 		WithDirectory("/app/project", projectDir).
 		WithWorkdir("/app/project").
 		WithExec([]string{
-			"guacone", "collect", "files", ".",
+			guaconeBinary, "collect", "files", ".",
 		}).
 		WithExec([]string{
-			"guacone", "visualizer", "--output", "graph.dot",
+			guaconeBinary, "visualizer", "--output", "graph.dot",
 		})
 
 	return result.Stdout(ctx)
@@ -90,7 +92,7 @@ func (m *GuacModule) AnalyzeImpact(ctx context.Context, vulnID string) (string, 
 	result := m.Client.Container().
 		From("ghcr.io/guacsec/guac:latest").
 		WithExec([]string{
-			"guacone", "query", "impact", vulnID,
+			guaconeBinary, "query", "impact", vulnID,
 		})
 
 	return result.Stdout(ctx)
@@ -105,7 +107,7 @@ func (m *GuacModule) CollectFiles(ctx context.Context, projectPath string) (stri
 		WithDirectory("/app/project", projectDir).
 		WithWorkdir("/app/project").
 		WithExec([]string{
-			"guacone", "collect", "files", ".",
+			guaconeBinary, "collect", "files", ".",
 		})
 
 	return result.Stdout(ctx)
@@ -119,7 +121,7 @@ func (m *GuacModule) ValidateAttestation(ctx context.Context, attestationPath st
 		From("ghcr.io/guacsec/guac:latest").
 		WithFile("/app/attestation.json", attestationFile).
 		WithExec([]string{
-			"guacone", "collect", "attestation", "/app/attestation.json",
+			guaconeBinary, "collect", "attestation", "/app/attestation.json",
 		})
 
 	return result.Stdout(ctx)

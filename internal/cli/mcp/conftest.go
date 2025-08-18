@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
+	"dagger.io/dagger"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // AddConftestTools adds Conftest (OPA policy testing) MCP tool implementations
 func AddConftestTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addConftestToolsDirect(s)
+}
+
+// addConftestToolsDirect implements direct Dagger calls for Conftest tools
+func addConftestToolsDirect(s *server.MCPServer) {
 	// Conftest test policies tool
 	testTool := mcp.NewTool("conftest_test",
 		mcp.WithDescription("Test configuration files against OPA policies"),
@@ -35,26 +44,29 @@ func AddConftestTools(s *server.MCPServer, executeShipCommand ExecuteShipCommand
 		),
 	)
 	s.AddTool(testTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		inputFile := request.GetString("input_file", "")
-		args := []string{"conftest", "test", inputFile}
-		
-		if policy := request.GetString("policy", ""); policy != "" {
-			args = append(args, "--policy", policy)
+		policy := request.GetString("policy", "")
+		namespace := request.GetString("namespace", "")
+		allNamespaces := request.GetBool("all_namespaces", false)
+		output := request.GetString("output", "")
+		parser := request.GetString("parser", "")
+
+		// Create Conftest module and test with options
+		conftestModule := modules.NewConftestModule(client)
+		result, err := conftestModule.TestWithOptions(ctx, inputFile, policy, namespace, allNamespaces, output, parser)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("conftest test failed: %v", err)), nil
 		}
-		if namespace := request.GetString("namespace", ""); namespace != "" {
-			args = append(args, "--namespace", namespace)
-		}
-		if request.GetBool("all_namespaces", false) {
-			args = append(args, "--all-namespaces")
-		}
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "--output", output)
-		}
-		if parser := request.GetString("parser", ""); parser != "" {
-			args = append(args, "--parser", parser)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Conftest verify policies tool
@@ -68,16 +80,25 @@ func AddConftestTools(s *server.MCPServer, executeShipCommand ExecuteShipCommand
 		),
 	)
 	s.AddTool(verifyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"conftest", "verify"}
-		
-		if policy := request.GetString("policy", ""); policy != "" {
-			args = append(args, "--policy", policy)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if request.GetBool("show_builtin_errors", false) {
-			args = append(args, "--show-builtin-errors")
+		defer client.Close()
+
+		// Get parameters
+		policy := request.GetString("policy", "")
+		showBuiltinErrors := request.GetBool("show_builtin_errors", false)
+
+		// Create Conftest module and verify with options
+		conftestModule := modules.NewConftestModule(client)
+		result, err := conftestModule.VerifyWithOptions(ctx, policy, showBuiltinErrors)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("conftest verify failed: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Conftest parse configuration files tool
@@ -93,14 +114,25 @@ func AddConftestTools(s *server.MCPServer, executeShipCommand ExecuteShipCommand
 		),
 	)
 	s.AddTool(parseTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		inputFile := request.GetString("input_file", "")
-		args := []string{"conftest", "parse", inputFile}
-		
-		if parser := request.GetString("parser", ""); parser != "" {
-			args = append(args, "--parser", parser)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		inputFile := request.GetString("input_file", "")
+		parser := request.GetString("parser", "")
+
+		// Create Conftest module and parse file
+		conftestModule := modules.NewConftestModule(client)
+		result, err := conftestModule.ParseFile(ctx, inputFile, parser)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("conftest parse failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Conftest push policies to OCI registry
@@ -118,14 +150,25 @@ func AddConftestTools(s *server.MCPServer, executeShipCommand ExecuteShipCommand
 		),
 	)
 	s.AddTool(pushTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		registryURL := request.GetString("registry_url", "")
-		args := []string{"conftest", "push", registryURL}
-		
-		if policyDir := request.GetString("policy_dir", ""); policyDir != "" {
-			args = append(args, policyDir)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		registryURL := request.GetString("registry_url", "")
+		policyDir := request.GetString("policy_dir", "")
+
+		// Create Conftest module and push policies
+		conftestModule := modules.NewConftestModule(client)
+		result, err := conftestModule.PushPolicies(ctx, registryURL, policyDir)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("conftest push failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Conftest get version tool
@@ -133,7 +176,20 @@ func AddConftestTools(s *server.MCPServer, executeShipCommand ExecuteShipCommand
 		mcp.WithDescription("Get Conftest version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"conftest", "--version"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create Conftest module and get version
+		conftestModule := modules.NewConftestModule(client)
+		result, err := conftestModule.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("conftest get version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 }

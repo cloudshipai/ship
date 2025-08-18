@@ -14,6 +14,8 @@ type AWSIAMRotationModule struct {
 	name   string
 }
 
+const awsCLIBinary = "/usr/local/bin/aws"
+
 // NewAWSIAMRotationModule creates a new AWS IAM rotation module
 func NewAWSIAMRotationModule(client *dagger.Client) *AWSIAMRotationModule {
 	return &AWSIAMRotationModule{
@@ -36,7 +38,7 @@ func (m *AWSIAMRotationModule) RotateAccessKeys(ctx context.Context, username st
 	}
 
 	container = container.WithExec([]string{
-		"aws", "iam", "create-access-key",
+		awsCLIBinary, "iam", "create-access-key",
 		"--user-name", username,
 		"--output", "json",
 	})
@@ -63,7 +65,7 @@ func (m *AWSIAMRotationModule) ListAccessKeys(ctx context.Context, username stri
 	}
 
 	container = container.WithExec([]string{
-		"aws", "iam", "list-access-keys",
+		awsCLIBinary, "iam", "list-access-keys",
 		"--user-name", username,
 		"--output", "json",
 	})
@@ -90,7 +92,7 @@ func (m *AWSIAMRotationModule) DeleteAccessKey(ctx context.Context, username str
 	}
 
 	container = container.WithExec([]string{
-		"aws", "iam", "delete-access-key",
+		awsCLIBinary, "iam", "delete-access-key",
 		"--user-name", username,
 		"--access-key-id", accessKeyId,
 		"--output", "json",

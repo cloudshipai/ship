@@ -14,6 +14,8 @@ type CloudsplainingModule struct {
 	name   string
 }
 
+const cloudsplainingBinary = "/usr/local/bin/cloudsplaining"
+
 // NewCloudsplainingModule creates a new Cloudsplaining module
 func NewCloudsplainingModule(client *dagger.Client) *CloudsplainingModule {
 	return &CloudsplainingModule{
@@ -37,7 +39,7 @@ func (m *CloudsplainingModule) ScanAccountAuthorization(ctx context.Context, pro
 
 	// First download, then scan
 	container = container.WithExec([]string{
-		"sh", "-c", "cloudsplaining download --profile " + profile + " && cloudsplaining scan --input-file default.json --output /workspace/results.json",
+		"sh", "-c", cloudsplainingBinary + " download --profile " + profile + " && " + cloudsplainingBinary + " scan --input-file default.json --output /workspace/results.json",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -59,7 +61,7 @@ func (m *CloudsplainingModule) ScanPolicyFile(ctx context.Context, policyPath st
 		WithFile("/workspace/policy.json", m.client.Host().File(policyPath)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			"cloudsplaining", "scan-policy-file",
+			cloudsplainingBinary, "scan-policy-file",
 			"--input-file", "policy.json",
 			"--output", "results.json",
 		})
@@ -83,7 +85,7 @@ func (m *CloudsplainingModule) CreateReportFromResults(ctx context.Context, resu
 		WithFile("/workspace/results.json", m.client.Host().File(resultsPath)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			"cloudsplaining", "create-report",
+			cloudsplainingBinary, "create-report",
 			"--input-file", "results.json",
 			"--output", "report.html",
 		})
@@ -114,9 +116,9 @@ func (m *CloudsplainingModule) ScanWithMinimization(ctx context.Context, profile
 	}
 
 	// Build the command with optional parameters
-	cmd := "cloudsplaining download --profile " + profile + " && cloudsplaining scan --input-file default.json --output /workspace/results.json"
+	cmd := cloudsplainingBinary + " download --profile " + profile + " && " + cloudsplainingBinary + " scan --input-file default.json --output /workspace/results.json"
 	if minimizeStatementId != "" {
-		cmd = "cloudsplaining download --profile " + profile + " && cloudsplaining scan --input-file default.json --minimize-statement-id " + minimizeStatementId + " --output /workspace/results.json"
+		cmd = cloudsplainingBinary + " download --profile " + profile + " && " + cloudsplainingBinary + " scan --input-file default.json --minimize-statement-id " + minimizeStatementId + " --output /workspace/results.json"
 	}
 
 	container = container.WithExec([]string{"sh", "-c", cmd})
@@ -135,7 +137,7 @@ func (m *CloudsplainingModule) ScanWithMinimization(ctx context.Context, profile
 
 // Download downloads AWS account authorization data
 func (m *CloudsplainingModule) Download(ctx context.Context, profile string, includeNonDefaultPolicyVersions bool) (string, error) {
-	args := []string{"cloudsplaining", "download"}
+	args := []string{cloudsplainingBinary, "download"}
 	if profile != "" {
 		args = append(args, "--profile", profile)
 	}
@@ -169,7 +171,7 @@ func (m *CloudsplainingModule) Download(ctx context.Context, profile string, inc
 
 // ScanAccountData scans downloaded account authorization data
 func (m *CloudsplainingModule) ScanAccountData(ctx context.Context, inputFile string, exclusionsFile string, outputDir string) (string, error) {
-	args := []string{"cloudsplaining", "scan", "--input-file", "/workspace/input.json"}
+	args := []string{cloudsplainingBinary, "scan", "--input-file", "/workspace/input.json"}
 	if exclusionsFile != "" {
 		args = append(args, "--exclusions-file", "/workspace/exclusions.yml")
 	}
@@ -204,7 +206,7 @@ func (m *CloudsplainingModule) ScanAccountData(ctx context.Context, inputFile st
 func (m *CloudsplainingModule) CreateExclusionsFile(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("cloudshipai/cloudsplaining:latest").
-		WithExec([]string{"cloudsplaining", "create-exclusions-file"})
+		WithExec([]string{cloudsplainingBinary, "create-exclusions-file"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -222,7 +224,7 @@ func (m *CloudsplainingModule) CreateExclusionsFile(ctx context.Context) (string
 func (m *CloudsplainingModule) CreateMultiAccountConfig(ctx context.Context, outputFile string) (string, error) {
 	container := m.client.Container().
 		From("cloudshipai/cloudsplaining:latest").
-		WithExec([]string{"cloudsplaining", "create-multi-account-config-file", "-o", "/workspace/config.yml"})
+		WithExec([]string{cloudsplainingBinary, "create-multi-account-config-file", "-o", "/workspace/config.yml"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -238,7 +240,7 @@ func (m *CloudsplainingModule) CreateMultiAccountConfig(ctx context.Context, out
 
 // ScanMultiAccount scans multiple AWS accounts
 func (m *CloudsplainingModule) ScanMultiAccount(ctx context.Context, configFile string, profile string, roleName string, outputBucket string, outputDirectory string) (string, error) {
-	args := []string{"cloudsplaining", "scan-multi-account", "-c", "/workspace/config.yml"}
+	args := []string{cloudsplainingBinary, "scan-multi-account", "-c", "/workspace/config.yml"}
 	
 	if profile != "" {
 		args = append(args, "--profile", profile)

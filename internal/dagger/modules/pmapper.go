@@ -14,11 +14,13 @@ type PMapperModule struct {
 	name   string
 }
 
+const pmapperBinary = "/usr/local/bin/pmapper"
+
 // NewPMapperModule creates a new PMapper module
 func NewPMapperModule(client *dagger.Client) *PMapperModule {
 	return &PMapperModule{
 		client: client,
-		name:   "pmapper",
+		name:   pmapperBinary,
 	}
 }
 
@@ -35,7 +37,7 @@ func (m *PMapperModule) CreateGraph(ctx context.Context, profile string) (string
 			WithEnvVariable("AWS_REGION", os.Getenv("AWS_REGION"))
 	}
 
-	container = container.WithExec([]string{"pmapper", "graph", "create"})
+	container = container.WithExec([]string{pmapperBinary, "graph", "create"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -62,7 +64,7 @@ func (m *PMapperModule) QueryAccess(ctx context.Context, profile string, princip
 			WithEnvVariable("AWS_REGION", os.Getenv("AWS_REGION"))
 	}
 
-	args := []string{"pmapper", "query", "can", principal, action}
+	args := []string{pmapperBinary, "query", "can", principal, action}
 	if resource != "" {
 		args = append(args, resource)
 	}
@@ -94,7 +96,7 @@ func (m *PMapperModule) FindPrivilegeEscalation(ctx context.Context, profile str
 			WithEnvVariable("AWS_REGION", os.Getenv("AWS_REGION"))
 	}
 
-	container = container.WithExec([]string{"pmapper", "query", "preset", "privesc", principal})
+	container = container.WithExec([]string{pmapperBinary, "query", "preset", "privesc", principal})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -121,7 +123,7 @@ func (m *PMapperModule) VisualizeGraph(ctx context.Context, profile string, outp
 			WithEnvVariable("AWS_REGION", os.Getenv("AWS_REGION"))
 	}
 
-	args := []string{"pmapper", "visualize"}
+	args := []string{pmapperBinary, "visualize"}
 	if outputFormat != "" {
 		args = append(args, "--format", outputFormat)
 	}
@@ -153,7 +155,7 @@ func (m *PMapperModule) ListPrincipals(ctx context.Context, profile string) (str
 			WithEnvVariable("AWS_REGION", os.Getenv("AWS_REGION"))
 	}
 
-	container = container.WithExec([]string{"pmapper", "query", "list", "principals"})
+	container = container.WithExec([]string{pmapperBinary, "query", "list", "principals"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -180,7 +182,7 @@ func (m *PMapperModule) CheckAdminAccess(ctx context.Context, profile string, pr
 			WithEnvVariable("AWS_REGION", os.Getenv("AWS_REGION"))
 	}
 
-	container = container.WithExec([]string{"pmapper", "query", "preset", "admin", principal})
+	container = container.WithExec([]string{pmapperBinary, "query", "preset", "admin", principal})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

@@ -13,6 +13,8 @@ type ConftestModule struct {
 	name   string
 }
 
+const conftestBinary = "/conftest"
+
 // NewConftestModule creates a new Conftest module
 func NewConftestModule(client *dagger.Client) *ConftestModule {
 	return &ConftestModule{
@@ -29,7 +31,7 @@ func (m *ConftestModule) TestWithPolicy(ctx context.Context, dir string, policyP
 		WithDirectory("/policies", m.client.Host().Directory(policyPath)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			"conftest",
+			conftestBinary,
 			"test",
 			"--policy", "/policies",
 			"--output", "json",
@@ -54,7 +56,7 @@ func (m *ConftestModule) TestFile(ctx context.Context, filePath string, policyPa
 		WithDirectory("/policies", m.client.Host().Directory(policyPath)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			"conftest",
+			conftestBinary,
 			"test",
 			"--policy", "/policies",
 			"--output", "json",
@@ -77,7 +79,7 @@ func (m *ConftestModule) VerifyPolicies(ctx context.Context, policyPath string) 
 		From("openpolicyagent/conftest:latest").
 		WithDirectory("/policies", m.client.Host().Directory(policyPath)).
 		WithExec([]string{
-			"conftest",
+			conftestBinary,
 			"verify",
 			"--policy", "/policies",
 		}, dagger.ContainerWithExecOpts{
@@ -149,4 +151,73 @@ func (m *ConftestModule) GetVersion(ctx context.Context) (string, error) {
 	}
 
 	return output, nil
+}
+
+// TestWithOptions tests configuration files with comprehensive options
+func (m *ConftestModule) TestWithOptions(ctx context.Context, inputFile string, policy string, namespace string, allNamespaces bool, output string, parser string) (string, error) {
+	args := []string{"conftest", "test", "/workspace/input"}
+	
+	if policy != "" {
+		args = append(args, "--policy", "/policies")
+	}
+	if namespace != "" {
+		args = append(args, "--namespace", namespace)
+	}
+	if allNamespaces {
+		args = append(args, "--all-namespaces")
+	}
+	if output != "" {
+		args = append(args, "--output", output)
+	} else {
+		args = append(args, "--output", "json")
+	}
+	if parser != "" {
+		args = append(args, "--parser", parser)
+	}
+
+	container := m.client.Container().
+		From("openpolicyagent/conftest:latest").
+		WithFile("/workspace/input", m.client.Host().File(inputFile)).
+		WithWorkdir("/workspace")
+
+	if policy != "" {
+		container = container.WithDirectory("/policies", m.client.Host().Directory(policy))
+	}
+
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{Expect: "ANY"})
+
+	result, _ := container.Stdout(ctx)
+	if result != "" {
+		return result, nil
+	}
+
+	return "", fmt.Errorf("failed to run conftest test with options: no output received")
+}
+
+// VerifyWithOptions runs policy unit tests with options
+func (m *ConftestModule) VerifyWithOptions(ctx context.Context, policy string, showBuiltinErrors bool) (string, error) {
+	args := []string{"conftest", "verify"}
+	
+	if policy != "" {
+		args = append(args, "--policy", "/policies")
+	}
+	if showBuiltinErrors {
+		args = append(args, "--show-builtin-errors")
+	}
+
+	container := m.client.Container().
+		From("openpolicyagent/conftest:latest")
+
+	if policy != "" {
+		container = container.WithDirectory("/policies", m.client.Host().Directory(policy))
+	}
+
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{Expect: "ANY"})
+
+	result, _ := container.Stdout(ctx)
+	if result != "" {
+		return result, nil
+	}
+
+	return "", fmt.Errorf("failed to run conftest verify with options: no output received")
 }

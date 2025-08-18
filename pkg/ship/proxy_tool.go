@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"time"
 
 	"github.com/cloudshipai/ship/pkg/dagger"
 	"github.com/mark3labs/mcp-go/client"
@@ -52,7 +54,7 @@ func (p *ProxyTool) Execute(ctx context.Context, params map[string]interface{}, 
 	for key, value := range params {
 		arguments[key] = value
 	}
-	
+
 	// Create the tool call request
 	toolCallRequest := mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
@@ -60,7 +62,7 @@ func (p *ProxyTool) Execute(ctx context.Context, params map[string]interface{}, 
 			Arguments: arguments,
 		},
 	}
-	
+
 	// Forward the call to the external MCP server
 	response, err := p.client.CallTool(ctx, toolCallRequest)
 	if err != nil {
@@ -68,7 +70,7 @@ func (p *ProxyTool) Execute(ctx context.Context, params map[string]interface{}, 
 			Error: err,
 		}, fmt.Errorf("failed to call external tool %s: %w", p.toolName, err)
 	}
-	
+
 	// Convert the response back to our ToolResult format
 	var content string
 	if len(response.Content) > 0 {
@@ -90,14 +92,14 @@ func (p *ProxyTool) Execute(ctx context.Context, params map[string]interface{}, 
 			}
 		}
 	}
-	
+
 	// Check for errors in the response
 	if response.IsError {
 		return &ToolResult{
 			Error: fmt.Errorf("external tool error: %s", content),
 		}, nil
 	}
-	
+
 	return &ToolResult{
 		Content: content,
 	}, nil
@@ -143,22 +145,38 @@ func (p *MCPProxy) Connect(ctx context.Context) error {
 	if p.config.Disabled {
 		return fmt.Errorf("MCP server %s is disabled", p.config.Name)
 	}
-	
+
 	var mcpClient client.MCPClient
 	var err error
-	
+
 	// Create client based on transport type
 	switch p.config.Transport {
 	case "stdio":
 		if p.config.Command == "" {
 			return fmt.Errorf("command is required for stdio transport")
 		}
+
+		// Debug: Log the command being executed
+		fmt.Fprintf(os.Stderr, "[DEBUG] Creating stdio MCP client with command: %s %v\n", p.config.Command, p.config.Args)
+
 		// Convert env map to slice format
 		var envSlice []string
 		for key, value := range p.config.Env {
 			envSlice = append(envSlice, fmt.Sprintf("%s=%s", key, value))
 		}
+
+		// Debug: Log environment variables
+		if len(envSlice) > 0 {
+			fmt.Fprintf(os.Stderr, "[DEBUG] Environment variables: %v\n", envSlice)
+		}
+
 		mcpClient, err = client.NewStdioMCPClient(p.config.Command, envSlice, p.config.Args...)
+		if err != nil {
+			return fmt.Errorf("failed to create stdio MCP client: %w", err)
+		}
+
+		fmt.Fprintf(os.Stderr, "[DEBUG] Stdio MCP client created successfully\n")
+
 	case "http":
 		if p.config.BaseURL == "" {
 			return fmt.Errorf("baseUrl is required for http transport")
@@ -166,35 +184,70 @@ func (p *MCPProxy) Connect(ctx context.Context) error {
 		mcpClient, err = client.NewStreamableHttpClient(p.config.BaseURL, nil)
 	case "sse":
 		if p.config.BaseURL == "" {
-			return fmt.Errorf("baseUrl is required for sse transport")
+			return fmt.Errorf("baseUrl is required for http transport")
 		}
 		mcpClient, err = client.NewSSEMCPClient(p.config.BaseURL, nil)
 	default:
 		return fmt.Errorf("unsupported transport type: %s", p.config.Transport)
 	}
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to create MCP client: %w", err)
 	}
-	
+
 	// Note: stdio clients are automatically started by the constructor
 	// HTTP and SSE clients may also be automatically started depending on implementation
-	
-	// Initialize the connection
+
+	fmt.Fprintf(os.Stderr, "[DEBUG] Starting MCP client initialization...\n")
+
+	// Initialize the connection with timeout to prevent deadlock
+	initCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	initRequest := mcp.InitializeRequest{}
 	initRequest.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
 	initRequest.Params.ClientInfo = mcp.Implementation{
 		Name:    "Ship MCP Proxy",
 		Version: "1.0.0",
 	}
-	
-	_, err = mcpClient.Initialize(ctx, initRequest)
-	if err != nil {
-		mcpClient.Close()
-		return fmt.Errorf("failed to initialize MCP connection: %w", err)
+
+	// Add timeout and better error handling for stdio transport
+	if p.config.Transport == "stdio" {
+		fmt.Fprintf(os.Stderr, "[DEBUG] Using stdio transport with timeout handling\n")
+
+		// For stdio transport, try to detect if the process is responsive
+		done := make(chan error, 1)
+		go func() {
+			fmt.Fprintf(os.Stderr, "[DEBUG] Starting MCP initialization in goroutine...\n")
+			_, err := mcpClient.Initialize(initCtx, initRequest)
+			fmt.Fprintf(os.Stderr, "[DEBUG] MCP initialization completed with error: %v\n", err)
+			done <- err
+		}()
+
+		select {
+		case err = <-done:
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "[DEBUG] MCP initialization failed: %v\n", err)
+				mcpClient.Close()
+				return fmt.Errorf("failed to initialize MCP connection: %w", err)
+			}
+			fmt.Fprintf(os.Stderr, "[DEBUG] MCP initialization successful\n")
+		case <-initCtx.Done():
+			fmt.Fprintf(os.Stderr, "[DEBUG] MCP initialization timed out\n")
+			mcpClient.Close()
+			return fmt.Errorf("MCP initialization timed out after 30 seconds - possible stdio transport deadlock")
+		}
+	} else {
+		// For other transport types, use normal initialization
+		_, err = mcpClient.Initialize(initCtx, initRequest)
+		if err != nil {
+			mcpClient.Close()
+			return fmt.Errorf("failed to initialize MCP connection: %w", err)
+		}
 	}
-	
+
 	p.client = mcpClient
+	fmt.Fprintf(os.Stderr, "[DEBUG] MCP proxy connection established successfully\n")
 	return nil
 }
 
@@ -203,16 +256,16 @@ func (p *MCPProxy) DiscoverTools(ctx context.Context) ([]Tool, error) {
 	if p.client == nil {
 		return nil, fmt.Errorf("not connected to MCP server")
 	}
-	
+
 	// List tools from the external server
 	listToolsRequest := mcp.ListToolsRequest{}
 	toolsResponse, err := p.client.ListTools(ctx, listToolsRequest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list tools from external server: %w", err)
 	}
-	
+
 	var proxyTools []Tool
-	
+
 	// Create proxy tools for each discovered tool
 	for _, tool := range toolsResponse.Tools {
 		// Convert MCP tool parameters to Ship parameters
@@ -225,7 +278,7 @@ func (p *MCPProxy) DiscoverTools(ctx context.Context) ([]Tool, error) {
 					Description: fmt.Sprintf("Parameter for %s", propName),
 					Required:    false, // Could parse required from schema
 				}
-				
+
 				// Try to extract description from schema
 				if schemaMap, ok := propSchema.(map[string]interface{}); ok {
 					if desc, ok := schemaMap["description"].(string); ok {
@@ -235,18 +288,18 @@ func (p *MCPProxy) DiscoverTools(ctx context.Context) ([]Tool, error) {
 						param.Type = typeStr
 					}
 				}
-				
+
 				shipParams = append(shipParams, param)
 			}
 		}
-		
+
 		// Create proxy tool with namespace prefix
 		proxyToolName := fmt.Sprintf("%s_%s", p.config.Name, tool.Name)
 		description := tool.Description
 		if description == "" {
 			description = fmt.Sprintf("Proxied tool %s from %s", tool.Name, p.config.Name)
 		}
-		
+
 		proxyTool := NewProxyTool(
 			proxyToolName,
 			description,
@@ -254,10 +307,10 @@ func (p *MCPProxy) DiscoverTools(ctx context.Context) ([]Tool, error) {
 			p.client,
 			tool.Name, // Original tool name for the external server
 		)
-		
+
 		proxyTools = append(proxyTools, proxyTool)
 	}
-	
+
 	return proxyTools, nil
 }
 

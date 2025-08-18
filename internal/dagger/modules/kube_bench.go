@@ -13,11 +13,13 @@ type KubeBenchModule struct {
 	name   string
 }
 
+const kubeBenchBinary = "/usr/local/bin/kube-bench"
+
 // NewKubeBenchModule creates a new kube-bench module
 func NewKubeBenchModule(client *dagger.Client) *KubeBenchModule {
 	return &KubeBenchModule{
 		client: client,
-		name:   "kube-bench",
+		name:   kubeBenchBinary,
 	}
 }
 
@@ -31,7 +33,7 @@ func (m *KubeBenchModule) RunBenchmark(ctx context.Context, kubeconfig string) (
 	}
 
 	container = container.WithExec([]string{
-		"kube-bench",
+		kubeBenchBinary,
 		"--json",
 	})
 
@@ -53,7 +55,7 @@ func (m *KubeBenchModule) RunMasterBenchmark(ctx context.Context, kubeconfig str
 	}
 
 	container = container.WithExec([]string{
-		"kube-bench",
+		kubeBenchBinary,
 		"master",
 		"--json",
 	})
@@ -76,7 +78,7 @@ func (m *KubeBenchModule) RunNodeBenchmark(ctx context.Context, kubeconfig strin
 	}
 
 	container = container.WithExec([]string{
-		"kube-bench",
+		kubeBenchBinary,
 		"node",
 		"--json",
 	})
@@ -93,7 +95,7 @@ func (m *KubeBenchModule) RunNodeBenchmark(ctx context.Context, kubeconfig strin
 func (m *KubeBenchModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("aquasec/kube-bench:latest").
-		WithExec([]string{"kube-bench", "--version"})
+		WithExec([]string{kubeBenchBinary, "--version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -112,7 +114,7 @@ func (m *KubeBenchModule) RunWithChecks(ctx context.Context, kubeconfig string, 
 		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
 	}
 
-	args := []string{"kube-bench", "--json"}
+	args := []string{kubeBenchBinary, "--json"}
 	if checks != "" {
 		args = append(args, "--check", checks)
 	}
@@ -136,7 +138,7 @@ func (m *KubeBenchModule) RunWithSkip(ctx context.Context, kubeconfig string, sk
 		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
 	}
 
-	args := []string{"kube-bench", "--json"}
+	args := []string{kubeBenchBinary, "--json"}
 	if skip != "" {
 		args = append(args, "--skip", skip)
 	}
@@ -190,7 +192,7 @@ func (m *KubeBenchModule) RunASFF(ctx context.Context, kubeconfig string) (strin
 	}
 
 	container = container.WithExec([]string{
-		"kube-bench",
+		kubeBenchBinary,
 		"--asff",
 	})
 

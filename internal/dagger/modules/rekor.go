@@ -28,7 +28,7 @@ func (m *RekorModule) Upload(ctx context.Context, artifactPath string, signature
 		WithFile("/artifact", m.client.Host().File(artifactPath)).
 		WithFile("/signature", m.client.Host().File(signaturePath)).
 		WithExec([]string{
-			"rekor-cli",
+			"/usr/local/bin/rekor-cli",
 			"upload",
 			"--artifact", "/artifact",
 			"--signature", "/signature",
@@ -48,7 +48,7 @@ func (m *RekorModule) Search(ctx context.Context, query string) (string, error) 
 	container := m.client.Container().
 		From("gcr.io/projectsigstore/rekor-cli:latest").
 		WithExec([]string{
-			"rekor-cli",
+			"/usr/local/bin/rekor-cli",
 			"search",
 			"--artifact", query,
 			"--format", "json",
@@ -67,7 +67,7 @@ func (m *RekorModule) Get(ctx context.Context, logIndex string) (string, error) 
 	container := m.client.Container().
 		From("gcr.io/projectsigstore/rekor-cli:latest").
 		WithExec([]string{
-			"rekor-cli",
+			"/usr/local/bin/rekor-cli",
 			"get",
 			"--log-index", logIndex,
 			"--format", "json",
@@ -88,7 +88,7 @@ func (m *RekorModule) Verify(ctx context.Context, artifactPath string, signature
 		WithFile("/artifact", m.client.Host().File(artifactPath)).
 		WithFile("/signature", m.client.Host().File(signaturePath)).
 		WithExec([]string{
-			"rekor-cli",
+			"/usr/local/bin/rekor-cli",
 			"verify",
 			"--artifact", "/artifact",
 			"--signature", "/signature",
@@ -108,7 +108,7 @@ func (m *RekorModule) GetByUUID(ctx context.Context, uuid string) (string, error
 	container := m.client.Container().
 		From("gcr.io/projectsigstore/rekor-cli:latest").
 		WithExec([]string{
-			"rekor-cli",
+			"/usr/local/bin/rekor-cli",
 			"get",
 			"--uuid", uuid,
 			"--format", "json",
@@ -127,7 +127,7 @@ func (m *RekorModule) VerifyByUUID(ctx context.Context, uuid string) (string, er
 	container := m.client.Container().
 		From("gcr.io/projectsigstore/rekor-cli:latest").
 		WithExec([]string{
-			"rekor-cli",
+			"/usr/local/bin/rekor-cli",
 			"verify",
 			"--uuid", uuid,
 			"--format", "json",
@@ -146,7 +146,7 @@ func (m *RekorModule) VerifyByIndex(ctx context.Context, logIndex string) (strin
 	container := m.client.Container().
 		From("gcr.io/projectsigstore/rekor-cli:latest").
 		WithExec([]string{
-			"rekor-cli",
+			"/usr/local/bin/rekor-cli",
 			"verify",
 			"--log-index", logIndex,
 			"--format", "json",

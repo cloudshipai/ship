@@ -2,13 +2,23 @@ package mcp
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
+	"dagger.io/dagger"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // AddCheckSSLCertTools adds SSL certificate validation MCP tool implementations
 func AddCheckSSLCertTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addCheckSSLCertToolsDirect(s)
+}
+
+// addCheckSSLCertToolsDirect implements direct Dagger calls for SSL certificate checking tools
+func addCheckSSLCertToolsDirect(s *server.MCPServer) {
 	// Check SSL certificate for host tool
 	checkHostTool := mcp.NewTool("check_ssl_cert_host",
 		mcp.WithDescription("Check SSL certificate for a remote host"),
@@ -33,24 +43,32 @@ func AddCheckSSLCertTools(s *server.MCPServer, executeShipCommand ExecuteShipCom
 		),
 	)
 	s.AddTool(checkHostTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		host := request.GetString("host", "")
-		args := []string{"check_ssl_cert", "-H", host}
-		if port := request.GetString("port", ""); port != "" {
-			args = append(args, "-p", port)
+		portStr := request.GetString("port", "443")
+		port, _ := strconv.Atoi(portStr)
+		warningStr := request.GetString("warning", "20")
+		warningDays, _ := strconv.Atoi(warningStr)
+		criticalStr := request.GetString("critical", "15")
+		criticalDays, _ := strconv.Atoi(criticalStr)
+		protocol := request.GetString("protocol", "")
+		allowSelfSigned := request.GetBool("selfsigned", false)
+
+		// Create SSL cert module and check host certificate
+		sslCertModule := modules.NewCheckSSLCertModule(client)
+		result, err := sslCertModule.CheckCertificateWithAdvancedOptions(ctx, host, port, protocol, warningDays, criticalDays, allowSelfSigned, "", false, false, 0, false)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("check SSL certificate for host failed: %v", err)), nil
 		}
-		if warning := request.GetString("warning", ""); warning != "" {
-			args = append(args, "-w", warning)
-		}
-		if critical := request.GetString("critical", ""); critical != "" {
-			args = append(args, "-c", critical)
-		}
-		if protocol := request.GetString("protocol", ""); protocol != "" {
-			args = append(args, "-P", protocol)
-		}
-		if request.GetBool("selfsigned", false) {
-			args = append(args, "-s")
-		}
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Check SSL certificate from file tool
@@ -71,18 +89,29 @@ func AddCheckSSLCertTools(s *server.MCPServer, executeShipCommand ExecuteShipCom
 		),
 	)
 	s.AddTool(checkFileTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		file := request.GetString("file", "")
-		args := []string{"check_ssl_cert", "-f", file}
-		if warning := request.GetString("warning", ""); warning != "" {
-			args = append(args, "-w", warning)
+		warningStr := request.GetString("warning", "20")
+		warningDays, _ := strconv.Atoi(warningStr)
+		criticalStr := request.GetString("critical", "15")
+		criticalDays, _ := strconv.Atoi(criticalStr)
+		allowSelfSigned := request.GetBool("selfsigned", false)
+
+		// Create SSL cert module and check certificate from file
+		sslCertModule := modules.NewCheckSSLCertModule(client)
+		result, err := sslCertModule.CheckCertificateFromFile(ctx, file, warningDays, criticalDays, allowSelfSigned)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("check SSL certificate from file failed: %v", err)), nil
 		}
-		if critical := request.GetString("critical", ""); critical != "" {
-			args = append(args, "-c", critical)
-		}
-		if request.GetBool("selfsigned", false) {
-			args = append(args, "-s")
-		}
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Check SSL certificate with chain validation tool
@@ -103,18 +132,27 @@ func AddCheckSSLCertTools(s *server.MCPServer, executeShipCommand ExecuteShipCom
 		),
 	)
 	s.AddTool(checkChainTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		host := request.GetString("host", "")
-		args := []string{"check_ssl_cert", "-H", host}
-		if rootcert := request.GetString("rootcert", ""); rootcert != "" {
-			args = append(args, "-r", rootcert)
+		rootCert := request.GetString("rootcert", "")
+		checkChain := request.GetBool("check_chain", false)
+		ignoreAuth := request.GetBool("noauth", false)
+
+		// Create SSL cert module and check certificate chain
+		sslCertModule := modules.NewCheckSSLCertModule(client)
+		result, err := sslCertModule.CheckCertificateWithAdvancedOptions(ctx, host, 443, "", 0, 0, false, rootCert, checkChain, ignoreAuth, 0, false)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("check SSL certificate chain failed: %v", err)), nil
 		}
-		if request.GetBool("check_chain", false) {
-			args = append(args, "--check-chain")
-		}
-		if request.GetBool("noauth", false) {
-			args = append(args, "-A")
-		}
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Check SSL certificate with fingerprint tool
@@ -130,10 +168,25 @@ func AddCheckSSLCertTools(s *server.MCPServer, executeShipCommand ExecuteShipCom
 		),
 	)
 	s.AddTool(checkFingerprintTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		host := request.GetString("host", "")
 		fingerprint := request.GetString("fingerprint", "")
-		args := []string{"check_ssl_cert", "-H", host, "--fingerprint", fingerprint}
-		return executeShipCommand(args)
+
+		// Create SSL cert module and check certificate fingerprint
+		sslCertModule := modules.NewCheckSSLCertModule(client)
+		result, err := sslCertModule.CheckCertificateFingerprint(ctx, host, 443, fingerprint)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("check SSL certificate fingerprint failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Check SSL certificate with all checks tool
@@ -151,15 +204,27 @@ func AddCheckSSLCertTools(s *server.MCPServer, executeShipCommand ExecuteShipCom
 		),
 	)
 	s.AddTool(checkAllTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		host := request.GetString("host", "")
-		args := []string{"check_ssl_cert", "-H", host, "--all"}
-		if timeout := request.GetString("timeout", ""); timeout != "" {
-			args = append(args, "--timeout", timeout)
+		timeoutStr := request.GetString("timeout", "0")
+		timeout, _ := strconv.Atoi(timeoutStr)
+		debug := request.GetBool("debug", false)
+
+		// Create SSL cert module and run comprehensive check
+		sslCertModule := modules.NewCheckSSLCertModule(client)
+		result, err := sslCertModule.CheckCertificateComprehensive(ctx, host, 443, timeout, debug)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("comprehensive SSL certificate check failed: %v", err)), nil
 		}
-		if request.GetBool("debug", false) {
-			args = append(args, "-d")
-		}
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Check SSL cert get version tool
@@ -167,7 +232,20 @@ func AddCheckSSLCertTools(s *server.MCPServer, executeShipCommand ExecuteShipCom
 		mcp.WithDescription("Get check_ssl_cert version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"check_ssl_cert", "--version"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create SSL cert module and get version
+		sslCertModule := modules.NewCheckSSLCertModule(client)
+		result, err := sslCertModule.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("get SSL cert tool version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 }

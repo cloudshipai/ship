@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddScoutSuiteTools adds Scout Suite MCP tool implementations using real scout CLI commands
+// AddScoutSuiteTools adds Scout Suite MCP tool implementations using direct Dagger calls
 func AddScoutSuiteTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addScoutSuiteToolsDirect(s)
+}
+
+// addScoutSuiteToolsDirect adds Scout Suite tools using direct Dagger module calls
+func addScoutSuiteToolsDirect(s *server.MCPServer) {
 	// Scout Suite scan AWS tool
 	scanAWSTool := mcp.NewTool("scout_suite_scan_aws",
 		mcp.WithDescription("Scan AWS environment for security issues using real scout CLI"),
@@ -16,91 +25,98 @@ func AddScoutSuiteTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 			mcp.Description("AWS profile to use for scanning"),
 		),
 		mcp.WithString("regions",
-			mcp.Description("Comma-separated list of AWS regions to scan"),
+			mcp.Description("Comma-separated list of AWS regions to scan - NOTE: not supported in current Dagger module"),
 		),
 		mcp.WithString("services",
-			mcp.Description("Comma-separated list of AWS services to scan"),
+			mcp.Description("Comma-separated list of AWS services to scan - NOTE: not supported in current Dagger module"),
 		),
 		mcp.WithString("report_dir",
-			mcp.Description("Directory to save the report"),
+			mcp.Description("Directory to save the report - NOTE: not supported in current Dagger module"),
 		),
 		mcp.WithString("exceptions",
-			mcp.Description("Path to exceptions file"),
+			mcp.Description("Path to exceptions file - NOTE: not supported in current Dagger module"),
 		),
 	)
 	s.AddTool(scanAWSTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"scout", "aws"}
-		
-		if profile := request.GetString("profile", ""); profile != "" {
-			args = append(args, "--profile", profile)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if regions := request.GetString("regions", ""); regions != "" {
-			args = append(args, "--regions", regions)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewScoutSuiteModule(client)
+
+		// Get parameters
+		profile := request.GetString("profile", "default")
+
+		// Check for unsupported parameters
+		if request.GetString("regions", "") != "" || request.GetString("services", "") != "" ||
+			request.GetString("report_dir", "") != "" || request.GetString("exceptions", "") != "" {
+			return mcp.NewToolResultError("regions, services, report_dir, and exceptions options not supported in current Dagger module"), nil
 		}
-		if services := request.GetString("services", ""); services != "" {
-			args = append(args, "--services", services)
+
+		// Scan AWS
+		output, err := module.ScanAWS(ctx, profile)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("scout suite AWS scan failed: %v", err)), nil
 		}
-		if reportDir := request.GetString("report_dir", ""); reportDir != "" {
-			args = append(args, "--report-dir", reportDir)
-		}
-		if exceptions := request.GetString("exceptions", ""); exceptions != "" {
-			args = append(args, "--exceptions", exceptions)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Scout Suite scan Azure tool
 	scanAzureTool := mcp.NewTool("scout_suite_scan_azure",
 		mcp.WithDescription("Scan Azure environment for security issues using real scout CLI"),
 		mcp.WithString("subscriptions",
-			mcp.Description("Azure subscription IDs to scan (space-separated)"),
+			mcp.Description("Azure subscription IDs to scan (space-separated) - NOTE: not supported in current Dagger module"),
 		),
 		mcp.WithString("tenant_id",
-			mcp.Description("Azure tenant ID"),
+			mcp.Description("Azure tenant ID - NOTE: not supported in current Dagger module"),
 		),
 		mcp.WithString("username",
-			mcp.Description("Azure username"),
+			mcp.Description("Azure username - NOTE: not supported in current Dagger module"),
 		),
 		mcp.WithString("password",
-			mcp.Description("Azure password"),
+			mcp.Description("Azure password - NOTE: not supported in current Dagger module"),
 		),
 		mcp.WithBoolean("cli",
-			mcp.Description("Use Azure CLI for authentication"),
+			mcp.Description("Use Azure CLI for authentication - NOTE: not supported in current Dagger module"),
 		),
 		mcp.WithBoolean("service_principal",
-			mcp.Description("Use service principal authentication"),
+			mcp.Description("Use service principal authentication - NOTE: not supported in current Dagger module"),
 		),
 		mcp.WithString("report_dir",
-			mcp.Description("Directory to save the report"),
+			mcp.Description("Directory to save the report - NOTE: not supported in current Dagger module"),
 		),
 	)
 	s.AddTool(scanAzureTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"scout", "azure"}
-		
-		if subscriptions := request.GetString("subscriptions", ""); subscriptions != "" {
-			args = append(args, "--subscriptions", subscriptions)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if tenantID := request.GetString("tenant_id", ""); tenantID != "" {
-			args = append(args, "--tenant-id", tenantID)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewScoutSuiteModule(client)
+
+		// Check for unsupported parameters
+		if request.GetString("subscriptions", "") != "" || request.GetString("tenant_id", "") != "" ||
+			request.GetString("username", "") != "" || request.GetString("password", "") != "" ||
+			request.GetBool("cli", false) || request.GetBool("service_principal", false) ||
+			request.GetString("report_dir", "") != "" {
+			return mcp.NewToolResultError("advanced Azure options not supported in current Dagger module - uses environment variables"), nil
 		}
-		if username := request.GetString("username", ""); username != "" {
-			args = append(args, "--username", username)
+
+		// Scan Azure
+		output, err := module.ScanAzure(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("scout suite Azure scan failed: %v", err)), nil
 		}
-		if password := request.GetString("password", ""); password != "" {
-			args = append(args, "--password", password)
-		}
-		if request.GetBool("cli", false) {
-			args = append(args, "--cli")
-		}
-		if request.GetBool("service_principal", false) {
-			args = append(args, "--service-principal")
-		}
-		if reportDir := request.GetString("report_dir", ""); reportDir != "" {
-			args = append(args, "--report-dir", reportDir)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Scout Suite scan GCP tool
@@ -110,50 +126,55 @@ func AddScoutSuiteTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 			mcp.Description("GCP project ID to scan"),
 		),
 		mcp.WithString("folder_id",
-			mcp.Description("GCP folder ID to scan"),
+			mcp.Description("GCP folder ID to scan - NOTE: not supported in current Dagger module"),
 		),
 		mcp.WithString("organization_id",
-			mcp.Description("GCP organization ID to scan"),
+			mcp.Description("GCP organization ID to scan - NOTE: not supported in current Dagger module"),
 		),
 		mcp.WithString("service_account",
-			mcp.Description("Path to GCP service account key file"),
+			mcp.Description("Path to GCP service account key file - NOTE: not supported in current Dagger module"),
 		),
 		mcp.WithBoolean("user_account",
-			mcp.Description("Use user account for authentication"),
+			mcp.Description("Use user account for authentication - NOTE: not supported in current Dagger module"),
 		),
 		mcp.WithBoolean("all_projects",
-			mcp.Description("Scan all accessible projects"),
+			mcp.Description("Scan all accessible projects - NOTE: not supported in current Dagger module"),
 		),
 		mcp.WithString("report_dir",
-			mcp.Description("Directory to save the report"),
+			mcp.Description("Directory to save the report - NOTE: not supported in current Dagger module"),
 		),
 	)
 	s.AddTool(scanGCPTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"scout", "gcp"}
-		
-		if projectID := request.GetString("project_id", ""); projectID != "" {
-			args = append(args, "--project-id", projectID)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if folderID := request.GetString("folder_id", ""); folderID != "" {
-			args = append(args, "--folder-id", folderID)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewScoutSuiteModule(client)
+
+		// Get parameters
+		projectID := request.GetString("project_id", "")
+		if projectID == "" {
+			return mcp.NewToolResultError("project_id is required"), nil
 		}
-		if orgID := request.GetString("organization_id", ""); orgID != "" {
-			args = append(args, "--organization-id", orgID)
+
+		// Check for unsupported parameters
+		if request.GetString("folder_id", "") != "" || request.GetString("organization_id", "") != "" ||
+			request.GetString("service_account", "") != "" || request.GetBool("user_account", false) ||
+			request.GetBool("all_projects", false) || request.GetString("report_dir", "") != "" {
+			return mcp.NewToolResultError("advanced GCP options not supported in current Dagger module"), nil
 		}
-		if serviceAccount := request.GetString("service_account", ""); serviceAccount != "" {
-			args = append(args, "--service-account", serviceAccount)
+
+		// Scan GCP
+		output, err := module.ScanGCP(ctx, projectID)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("scout suite GCP scan failed: %v", err)), nil
 		}
-		if request.GetBool("user_account", false) {
-			args = append(args, "--user-account")
-		}
-		if request.GetBool("all_projects", false) {
-			args = append(args, "--all-projects")
-		}
-		if reportDir := request.GetString("report_dir", ""); reportDir != "" {
-			args = append(args, "--report-dir", reportDir)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Scout Suite serve report tool
@@ -174,20 +195,29 @@ func AddScoutSuiteTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(serveReportTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewScoutSuiteModule(client)
+
+		// Get parameters
 		provider := request.GetString("provider", "")
-		args := []string{"scout", provider, "--serve"}
-		
-		if reportName := request.GetString("report_name", ""); reportName != "" {
-			args = append(args, reportName)
+		reportName := request.GetString("report_name", "")
+		host := request.GetString("host", "")
+		port := request.GetString("port", "")
+
+		// Serve report
+		output, err := module.ServeReport(ctx, provider, reportName, host, port)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("scout suite serve report failed: %v", err)), nil
 		}
-		if host := request.GetString("host", ""); host != "" {
-			args = append(args, "--host", host)
-		}
-		if port := request.GetString("port", ""); port != "" {
-			args = append(args, "--port", port)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Scout Suite help tool
@@ -198,12 +228,25 @@ func AddScoutSuiteTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(helpTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"scout", "--help"}
-		
-		if provider := request.GetString("provider", ""); provider != "" {
-			args = []string{"scout", provider, "--help"}
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewScoutSuiteModule(client)
+
+		// Get parameters
+		provider := request.GetString("provider", "")
+
+		// Get help
+		output, err := module.Help(ctx, provider)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("scout suite help failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 }

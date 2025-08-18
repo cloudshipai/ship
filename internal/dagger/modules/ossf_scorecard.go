@@ -13,6 +13,8 @@ type OSSFScorecardModule struct {
 	name   string
 }
 
+const scorecardBinary = "/usr/local/bin/scorecard"
+
 // NewOSSFScorecardModule creates a new OSSF Scorecard module
 func NewOSSFScorecardModule(client *dagger.Client) *OSSFScorecardModule {
 	return &OSSFScorecardModule{
@@ -27,7 +29,7 @@ func (m *OSSFScorecardModule) ScoreRepository(ctx context.Context, repoURL strin
 		From("gcr.io/openssf/scorecard:stable").
 		WithEnvVariable("GITHUB_TOKEN", githubToken).
 		WithExec([]string{
-			"scorecard",
+			scorecardBinary,
 			"--repo", repoURL,
 			"--format", "json",
 		})
@@ -43,7 +45,7 @@ func (m *OSSFScorecardModule) ScoreRepository(ctx context.Context, repoURL strin
 // ScoreWithChecks scores repository with specific checks
 func (m *OSSFScorecardModule) ScoreWithChecks(ctx context.Context, repoURL string, checks []string, githubToken string) (string, error) {
 	args := []string{
-		"scorecard",
+		scorecardBinary,
 		"--repo", repoURL,
 		"--format", "json",
 	}
@@ -70,7 +72,7 @@ func (m *OSSFScorecardModule) ListChecks(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("gcr.io/openssf/scorecard:stable").
 		WithExec([]string{
-			"scorecard",
+			scorecardBinary,
 			"--show-details",
 		})
 
@@ -86,7 +88,7 @@ func (m *OSSFScorecardModule) ListChecks(ctx context.Context) (string, error) {
 func (m *OSSFScorecardModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("gcr.io/openssf/scorecard:stable").
-		WithExec([]string{"scorecard", "version"})
+		WithExec([]string{scorecardBinary, "version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

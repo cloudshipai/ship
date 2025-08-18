@@ -13,6 +13,8 @@ type GitSecretsModule struct {
 	name   string
 }
 
+const gitBinary = "/usr/bin/git"
+
 // NewGitSecretsModule creates a new git-secrets module
 func NewGitSecretsModule(client *dagger.Client) *GitSecretsModule {
 	return &GitSecretsModule{
@@ -28,7 +30,7 @@ func (m *GitSecretsModule) ScanRepository(ctx context.Context, dir string) (stri
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			"git", "secrets",
+			gitBinary, "secrets",
 			"--scan",
 		}, dagger.ContainerWithExecOpts{
 			Expect: "ANY",
@@ -171,6 +173,22 @@ func (m *GitSecretsModule) RegisterAWS(ctx context.Context, dir string) (string,
 	output, err := container.Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to register AWS patterns: %w", err)
+	}
+
+	return output, nil
+}
+
+// AddAllowedPattern adds an allowed pattern to prevent false positives (MCP compatible)
+func (m *GitSecretsModule) AddAllowedPattern(ctx context.Context, dir string, pattern string) (string, error) {
+	container := m.client.Container().
+		From("cloudshipai/git-secrets:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(dir)).
+		WithWorkdir("/workspace").
+		WithExec([]string{"git", "secrets", "--add", "-a", pattern})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to add allowed pattern: %w", err)
 	}
 
 	return output, nil

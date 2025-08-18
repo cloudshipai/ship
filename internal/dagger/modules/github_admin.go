@@ -204,3 +204,117 @@ func (m *GitHubAdminModule) GetVersion(ctx context.Context) (string, error) {
 
 	return output, nil
 }
+
+// ListOrgReposSimple lists repositories in an organization (MCP compatible)
+func (m *GitHubAdminModule) ListOrgReposSimple(ctx context.Context, organization string, visibility string) (string, error) {
+	args := []string{"gh", "repo", "list", organization}
+	if visibility != "" {
+		args = append(args, "--visibility", visibility)
+	}
+
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "github-cli"}).
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to list org repos simple: %w", err)
+	}
+
+	return output, nil
+}
+
+// CreateOrgRepoSimple creates a repository in an organization (MCP compatible)
+func (m *GitHubAdminModule) CreateOrgRepoSimple(ctx context.Context, organization string, repoName string, visibility string, description string) (string, error) {
+	args := []string{"gh", "repo", "create", organization + "/" + repoName}
+	
+	if visibility != "" {
+		args = append(args, "--"+visibility)
+	}
+	if description != "" {
+		args = append(args, "--description", description)
+	}
+
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "github-cli"}).
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to create org repo simple: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetRepoInfoSimple gets repository information (MCP compatible)
+func (m *GitHubAdminModule) GetRepoInfoSimple(ctx context.Context, repository string) (string, error) {
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "github-cli"}).
+		WithExec([]string{"gh", "repo", "view", repository})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get repo info simple: %w", err)
+	}
+
+	return output, nil
+}
+
+// ListOrgIssuesSimple lists issues across organization repositories (MCP compatible)
+func (m *GitHubAdminModule) ListOrgIssuesSimple(ctx context.Context, organization string, state string) (string, error) {
+	args := []string{"gh", "issue", "list", "--search", "org:" + organization}
+	if state != "" {
+		args = append(args, "--state", state)
+	}
+
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "github-cli"}).
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to list org issues simple: %w", err)
+	}
+
+	return output, nil
+}
+
+// ListOrgPRsSimple lists pull requests across organization repositories (MCP compatible)
+func (m *GitHubAdminModule) ListOrgPRsSimple(ctx context.Context, organization string, state string) (string, error) {
+	args := []string{"gh", "pr", "list", "--search", "org:" + organization}
+	if state != "" {
+		args = append(args, "--state", state)
+	}
+
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "github-cli"}).
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to list org PRs simple: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetVersionSimple returns GitHub CLI version (MCP compatible)
+func (m *GitHubAdminModule) GetVersionSimple(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "github-cli"}).
+		WithExec([]string{"gh", "--version"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get GitHub CLI version simple: %w", err)
+	}
+
+	return output, nil
+}

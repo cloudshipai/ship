@@ -13,6 +13,8 @@ type GrypeModule struct {
 	name   string
 }
 
+const grypeBinary = "/grype"
+
 // NewGrypeModule creates a new Grype module
 func NewGrypeModule(client *dagger.Client) *GrypeModule {
 	return &GrypeModule{
@@ -27,7 +29,7 @@ func (m *GrypeModule) ScanDirectory(ctx context.Context, dir string) (string, er
 		From("anchore/grype:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"grype", "dir:.", "-o", "json"})
+		WithExec([]string{grypeBinary, "dir:.", "-o", "json"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -41,7 +43,7 @@ func (m *GrypeModule) ScanDirectory(ctx context.Context, dir string) (string, er
 func (m *GrypeModule) ScanImage(ctx context.Context, imageName string) (string, error) {
 	container := m.client.Container().
 		From("anchore/grype:latest").
-		WithExec([]string{"grype", imageName, "-o", "json"})
+		WithExec([]string{grypeBinary, imageName, "-o", "json"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -58,7 +60,7 @@ func (m *GrypeModule) ScanSBOM(ctx context.Context, sbomPath string) (string, er
 		From("anchore/grype:latest").
 		WithFile(dir+"/sbom.json", m.client.Host().File(sbomPath)).
 		WithWorkdir(dir).
-		WithExec([]string{"grype", "sbom:sbom.json", "-o", "json"})
+		WithExec([]string{grypeBinary, "sbom:sbom.json", "-o", "json"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -107,7 +109,7 @@ func (m *GrypeModule) ScanWithSeverity(ctx context.Context, target string, sever
 func (m *GrypeModule) DBStatus(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("anchore/grype:latest").
-		WithExec([]string{"grype", "db", "status"})
+		WithExec([]string{grypeBinary, "db", "status"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -121,7 +123,7 @@ func (m *GrypeModule) DBStatus(ctx context.Context) (string, error) {
 func (m *GrypeModule) DBCheck(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("anchore/grype:latest").
-		WithExec([]string{"grype", "db", "check"})
+		WithExec([]string{grypeBinary, "db", "check"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -135,7 +137,7 @@ func (m *GrypeModule) DBCheck(ctx context.Context) (string, error) {
 func (m *GrypeModule) DBUpdate(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("anchore/grype:latest").
-		WithExec([]string{"grype", "db", "update"})
+		WithExec([]string{grypeBinary, "db", "update"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -149,7 +151,7 @@ func (m *GrypeModule) DBUpdate(ctx context.Context) (string, error) {
 func (m *GrypeModule) DBList(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("anchore/grype:latest").
-		WithExec([]string{"grype", "db", "list"})
+		WithExec([]string{grypeBinary, "db", "list"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -163,7 +165,7 @@ func (m *GrypeModule) DBList(ctx context.Context) (string, error) {
 func (m *GrypeModule) Explain(ctx context.Context, id string) (string, error) {
 	container := m.client.Container().
 		From("anchore/grype:latest").
-		WithExec([]string{"grype", "explain", id})
+		WithExec([]string{grypeBinary, "explain", id})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -177,7 +179,7 @@ func (m *GrypeModule) Explain(ctx context.Context, id string) (string, error) {
 func (m *GrypeModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("anchore/grype:latest").
-		WithExec([]string{"grype", "version"})
+		WithExec([]string{grypeBinary, "version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

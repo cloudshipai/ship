@@ -13,11 +13,13 @@ type SteampipeModule struct {
 	name   string
 }
 
+const steampipeBinary = "/usr/local/bin/steampipe"
+
 // NewSteampipeModule creates a new Steampipe module
 func NewSteampipeModule(client *dagger.Client) *SteampipeModule {
 	return &SteampipeModule{
 		client: client,
-		name:   "steampipe",
+		name:   steampipeBinary,
 	}
 }
 
@@ -26,10 +28,10 @@ func (m *SteampipeModule) Query(ctx context.Context, query string, plugin string
 	container := m.client.Container().
 		From("turbot/steampipe:latest").
 		WithExec([]string{
-			"steampipe", "plugin", "install", plugin,
+			steampipeBinary, "plugin", "install", plugin,
 		}).
 		WithExec([]string{
-			"steampipe", "query",
+			steampipeBinary, "query",
 			"--output", "json",
 			query,
 		})
@@ -48,10 +50,10 @@ func (m *SteampipeModule) QueryFromFile(ctx context.Context, queryFile string, p
 		From("turbot/steampipe:latest").
 		WithFile("/query.sql", m.client.Host().File(queryFile)).
 		WithExec([]string{
-			"steampipe", "plugin", "install", plugin,
+			steampipeBinary, "plugin", "install", plugin,
 		}).
 		WithExec([]string{
-			"steampipe", "query",
+			steampipeBinary, "query",
 			"--output", "json",
 			"/query.sql",
 		})
@@ -69,7 +71,7 @@ func (m *SteampipeModule) ListPlugins(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("turbot/steampipe:latest").
 		WithExec([]string{
-			"steampipe", "plugin", "list",
+			steampipeBinary, "plugin", "list",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -84,7 +86,7 @@ func (m *SteampipeModule) ListPlugins(ctx context.Context) (string, error) {
 func (m *SteampipeModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("turbot/steampipe:latest").
-		WithExec([]string{"steampipe", "--version"})
+		WithExec([]string{steampipeBinary, "--version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -99,10 +101,10 @@ func (m *SteampipeModule) QueryInteractive(ctx context.Context, plugin string) (
 	container := m.client.Container().
 		From("turbot/steampipe:latest").
 		WithExec([]string{
-			"steampipe", "plugin", "install", plugin,
+			steampipeBinary, "plugin", "install", plugin,
 		}).
 		WithExec([]string{
-			"steampipe", "query", "--output", "json",
+			steampipeBinary, "query", "--output", "json",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -118,7 +120,7 @@ func (m *SteampipeModule) InstallPlugin(ctx context.Context, plugin string) (str
 	container := m.client.Container().
 		From("turbot/steampipe:latest").
 		WithExec([]string{
-			"steampipe", "plugin", "install", plugin,
+			steampipeBinary, "plugin", "install", plugin,
 		})
 
 	output, err := container.Stdout(ctx)
@@ -134,7 +136,7 @@ func (m *SteampipeModule) UpdatePlugin(ctx context.Context, plugin string) (stri
 	container := m.client.Container().
 		From("turbot/steampipe:latest").
 		WithExec([]string{
-			"steampipe", "plugin", "update", plugin,
+			steampipeBinary, "plugin", "update", plugin,
 		})
 
 	output, err := container.Stdout(ctx)
@@ -150,7 +152,7 @@ func (m *SteampipeModule) UninstallPlugin(ctx context.Context, plugin string) (s
 	container := m.client.Container().
 		From("turbot/steampipe:latest").
 		WithExec([]string{
-			"steampipe", "plugin", "uninstall", plugin,
+			steampipeBinary, "plugin", "uninstall", plugin,
 		})
 
 	output, err := container.Stdout(ctx)
@@ -163,7 +165,7 @@ func (m *SteampipeModule) UninstallPlugin(ctx context.Context, plugin string) (s
 
 // StartService starts the Steampipe service
 func (m *SteampipeModule) StartService(ctx context.Context, port int) (string, error) {
-	args := []string{"steampipe", "service", "start"}
+	args := []string{steampipeBinary, "service", "start"}
 	if port > 0 {
 		args = append(args, "--port", fmt.Sprintf("%d", port))
 	}
@@ -185,7 +187,7 @@ func (m *SteampipeModule) GetServiceStatus(ctx context.Context) (string, error) 
 	container := m.client.Container().
 		From("turbot/steampipe:latest").
 		WithExec([]string{
-			"steampipe", "service", "status",
+			steampipeBinary, "service", "status",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -201,7 +203,7 @@ func (m *SteampipeModule) StopService(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("turbot/steampipe:latest").
 		WithExec([]string{
-			"steampipe", "service", "stop",
+			steampipeBinary, "service", "stop",
 		})
 
 	output, err := container.Stdout(ctx)

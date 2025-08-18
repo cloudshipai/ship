@@ -56,7 +56,7 @@ func GenerateMCPHelpText() string {
 	helpText.WriteString("Examples:\n")
 	helpText.WriteString("  # Our Security & Infrastructure Tools\n")
 	helpText.WriteString("  ship mcp gitleaks    # MCP server for just Gitleaks\n")
-	helpText.WriteString("  ship mcp security    # MCP server for all security tools\n")
+	helpText.WriteString("  ship mcp terraform   # MCP server for all terraform tools\n")
 	helpText.WriteString("  ship mcp all         # MCP server for all tools\n")
 	helpText.WriteString("\n")
 	helpText.WriteString("  # External MCP Servers\n")
@@ -64,6 +64,9 @@ func GenerateMCPHelpText() string {
 	helpText.WriteString("  ship mcp memory         # Proxy memory/knowledge storage MCP server\n")
 	helpText.WriteString("  ship mcp brave-search --var BRAVE_API_KEY=your_api_key   # Proxy Brave search with API key\n")
 	helpText.WriteString("  ship mcp steampipe                                       # Proxy Steampipe for cloud infrastructure queries\n")
+	helpText.WriteString("  ship mcp slack --var SLACK_MCP_XOXC_TOKEN=your_token     # Proxy Slack workspace operations\n")
+	helpText.WriteString("  ship mcp github --var GITHUB_PERSONAL_ACCESS_TOKEN=your_token  # Proxy GitHub operations\n")
+	helpText.WriteString("  ship mcp desktop-commander                                # Proxy desktop operations\n")
 	helpText.WriteString("\n")
 	helpText.WriteString("  # AWS Labs Official MCP Servers (requires 'uv' and AWS credentials)\n")
 	helpText.WriteString("  ship mcp aws-core --var AWS_PROFILE=default             # AWS core operations\n")
@@ -93,7 +96,7 @@ func generateExternalServersHelpText() string {
 	var helpText strings.Builder
 
 	// Group external servers by type
-	officialServers := []string{"filesystem", "memory", "brave-search", "steampipe"}
+	officialServers := []string{"filesystem", "memory", "brave-search", "steampipe", "slack", "github", "desktop-commander"}
 	awsLabsServers := []string{"aws-core", "aws-iam", "aws-pricing", "aws-eks", "aws-ec2", "aws-s3"}
 
 	// Official ModelContextProtocol servers
@@ -121,16 +124,19 @@ func generateExternalServersHelpText() string {
 // getServerDescription returns a user-friendly description for external servers
 func getServerDescription(serverName string) string {
 	descriptions := map[string]string{
-		"filesystem":   "Filesystem operations MCP server",
-		"memory":       "Memory/knowledge storage MCP server",
-		"brave-search": "Brave search MCP server",
-		"steampipe":    "Cloud infrastructure queries MCP server",
-		"aws-core":     "AWS core operations and general services",
-		"aws-iam":      "AWS IAM operations and identity management",
-		"aws-pricing":  "AWS pricing and cost estimation",
-		"aws-eks":      "AWS EKS and Kubernetes operations",
-		"aws-ec2":      "AWS EC2 compute operations",
-		"aws-s3":       "AWS S3 storage operations",
+		"filesystem":        "Filesystem operations MCP server",
+		"memory":            "Memory/knowledge storage MCP server",
+		"brave-search":      "Brave search MCP server",
+		"steampipe":         "Cloud infrastructure queries MCP server",
+		"slack":             "Slack workspace operations MCP server",
+		"github":            "GitHub operations MCP server",
+		"desktop-commander": "Desktop operations MCP server",
+		"aws-core":          "AWS core operations and general services",
+		"aws-iam":           "AWS IAM operations and identity management",
+		"aws-pricing":       "AWS pricing and cost estimation",
+		"aws-eks":           "AWS EKS and Kubernetes operations",
+		"aws-ec2":           "AWS EC2 compute operations",
+		"aws-s3":            "AWS S3 storage operations",
 	}
 
 	if desc, exists := descriptions[serverName]; exists {
@@ -178,7 +184,6 @@ func GenerateToolsResourceContent() string {
 	// Add usage examples
 	content.WriteString("## Usage Examples\n\n")
 	content.WriteString("### Tool Collections\n")
-	content.WriteString("- `ship mcp security` - Start MCP server with all security tools\n")
 	content.WriteString("- `ship mcp terraform` - Start MCP server with all Terraform tools\n")
 	content.WriteString("- `ship mcp all` - Start MCP server with all tools\n\n")
 

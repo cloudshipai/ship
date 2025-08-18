@@ -2,6 +2,7 @@ package modules
 
 import (
 	"context"
+	"fmt"
 
 	"dagger.io/dagger"
 )
@@ -9,6 +10,8 @@ import (
 type DockleModule struct {
 	client *dagger.Client
 }
+
+const dockleBinary = "/usr/bin/dockle"
 
 func NewDockleModule(client *dagger.Client) *DockleModule {
 	return &DockleModule{
@@ -32,7 +35,7 @@ func (m *DockleModule) ScanImage(ctx context.Context, imageRef string, opts ...D
 		From("goodwithtech/dockle:" + config.DockleVersion).
 		WithWorkdir("/workspace")
 
-	args := []string{"dockle"}
+	args := []string{dockleBinary}
 
 	// Add format
 	if config.Format != "" {
@@ -91,7 +94,7 @@ func (m *DockleModule) ScanTarball(ctx context.Context, tarballPath string, opts
 		container = container.WithMountedFile("/workspace/image.tar", m.client.Host().File(tarballPath))
 	}
 
-	args := []string{"dockle"}
+	args := []string{dockleBinary}
 
 	// Add format
 	if config.Format != "" {
@@ -145,7 +148,7 @@ func (m *DockleModule) ScanDockerfile(ctx context.Context, dockerfilePath string
 		container = container.WithMountedFile("/workspace/Dockerfile", m.client.Host().File(dockerfilePath))
 	}
 
-	args := []string{"dockle"}
+	args := []string{dockleBinary}
 
 	// Add format
 	if config.Format != "" {
@@ -260,7 +263,7 @@ func (m *DockleModule) ScanWithPolicy(ctx context.Context, imageRef string, poli
 		container = container.WithMountedFile("/workspace/.dockleignore", m.client.Host().File(policyPath))
 	}
 
-	args := []string{"dockle"}
+	args := []string{dockleBinary}
 
 	// Add format
 	if config.Format != "" {
@@ -335,4 +338,79 @@ func WithDockleIgnore(ignores []string) DockleOption {
 	return func(c *DockleConfig) {
 		c.Ignore = ignores
 	}
+}
+
+// ScanImageString scans a container image and returns string output (MCP compatible)
+func (m *DockleModule) ScanImageString(ctx context.Context, imageRef string) (string, error) {
+	container := m.client.Container().
+		From("goodwithtech/dockle:v0.4.14").
+		WithExec([]string{"dockle", imageRef})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to scan image: %w", err)
+	}
+
+	return output, nil
+}
+
+// ScanTarballString scans a container image tarball and returns string output (MCP compatible)
+func (m *DockleModule) ScanTarballString(ctx context.Context, tarballPath string) (string, error) {
+	tarballFile := m.client.Host().File(tarballPath)
+	
+	container := m.client.Container().
+		From("goodwithtech/dockle:v0.4.14").
+		WithFile("/workspace/image.tar", tarballFile).
+		WithExec([]string{"dockle", "--input", "/workspace/image.tar"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to scan tarball: %w", err)
+	}
+
+	return output, nil
+}
+
+// ScanImageJSON scans a container image and returns JSON output (MCP compatible)
+func (m *DockleModule) ScanImageJSON(ctx context.Context, imageRef string, outputFile string) (string, error) {
+	args := []string{"dockle", "-f", "json"}
+	
+	if outputFile != "" {
+		args = append(args, "-o", outputFile)
+	}
+	args = append(args, imageRef)
+
+	container := m.client.Container().
+		From("goodwithtech/dockle:v0.4.14").
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to scan image with JSON output: %w", err)
+	}
+
+	return output, nil
+}
+
+// ScanTarballJSON scans a container image tarball and returns JSON output (MCP compatible)
+func (m *DockleModule) ScanTarballJSON(ctx context.Context, tarballPath string, outputFile string) (string, error) {
+	tarballFile := m.client.Host().File(tarballPath)
+	
+	args := []string{"dockle", "-f", "json", "--input", "/workspace/image.tar"}
+	
+	if outputFile != "" {
+		args = append(args, "-o", outputFile)
+	}
+
+	container := m.client.Container().
+		From("goodwithtech/dockle:v0.4.14").
+		WithFile("/workspace/image.tar", tarballFile).
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to scan tarball with JSON output: %w", err)
+	}
+
+	return output, nil
 }

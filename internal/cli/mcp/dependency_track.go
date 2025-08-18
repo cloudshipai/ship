@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
+	"dagger.io/dagger"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // AddDependencyTrackTools adds Dependency Track (software component analysis) MCP tool implementations
 func AddDependencyTrackTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addDependencyTrackToolsDirect(s)
+}
+
+// addDependencyTrackToolsDirect implements direct Dagger calls for Dependency Track tools
+func addDependencyTrackToolsDirect(s *server.MCPServer) {
 	// Dependency Track upload BOM tool using dtrack-cli
 	uploadBOMTool := mcp.NewTool("dependency_track_upload_bom",
 		mcp.WithDescription("Upload Software Bill of Materials to Dependency Track using dtrack-cli"),
@@ -31,23 +40,28 @@ func AddDependencyTrackTools(s *server.MCPServer, executeShipCommand ExecuteShip
 		),
 	)
 	s.AddTool(uploadBOMTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		bomPath := request.GetString("bom_path", "")
 		projectName := request.GetString("project_name", "")
-		args := []string{"dtrack-cli", "--bom-path", bomPath, "--project-name", projectName}
-		
-		if projectVersion := request.GetString("project_version", ""); projectVersion != "" {
-			args = append(args, "--project-version", projectVersion)
+		projectVersion := request.GetString("project_version", "")
+		serverUrl := request.GetString("server_url", "")
+		apiKey := request.GetString("api_key", "")
+
+		// Create Dependency Track module and upload BOM
+		dependencyTrackModule := modules.NewDependencyTrackModule(client)
+		result, err := dependencyTrackModule.UploadBOM(ctx, bomPath, projectName, projectVersion, serverUrl, apiKey)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("dependency track upload bom failed: %v", err)), nil
 		}
-		if serverUrl := request.GetString("server_url", ""); serverUrl != "" {
-			args = append(args, "--server", serverUrl)
-		}
-		if apiKey := request.GetString("api_key", ""); apiKey != "" {
-			args = append(args, "--api-key", apiKey)
-		}
-		
-		// Add auto-create by default for easier usage
-		args = append(args, "--auto-create", "true")
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Dependency Track upload BOM via API (alternative using curl)
@@ -76,26 +90,29 @@ func AddDependencyTrackTools(s *server.MCPServer, executeShipCommand ExecuteShip
 		),
 	)
 	s.AddTool(uploadBOMApiTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		bomPath := request.GetString("bom_path", "")
 		serverUrl := request.GetString("server_url", "")
 		apiKey := request.GetString("api_key", "")
-		
-		args := []string{"curl", "-X", "POST", serverUrl + "/api/v1/bom",
-			"-H", "Content-Type: multipart/form-data",
-			"-H", "X-Api-Key: " + apiKey,
-			"-F", "bom=@" + bomPath}
-		
-		if projectName := request.GetString("project_name", ""); projectName != "" {
-			args = append(args, "-F", "projectName=" + projectName)
+		projectName := request.GetString("project_name", "")
+		projectVersion := request.GetString("project_version", "")
+		autoCreate := request.GetBool("auto_create", false)
+
+		// Create Dependency Track module and upload BOM via API
+		dependencyTrackModule := modules.NewDependencyTrackModule(client)
+		result, err := dependencyTrackModule.UploadBOMAPI(ctx, bomPath, serverUrl, apiKey, projectName, projectVersion, autoCreate)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("dependency track upload bom api failed: %v", err)), nil
 		}
-		if projectVersion := request.GetString("project_version", ""); projectVersion != "" {
-			args = append(args, "-F", "projectVersion=" + projectVersion)
-		}
-		if request.GetBool("auto_create", false) {
-			args = append(args, "-F", "autoCreate=true")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Generate CycloneDX BOM using CycloneDX CLI tools
@@ -114,33 +131,25 @@ func AddDependencyTrackTools(s *server.MCPServer, executeShipCommand ExecuteShip
 		),
 	)
 	s.AddTool(generateBOMTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		projectType := request.GetString("project_type", "")
-		
-		var args []string
-		switch projectType {
-		case "npm":
-			args = []string{"cyclonedx-npm"}
-		case "maven":
-			args = []string{"mvn", "org.cyclonedx:cyclonedx-maven-plugin:makeBom"}
-		case "gradle":
-			args = []string{"gradle", "cyclonedxBom"}
-		case "pip":
-			args = []string{"cyclonedx-py"}
-		case "composer":
-			args = []string{"cyclonedx-php", "composer"}
-		case "dotnet":
-			args = []string{"cyclonedx", "dotnet"}
-		default:
-			args = []string{"cyclonedx-npm"}
+		projectPath := request.GetString("project_path", ".")
+		outputFile := request.GetString("output_file", "bom.json")
+
+		// Create Dependency Track module and generate BOM
+		dependencyTrackModule := modules.NewDependencyTrackModule(client)
+		result, err := dependencyTrackModule.GenerateBOM(ctx, projectType, projectPath, outputFile)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("dependency track generate bom failed: %v", err)), nil
 		}
-		
-		if projectPath := request.GetString("project_path", ""); projectPath != "" && projectType == "npm" {
-			args = append(args, "-o", projectPath)
-		}
-		if outputFile := request.GetString("output_file", ""); outputFile != "" && projectType == "npm" {
-			args = append(args, "-o", outputFile)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 }

@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
+	"dagger.io/dagger"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // AddCloudsplainingTools adds Cloudsplaining (AWS IAM policy scanner) MCP tool implementations
 func AddCloudsplainingTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addCloudsplainingToolsDirect(s)
+}
+
+// addCloudsplainingToolsDirect implements direct Dagger calls for Cloudsplaining tools
+func addCloudsplainingToolsDirect(s *server.MCPServer) {
 	// Cloudsplaining download account data
 	downloadTool := mcp.NewTool("cloudsplaining_download",
 		mcp.WithDescription("Download AWS account authorization data"),
@@ -20,16 +29,25 @@ func AddCloudsplainingTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(downloadTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"cloudsplaining", "download"}
-		
-		if profile := request.GetString("profile", ""); profile != "" {
-			args = append(args, "--profile", profile)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if request.GetBool("include_non_default_policy_versions", false) {
-			args = append(args, "--include-non-default-policy-versions")
+		defer client.Close()
+
+		// Get parameters
+		profile := request.GetString("profile", "")
+		includeNonDefaultVersions := request.GetBool("include_non_default_policy_versions", false)
+
+		// Create Cloudsplaining module and download
+		cloudsplainingModule := modules.NewCloudsplainingModule(client)
+		result, err := cloudsplainingModule.Download(ctx, profile, includeNonDefaultVersions)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cloudsplaining download failed: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cloudsplaining scan account data
@@ -47,17 +65,26 @@ func AddCloudsplainingTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(scanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		inputFile := request.GetString("input_file", "")
-		args := []string{"cloudsplaining", "scan", "--input-file", inputFile}
-		
-		if exclusionsFile := request.GetString("exclusions_file", ""); exclusionsFile != "" {
-			args = append(args, "--exclusions-file", exclusionsFile)
+		exclusionsFile := request.GetString("exclusions_file", "")
+		output := request.GetString("output", "")
+
+		// Create Cloudsplaining module and scan account data
+		cloudsplainingModule := modules.NewCloudsplainingModule(client)
+		result, err := cloudsplainingModule.ScanAccountData(ctx, inputFile, exclusionsFile, output)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cloudsplaining scan failed: %v", err)), nil
 		}
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "--output", output)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cloudsplaining scan policy file
@@ -72,14 +99,24 @@ func AddCloudsplainingTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(scanPolicyFileTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		inputFile := request.GetString("input_file", "")
-		args := []string{"cloudsplaining", "scan-policy-file", "--input-file", inputFile}
-		
-		if exclusionsFile := request.GetString("exclusions_file", ""); exclusionsFile != "" {
-			args = append(args, "--exclusions-file", exclusionsFile)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		inputFile := request.GetString("input_file", "")
+
+		// Create Cloudsplaining module and scan policy file
+		cloudsplainingModule := modules.NewCloudsplainingModule(client)
+		result, err := cloudsplainingModule.ScanPolicyFile(ctx, inputFile)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cloudsplaining scan policy file failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cloudsplaining create exclusions file
@@ -87,8 +124,21 @@ func AddCloudsplainingTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		mcp.WithDescription("Create exclusions file template"),
 	)
 	s.AddTool(createExclusionsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"cloudsplaining", "create-exclusions-file"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create Cloudsplaining module and create exclusions file
+		cloudsplainingModule := modules.NewCloudsplainingModule(client)
+		result, err := cloudsplainingModule.CreateExclusionsFile(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cloudsplaining create exclusions file failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cloudsplaining create multi-account config
@@ -100,9 +150,24 @@ func AddCloudsplainingTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(createMultiAccountConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		outputFile := request.GetString("output_file", "")
-		args := []string{"cloudsplaining", "create-multi-account-config-file", "-o", outputFile}
-		return executeShipCommand(args)
+
+		// Create Cloudsplaining module and create multi-account config
+		cloudsplainingModule := modules.NewCloudsplainingModule(client)
+		result, err := cloudsplainingModule.CreateMultiAccountConfig(ctx, outputFile)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cloudsplaining create multi-account config failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cloudsplaining scan multi-account
@@ -126,22 +191,27 @@ func AddCloudsplainingTools(s *server.MCPServer, executeShipCommand ExecuteShipC
 		),
 	)
 	s.AddTool(scanMultiAccountTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		configFile := request.GetString("config_file", "")
-		args := []string{"cloudsplaining", "scan-multi-account", "-c", configFile}
-		
-		if profile := request.GetString("profile", ""); profile != "" {
-			args = append(args, "--profile", profile)
+		profile := request.GetString("profile", "")
+		roleName := request.GetString("role_name", "")
+		outputBucket := request.GetString("output_bucket", "")
+		outputDirectory := request.GetString("output_directory", "")
+
+		// Create Cloudsplaining module and scan multi-account
+		cloudsplainingModule := modules.NewCloudsplainingModule(client)
+		result, err := cloudsplainingModule.ScanMultiAccount(ctx, configFile, profile, roleName, outputBucket, outputDirectory)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cloudsplaining scan multi-account failed: %v", err)), nil
 		}
-		if roleName := request.GetString("role_name", ""); roleName != "" {
-			args = append(args, "--role-name", roleName)
-		}
-		if outputBucket := request.GetString("output_bucket", ""); outputBucket != "" {
-			args = append(args, "--output-bucket", outputBucket)
-		}
-		if outputDirectory := request.GetString("output_directory", ""); outputDirectory != "" {
-			args = append(args, "--output-directory", outputDirectory)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 }

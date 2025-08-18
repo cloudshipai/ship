@@ -2,117 +2,156 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddKubescapeTools adds Kubescape MCP tool implementations
+// AddKubescapeTools adds Kubescape (Kubernetes security scanner) MCP tool implementations using direct Dagger calls
 func AddKubescapeTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// Kubescape scan cluster tool
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addKubescapeToolsDirect(s)
+}
+
+// addKubescapeToolsDirect adds Kubescape tools using direct Dagger module calls
+func addKubescapeToolsDirect(s *server.MCPServer) {
+	// Kubescape scan cluster
 	scanClusterTool := mcp.NewTool("kubescape_scan_cluster",
 		mcp.WithDescription("Scan Kubernetes cluster using Kubescape"),
 		mcp.WithString("framework",
 			mcp.Description("Security framework to use"),
-			mcp.Enum("nsa", "mitre", "cis"),
+			mcp.Enum("nsa", "mitre", "armobest", "devopsbest", "cis-v1.23-t1.0.1", "cis-eks-t1.2.0", "cis-aks-t1.2.0", "cis-gke-t1.2.0", "cis-rke2-t1.2.0", "pci-dss-v3.2.1", "soc2", "iso27001"),
 		),
-		mcp.WithString("kube_context",
-			mcp.Description("Kubernetes context to use"),
+		mcp.WithString("severity_threshold",
+			mcp.Description("Severity threshold (low, medium, high, critical)"),
+			mcp.Enum("low", "medium", "high", "critical"),
 		),
-		mcp.WithString("output_format",
+		mcp.WithString("format",
 			mcp.Description("Output format"),
-			mcp.Enum("json", "junit", "pdf", "html", "sarif"),
+			mcp.Enum("pretty-printer", "json", "junit", "prometheus", "pdf", "html", "sarif"),
 		),
-		mcp.WithString("output_file",
-			mcp.Description("Output file path"),
+		mcp.WithString("kubeconfig",
+			mcp.Description("Path to kubeconfig file"),
 		),
-		mcp.WithBoolean("verbose",
-			mcp.Description("Enable verbose output"),
+		mcp.WithString("namespace",
+			mcp.Description("Namespace to scan (empty for all)"),
 		),
-		mcp.WithBoolean("submit",
-			mcp.Description("Submit results to Armo platform"),
-		),
-		mcp.WithBoolean("enable_host_scan",
-			mcp.Description("Enable host scanning"),
+		mcp.WithBoolean("exclude_kube_system",
+			mcp.Description("Exclude kube-system namespace"),
 		),
 	)
 	s.AddTool(scanClusterTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"kubescape", "scan"}
-		
-		if framework := request.GetString("framework", ""); framework != "" {
-			args = append(args, "framework", framework)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if kubeContext := request.GetString("kube_context", ""); kubeContext != "" {
-			args = append(args, "--kube-context", kubeContext)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKubescapeModule(client)
+
+		// Get parameters
+		framework := request.GetString("framework", "nsa")
+		severityThreshold := request.GetString("severity_threshold", "")
+		format := request.GetString("format", "pretty-printer")
+		kubeconfig := request.GetString("kubeconfig", "")
+
+		// Scan cluster
+		output, err := module.ScanCluster(ctx, kubeconfig, framework, format, severityThreshold)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("kubescape cluster scan failed: %v", err)), nil
 		}
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "--format", outputFormat)
-		}
-		if outputFile := request.GetString("output_file", ""); outputFile != "" {
-			args = append(args, "--output", outputFile)
-		}
-		if request.GetBool("verbose", false) {
-			args = append(args, "--verbose")
-		}
-		if request.GetBool("submit", false) {
-			args = append(args, "--submit")
-		}
-		if request.GetBool("enable_host_scan", false) {
-			args = append(args, "--enable-host-scan")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Kubescape scan manifests tool
+	// Kubescape scan manifests
 	scanManifestsTool := mcp.NewTool("kubescape_scan_manifests",
-		mcp.WithDescription("Scan Kubernetes manifests using Kubescape"),
-		mcp.WithString("manifests_path",
-			mcp.Description("Path to Kubernetes manifests (files or directory)"),
+		mcp.WithDescription("Scan Kubernetes manifest files using Kubescape"),
+		mcp.WithString("path",
+			mcp.Description("Path to directory containing manifest files"),
 			mcp.Required(),
 		),
 		mcp.WithString("framework",
 			mcp.Description("Security framework to use"),
-			mcp.Enum("nsa", "mitre", "cis"),
+			mcp.Enum("nsa", "mitre", "armobest", "devopsbest", "cis-v1.23-t1.0.1", "cis-eks-t1.2.0", "cis-aks-t1.2.0", "cis-gke-t1.2.0", "cis-rke2-t1.2.0", "pci-dss-v3.2.1", "soc2", "iso27001"),
 		),
-		mcp.WithString("output_format",
+		mcp.WithString("severity_threshold",
+			mcp.Description("Severity threshold (low, medium, high, critical)"),
+			mcp.Enum("low", "medium", "high", "critical"),
+		),
+		mcp.WithString("format",
 			mcp.Description("Output format"),
-			mcp.Enum("json", "junit", "pdf", "html", "sarif"),
+			mcp.Enum("pretty-printer", "json", "junit", "prometheus", "pdf", "html", "sarif"),
 		),
-		mcp.WithString("output_file",
-			mcp.Description("Output file path"),
-		),
-		mcp.WithBoolean("verbose",
-			mcp.Description("Enable verbose output"),
+		mcp.WithBoolean("include_helm",
+			mcp.Description("Treat as Helm chart"),
 		),
 	)
 	s.AddTool(scanManifestsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		manifestsPath := request.GetString("manifests_path", "")
-		args := []string{"kubescape", "scan", manifestsPath}
-		
-		if framework := request.GetString("framework", ""); framework != "" {
-			args = append(args, "framework", framework)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if outputFormat := request.GetString("output_format", ""); outputFormat != "" {
-			args = append(args, "--format", outputFormat)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKubescapeModule(client)
+
+		// Get parameters
+		path := request.GetString("path", "")
+		if path == "" {
+			return mcp.NewToolResultError("path is required"), nil
 		}
-		if outputFile := request.GetString("output_file", ""); outputFile != "" {
-			args = append(args, "--output", outputFile)
+
+		framework := request.GetString("framework", "nsa")
+		severityThreshold := request.GetString("severity_threshold", "")
+		format := request.GetString("format", "pretty-printer")
+		includeHelm := request.GetBool("include_helm", false)
+
+		// Choose appropriate scan method
+		var output string
+		if includeHelm {
+			// Scan as Helm chart
+			output, err = module.ScanHelm(ctx, path, framework, format)
+		} else {
+			// Scan as regular manifests
+			output, err = module.ScanManifests(ctx, path, framework, format, severityThreshold)
 		}
-		if request.GetBool("verbose", false) {
-			args = append(args, "--verbose")
+
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("kubescape manifest scan failed: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Kubescape get version tool
+	// Kubescape get version
 	getVersionTool := mcp.NewTool("kubescape_get_version",
-		mcp.WithDescription("Get Kubescape version information"),
+		mcp.WithDescription("Get Kubescape version"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"kubescape", "version"}
-		return executeShipCommand(args)
-	})
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
 
+		// Create module instance
+		module := modules.NewKubescapeModule(client)
+
+		// Get version
+		output, err := module.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to get kubescape version: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
+	})
 }

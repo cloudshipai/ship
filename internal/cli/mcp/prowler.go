@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddProwlerTools adds Prowler (multi-cloud security assessment) MCP tool implementations using real CLI commands
+// AddProwlerTools adds Prowler (multi-cloud security assessment) MCP tool implementations using direct Dagger calls
 func AddProwlerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addProwlerToolsDirect(s)
+}
+
+// addProwlerToolsDirect adds Prowler tools using direct Dagger module calls
+func addProwlerToolsDirect(s *server.MCPServer) {
 	// Prowler scan AWS tool
 	scanAWSTool := mcp.NewTool("prowler_aws",
 		mcp.WithDescription("Scan AWS account for security issues using real prowler CLI"),
@@ -35,31 +44,42 @@ func AddProwlerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(scanAWSTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"prowler", "aws"}
-		
-		if profile := request.GetString("profile", ""); profile != "" {
-			args = append(args, "--profile", profile)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if regions := request.GetString("regions", ""); regions != "" {
-			args = append(args, "--regions", regions)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewProwlerModule(client)
+
+		// Get parameters
+		regions := request.GetString("regions", "us-east-1")
+		services := request.GetString("services", "")
+		compliance := request.GetString("compliance", "")
+
+		// Note: Dagger module doesn't support profile, checks, output_formats, output_directory
+		if request.GetString("profile", "") != "" || request.GetString("checks", "") != "" ||
+			request.GetString("output_formats", "") != "" || request.GetString("output_directory", "") != "" {
+			return mcp.NewToolResultError("profile, checks, output_formats, and output_directory options not supported in Dagger module"), nil
 		}
-		if checks := request.GetString("checks", ""); checks != "" {
-			args = append(args, "--checks", checks)
+
+		// Choose appropriate scan method
+		var output string
+		if compliance != "" {
+			output, err = module.ScanWithCompliance(ctx, "aws", compliance, regions)
+		} else if services != "" {
+			output, err = module.ScanSpecificServices(ctx, "aws", services, regions)
+		} else {
+			output, err = module.ScanAWS(ctx, "aws", regions)
 		}
-		if services := request.GetString("services", ""); services != "" {
-			args = append(args, "--services", services)
+
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("prowler AWS scan failed: %v", err)), nil
 		}
-		if compliance := request.GetString("compliance", ""); compliance != "" {
-			args = append(args, "--compliance", compliance)
-		}
-		if outputFormats := request.GetString("output_formats", ""); outputFormats != "" {
-			args = append(args, "--output-formats", outputFormats)
-		}
-		if outputDirectory := request.GetString("output_directory", ""); outputDirectory != "" {
-			args = append(args, "--output-directory", outputDirectory)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Prowler scan Azure tool
@@ -85,28 +105,30 @@ func AddProwlerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(scanAzureTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"prowler", "azure"}
-		
-		if subscriptionId := request.GetString("subscription_id", ""); subscriptionId != "" {
-			args = append(args, "--subscription-id", subscriptionId)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if checks := request.GetString("checks", ""); checks != "" {
-			args = append(args, "--checks", checks)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewProwlerModule(client)
+
+		// Note: Dagger module doesn't support subscription_id, checks, services, compliance, output options
+		if request.GetString("subscription_id", "") != "" || request.GetString("checks", "") != "" ||
+			request.GetString("services", "") != "" || request.GetString("compliance", "") != "" ||
+			request.GetString("output_formats", "") != "" || request.GetString("output_directory", "") != "" {
+			return mcp.NewToolResultError("advanced Azure options not supported in Dagger module - uses environment variables"), nil
 		}
-		if services := request.GetString("services", ""); services != "" {
-			args = append(args, "--services", services)
+
+		// Scan Azure
+		output, err := module.ScanAzure(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("prowler Azure scan failed: %v", err)), nil
 		}
-		if compliance := request.GetString("compliance", ""); compliance != "" {
-			args = append(args, "--compliance", compliance)
-		}
-		if outputFormats := request.GetString("output_formats", ""); outputFormats != "" {
-			args = append(args, "--output-formats", outputFormats)
-		}
-		if outputDirectory := request.GetString("output_directory", ""); outputDirectory != "" {
-			args = append(args, "--output-directory", outputDirectory)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Prowler scan GCP tool
@@ -132,28 +154,33 @@ func AddProwlerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(scanGCPTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"prowler", "gcp"}
-		
-		if projectId := request.GetString("project_id", ""); projectId != "" {
-			args = append(args, "--project-id", projectId)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if checks := request.GetString("checks", ""); checks != "" {
-			args = append(args, "--checks", checks)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewProwlerModule(client)
+
+		// Get parameters
+		projectId := request.GetString("project_id", "")
+
+		// Note: Dagger module doesn't support checks, services, compliance, output options
+		if request.GetString("checks", "") != "" || request.GetString("services", "") != "" ||
+			request.GetString("compliance", "") != "" || request.GetString("output_formats", "") != "" ||
+			request.GetString("output_directory", "") != "" {
+			return mcp.NewToolResultError("advanced GCP options not supported in Dagger module"), nil
 		}
-		if services := request.GetString("services", ""); services != "" {
-			args = append(args, "--services", services)
+
+		// Scan GCP
+		output, err := module.ScanGCP(ctx, projectId)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("prowler GCP scan failed: %v", err)), nil
 		}
-		if compliance := request.GetString("compliance", ""); compliance != "" {
-			args = append(args, "--compliance", compliance)
-		}
-		if outputFormats := request.GetString("output_formats", ""); outputFormats != "" {
-			args = append(args, "--output-formats", outputFormats)
-		}
-		if outputDirectory := request.GetString("output_directory", ""); outputDirectory != "" {
-			args = append(args, "--output-directory", outputDirectory)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Prowler scan Kubernetes tool
@@ -179,28 +206,36 @@ func AddProwlerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(scanKubernetesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"prowler", "kubernetes"}
-		
-		if kubeconfigPath := request.GetString("kubeconfig_path", ""); kubeconfigPath != "" {
-			args = append(args, "--kubeconfig", kubeconfigPath)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if context := request.GetString("context", ""); context != "" {
-			args = append(args, "--context", context)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewProwlerModule(client)
+
+		// Get parameters
+		kubeconfigPath := request.GetString("kubeconfig_path", "")
+		if kubeconfigPath == "" {
+			return mcp.NewToolResultError("kubeconfig_path is required"), nil
 		}
-		if checks := request.GetString("checks", ""); checks != "" {
-			args = append(args, "--checks", checks)
+
+		// Note: Dagger module doesn't support context, checks, compliance, output options
+		if request.GetString("context", "") != "" || request.GetString("checks", "") != "" ||
+			request.GetString("compliance", "") != "" || request.GetString("output_formats", "") != "" ||
+			request.GetString("output_directory", "") != "" {
+			return mcp.NewToolResultError("advanced Kubernetes options not supported in Dagger module"), nil
 		}
-		if compliance := request.GetString("compliance", ""); compliance != "" {
-			args = append(args, "--compliance", compliance)
+
+		// Scan Kubernetes
+		output, err := module.ScanKubernetes(ctx, kubeconfigPath)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("prowler Kubernetes scan failed: %v", err)), nil
 		}
-		if outputFormats := request.GetString("output_formats", ""); outputFormats != "" {
-			args = append(args, "--output-formats", outputFormats)
-		}
-		if outputDirectory := request.GetString("output_directory", ""); outputDirectory != "" {
-			args = append(args, "--output-directory", outputDirectory)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Prowler list checks tool
@@ -218,22 +253,31 @@ func AddProwlerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(listChecksTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"prowler"}
-		
-		if provider := request.GetString("provider", ""); provider != "" {
-			args = append(args, provider)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		args = append(args, "--list-checks")
-		
-		if service := request.GetString("service", ""); service != "" {
-			args = append(args, "--service", service)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewProwlerModule(client)
+
+		// Get parameters
+		provider := request.GetString("provider", "")
+
+		// Note: Dagger module doesn't support service and compliance filtering
+		if request.GetString("service", "") != "" || request.GetString("compliance", "") != "" {
+			return mcp.NewToolResultError("service and compliance filtering not supported in Dagger module"), nil
 		}
-		if compliance := request.GetString("compliance", ""); compliance != "" {
-			args = append(args, "--compliance", compliance)
+
+		// List checks
+		output, err := module.ListChecks(ctx, provider)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("prowler list checks failed: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Prowler list services tool
@@ -245,14 +289,26 @@ func AddProwlerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(listServicesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"prowler"}
-		
-		if provider := request.GetString("provider", ""); provider != "" {
-			args = append(args, provider)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		args = append(args, "--list-services")
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewProwlerModule(client)
+
+		// Get parameters
+		provider := request.GetString("provider", "")
+
+		// List services
+		output, err := module.ListServices(ctx, provider)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("prowler list services failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Prowler list compliance tool
@@ -264,14 +320,26 @@ func AddProwlerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(listComplianceTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"prowler"}
-		
-		if provider := request.GetString("provider", ""); provider != "" {
-			args = append(args, provider)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		args = append(args, "--list-compliance")
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewProwlerModule(client)
+
+		// Get parameters
+		provider := request.GetString("provider", "")
+
+		// List compliance
+		output, err := module.ListCompliance(ctx, provider)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("prowler list compliance failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Prowler dashboard tool
@@ -285,16 +353,9 @@ func AddProwlerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		),
 	)
 	s.AddTool(dashboardTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"prowler", "dashboard"}
-		
-		if port := request.GetString("port", ""); port != "" {
-			args = append(args, "--port", port)
-		}
-		if host := request.GetString("host", ""); host != "" {
-			args = append(args, "--host", host)
-		}
-		
-		return executeShipCommand(args)
+		// Note: Dashboard server functionality not available in Dagger module
+		// Dagger module only supports dashboard generation from scan results
+		return mcp.NewToolResultError("dashboard server not supported in Dagger module - only dashboard generation from scan results"), nil
 	})
 
 }

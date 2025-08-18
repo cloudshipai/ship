@@ -2,245 +2,295 @@ package mcp
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddKubeHunterTools adds Kube-hunter (Kubernetes penetration testing) MCP tool implementations using real CLI commands
+// AddKubeHunterTools adds Kube-hunter (Kubernetes penetration testing) MCP tool implementations using direct Dagger calls
 func AddKubeHunterTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// Kube-hunter remote scan tool
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addKubeHunterToolsDirect(s)
+}
+
+// addKubeHunterToolsDirect adds Kube-hunter tools using direct Dagger module calls
+func addKubeHunterToolsDirect(s *server.MCPServer) {
+	// Kube-hunter remote scan
 	remoteScanTool := mcp.NewTool("kube_hunter_remote_scan",
-		mcp.WithDescription("Scan specific IP addresses or DNS names using kube-hunter --remote"),
-		mcp.WithString("target",
-			mcp.Description("IP address or DNS name to scan"),
+		mcp.WithDescription("Scan remote Kubernetes cluster using kube-hunter"),
+		mcp.WithString("remote",
+			mcp.Description("Remote hostname or IP address to scan"),
 			mcp.Required(),
 		),
 		mcp.WithBoolean("active",
-			mcp.Description("Enable active hunting (exploit testing)"),
-		),
-		mcp.WithString("log",
-			mcp.Description("Log level"),
-			mcp.Enum("DEBUG", "INFO", "WARNING"),
+			mcp.Description("Enable active hunting (attempts to exploit vulnerabilities)"),
 		),
 		mcp.WithString("report",
-			mcp.Description("Report format"),
-			mcp.Enum("json"),
+			mcp.Description("Report format: json, yaml, table"),
+			mcp.Enum("json", "yaml", "table"),
 		),
-		mcp.WithString("dispatch",
-			mcp.Description("Output method"),
-			mcp.Enum("stdout", "http"),
+		mcp.WithString("log_level",
+			mcp.Description("Log level: debug, info, warning"),
+			mcp.Enum("debug", "info", "warning"),
 		),
 	)
 	s.AddTool(remoteScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		target := request.GetString("target", "")
-		args := []string{"kube-hunter", "--remote", target}
-		
-		if request.GetBool("active", false) {
-			args = append(args, "--active")
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if log := request.GetString("log", ""); log != "" {
-			args = append(args, "--log", log)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKubeHunterModule(client)
+
+		// Get parameters
+		remote := request.GetString("remote", "")
+		if remote == "" {
+			return mcp.NewToolResultError("remote is required"), nil
 		}
-		if report := request.GetString("report", ""); report != "" {
-			args = append(args, "--report", report)
+
+		active := request.GetBool("active", false)
+		reportFormat := request.GetString("report", "json")
+
+		// Run remote scan
+		output, err := module.ScanRemote(ctx, remote, active, reportFormat)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("kube-hunter remote scan failed: %v", err)), nil
 		}
-		if dispatch := request.GetString("dispatch", ""); dispatch != "" {
-			args = append(args, "--dispatch", dispatch)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Kube-hunter CIDR scan tool
+	// Kube-hunter CIDR scan
 	cidrScanTool := mcp.NewTool("kube_hunter_cidr_scan",
-		mcp.WithDescription("Scan IP range using kube-hunter --cidr"),
+		mcp.WithDescription("Scan CIDR range for Kubernetes clusters using kube-hunter"),
 		mcp.WithString("cidr",
-			mcp.Description("CIDR range to scan (e.g., 192.168.0.0/24)"),
+			mcp.Description("CIDR range to scan (e.g., 192.168.1.0/24)"),
 			mcp.Required(),
 		),
 		mcp.WithBoolean("active",
-			mcp.Description("Enable active hunting (exploit testing)"),
-		),
-		mcp.WithBoolean("mapping",
-			mcp.Description("Show only network mapping of Kubernetes nodes"),
-		),
-		mcp.WithBoolean("quick",
-			mcp.Description("Limit subnet scanning to /24 CIDR"),
-		),
-		mcp.WithString("log",
-			mcp.Description("Log level"),
-			mcp.Enum("DEBUG", "INFO", "WARNING"),
+			mcp.Description("Enable active hunting"),
 		),
 		mcp.WithString("report",
-			mcp.Description("Report format"),
-			mcp.Enum("json"),
+			mcp.Description("Report format: json, yaml, table"),
+			mcp.Enum("json", "yaml", "table"),
 		),
 	)
 	s.AddTool(cidrScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKubeHunterModule(client)
+
+		// Get parameters
 		cidr := request.GetString("cidr", "")
-		args := []string{"kube-hunter", "--cidr", cidr}
-		
-		if request.GetBool("active", false) {
-			args = append(args, "--active")
+		if cidr == "" {
+			return mcp.NewToolResultError("cidr is required"), nil
 		}
-		if request.GetBool("mapping", false) {
-			args = append(args, "--mapping")
+
+		active := request.GetBool("active", false)
+		reportFormat := request.GetString("report", "json")
+
+		// Run CIDR scan
+		output, err := module.ScanCIDR(ctx, cidr, active, reportFormat)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("kube-hunter CIDR scan failed: %v", err)), nil
 		}
-		if request.GetBool("quick", false) {
-			args = append(args, "--quick")
-		}
-		if log := request.GetString("log", ""); log != "" {
-			args = append(args, "--log", log)
-		}
-		if report := request.GetString("report", ""); report != "" {
-			args = append(args, "--report", report)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Kube-hunter interface scan tool
+	// Kube-hunter interface scan
 	interfaceScanTool := mcp.NewTool("kube_hunter_interface_scan",
-		mcp.WithDescription("Scan all local network interfaces using kube-hunter --interface"),
+		mcp.WithDescription("Scan network interface using kube-hunter"),
+		mcp.WithString("interface",
+			mcp.Description("Network interface to scan (e.g., eth0)"),
+			mcp.Required(),
+		),
 		mcp.WithBoolean("active",
-			mcp.Description("Enable active hunting (exploit testing)"),
-		),
-		mcp.WithBoolean("quick",
-			mcp.Description("Limit subnet scanning to /24 CIDR"),
-		),
-		mcp.WithString("log",
-			mcp.Description("Log level"),
-			mcp.Enum("DEBUG", "INFO", "WARNING"),
+			mcp.Description("Enable active hunting"),
 		),
 		mcp.WithString("report",
-			mcp.Description("Report format"),
-			mcp.Enum("json"),
+			mcp.Description("Report format: json, yaml, table"),
+			mcp.Enum("json", "yaml", "table"),
 		),
 	)
 	s.AddTool(interfaceScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"kube-hunter", "--interface"}
-		
-		if request.GetBool("active", false) {
-			args = append(args, "--active")
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if request.GetBool("quick", false) {
-			args = append(args, "--quick")
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKubeHunterModule(client)
+
+		// Get parameters
+		networkInterface := request.GetString("interface", "")
+		if networkInterface == "" {
+			return mcp.NewToolResultError("interface is required"), nil
 		}
-		if log := request.GetString("log", ""); log != "" {
-			args = append(args, "--log", log)
+
+		active := request.GetBool("active", false)
+		reportFormat := request.GetString("report", "json")
+
+		// Run interface scan
+		output, err := module.ScanInterface(ctx, networkInterface, active, reportFormat)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("kube-hunter interface scan failed: %v", err)), nil
 		}
-		if report := request.GetString("report", ""); report != "" {
-			args = append(args, "--report", report)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Kube-hunter pod scan tool
+	// Kube-hunter pod scan
 	podScanTool := mcp.NewTool("kube_hunter_pod_scan",
-		mcp.WithDescription("Scan from within a Kubernetes pod using kube-hunter --pod"),
+		mcp.WithDescription("Run kube-hunter as pod in Kubernetes cluster"),
 		mcp.WithBoolean("active",
-			mcp.Description("Enable active hunting (exploit testing)"),
+			mcp.Description("Enable active hunting"),
 		),
-		mcp.WithBoolean("k8s_auto_discover_nodes",
-			mcp.Description("Query Kubernetes for all nodes and scan them"),
+		mcp.WithString("report",
+			mcp.Description("Report format: json, yaml, table"),
+			mcp.Enum("json", "yaml", "table"),
 		),
 		mcp.WithString("kubeconfig",
 			mcp.Description("Path to kubeconfig file"),
 		),
-		mcp.WithString("service_account_token",
-			mcp.Description("JWT Bearer token of service account"),
-		),
-		mcp.WithString("log",
-			mcp.Description("Log level"),
-			mcp.Enum("DEBUG", "INFO", "WARNING"),
-		),
-		mcp.WithString("report",
-			mcp.Description("Report format"),
-			mcp.Enum("json"),
+		mcp.WithBoolean("quick",
+			mcp.Description("Perform quick scan"),
 		),
 	)
 	s.AddTool(podScanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"kube-hunter", "--pod"}
-		
-		if request.GetBool("active", false) {
-			args = append(args, "--active")
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if request.GetBool("k8s_auto_discover_nodes", false) {
-			args = append(args, "--k8s-auto-discover-nodes")
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKubeHunterModule(client)
+
+		// Get parameters
+		kubeconfig := request.GetString("kubeconfig", "")
+		active := request.GetBool("active", false)
+		reportFormat := request.GetString("report", "json")
+
+		// Run pod scan
+		output, err := module.ScanPod(ctx, kubeconfig, active, reportFormat)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("kube-hunter pod scan failed: %v", err)), nil
 		}
-		if kubeconfig := request.GetString("kubeconfig", ""); kubeconfig != "" {
-			args = append(args, "--kubeconfig", kubeconfig)
-		}
-		if token := request.GetString("service_account_token", ""); token != "" {
-			args = append(args, "--service-account-token", token)
-		}
-		if log := request.GetString("log", ""); log != "" {
-			args = append(args, "--log", log)
-		}
-		if report := request.GetString("report", ""); report != "" {
-			args = append(args, "--report", report)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Kube-hunter list tests tool
+	// Kube-hunter list tests
 	listTestsTool := mcp.NewTool("kube_hunter_list_tests",
-		mcp.WithDescription("List available tests using kube-hunter --list"),
+		mcp.WithDescription("List all available kube-hunter tests"),
 		mcp.WithBoolean("active",
-			mcp.Description("Include active hunting tests in the list"),
-		),
-		mcp.WithBoolean("raw_hunter_names",
-			mcp.Description("Show raw hunter class names"),
+			mcp.Description("Include active hunting tests"),
 		),
 	)
 	s.AddTool(listTestsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"kube-hunter", "--list"}
-		
-		if request.GetBool("active", false) {
-			args = append(args, "--active")
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if request.GetBool("raw_hunter_names", false) {
-			args = append(args, "--raw-hunter-names")
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKubeHunterModule(client)
+
+		// Get parameters
+		showActive := request.GetBool("active", false)
+
+		// List tests
+		output, err := module.ListTests(ctx, showActive)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to list kube-hunter tests: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Kube-hunter custom hunters tool
+	// Kube-hunter custom hunters
 	customHuntersTool := mcp.NewTool("kube_hunter_custom_hunters",
-		mcp.WithDescription("Run specific hunters using kube-hunter --custom"),
-		mcp.WithString("hunters",
-			mcp.Description("Space-separated list of hunter class names"),
+		mcp.WithDescription("Run kube-hunter with specific hunters enabled/disabled"),
+		mcp.WithString("target",
+			mcp.Description("Target to scan (IP, hostname, CIDR, or interface)"),
 			mcp.Required(),
 		),
+		mcp.WithString("include_hunters",
+			mcp.Description("Comma-separated list of hunter types to include"),
+		),
+		mcp.WithString("exclude_hunters",
+			mcp.Description("Comma-separated list of hunter types to exclude"),
+		),
 		mcp.WithBoolean("active",
-			mcp.Description("Enable active hunting (exploit testing)"),
-		),
-		mcp.WithString("target",
-			mcp.Description("Target IP address or DNS name (for remote scanning)"),
-		),
-		mcp.WithString("log",
-			mcp.Description("Log level"),
-			mcp.Enum("DEBUG", "INFO", "WARNING"),
+			mcp.Description("Enable active hunting"),
 		),
 	)
 	s.AddTool(customHuntersTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		hunters := request.GetString("hunters", "")
-		args := []string{"kube-hunter", "--custom", hunters}
-		
-		if request.GetBool("active", false) {
-			args = append(args, "--active")
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if target := request.GetString("target", ""); target != "" {
-			args = append(args, "--remote", target)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKubeHunterModule(client)
+
+		// Get parameters
+		target := request.GetString("target", "")
+		if target == "" {
+			return mcp.NewToolResultError("target is required"), nil
 		}
-		if log := request.GetString("log", ""); log != "" {
-			args = append(args, "--log", log)
+
+		// Parse include hunters
+		includeHunters := []string{}
+		if include := request.GetString("include_hunters", ""); include != "" {
+			for _, h := range strings.Split(include, ",") {
+				h = strings.TrimSpace(h)
+				if h != "" {
+					includeHunters = append(includeHunters, h)
+				}
+			}
 		}
-		
-		return executeShipCommand(args)
+
+		// Parse exclude hunters
+		excludeHunters := []string{}
+		if exclude := request.GetString("exclude_hunters", ""); exclude != "" {
+			for _, h := range strings.Split(exclude, ",") {
+				h = strings.TrimSpace(h)
+				if h != "" {
+					excludeHunters = append(excludeHunters, h)
+				}
+			}
+		}
+
+		active := request.GetBool("active", false)
+
+		// Run custom hunters
+		output, err := module.RunCustomHunters(ctx, target, includeHunters, excludeHunters, active)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("kube-hunter custom hunters failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 }

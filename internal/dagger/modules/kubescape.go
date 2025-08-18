@@ -7,6 +7,9 @@ import (
 	"dagger.io/dagger"
 )
 
+// kubescapeBinary is the path to the kubescape binary in the container
+const kubescapeBinary = "/usr/bin/kubescape"
+
 type KubescapeModule struct {
 	client *dagger.Client
 }
@@ -18,92 +21,49 @@ func NewKubescapeModule(client *dagger.Client) *KubescapeModule {
 }
 
 // ScanCluster scans a Kubernetes cluster for security issues
-func (m *KubescapeModule) ScanCluster(ctx context.Context, opts ...KubescapeOption) (*dagger.Container, error) {
-	config := &KubescapeConfig{
-		KubescapeVersion: "v3.0.15",
-		Framework:        "nsa",
-		Format:           "pretty-printer",
-	}
-
-	for _, opt := range opts {
-		opt(config)
-	}
-
+func (m *KubescapeModule) ScanCluster(ctx context.Context, kubeconfig string, framework string, format string, severityThreshold string) (string, error) {
 	container := m.client.Container().
-		From("quay.io/kubescape/kubescape:" + config.KubescapeVersion).
+		From("quay.io/kubescape/kubescape:v3.0.15").
 		WithWorkdir("/workspace")
 
 	// Mount kubeconfig if provided
-	if config.KubeconfigPath != "" {
-		container = container.WithMountedFile("/root/.kube/config", m.client.Host().File(config.KubeconfigPath))
+	if kubeconfig != "" {
+		container = container.WithMountedFile("/root/.kube/config", m.client.Host().File(kubeconfig))
 	}
 
-	args := []string{"kubescape", "scan"}
+	args := []string{kubescapeBinary, "scan"}
 
-	// Add framework
-	if config.Framework != "" {
-		args = append(args, "framework", config.Framework)
+	// Add framework (default to nsa if not specified)
+	if framework == "" {
+		framework = "nsa"
 	}
+	args = append(args, "framework", framework)
 
 	// Add format
-	if config.Format != "" {
-		args = append(args, "--format", config.Format)
-	}
-
-	// Add output file
-	if config.Output != "" {
-		args = append(args, "--output", config.Output)
+	if format != "" {
+		args = append(args, "--format", format)
 	}
 
 	// Add severity threshold
-	if config.SeverityThreshold != "" {
-		args = append(args, "--severity-threshold", config.SeverityThreshold)
+	if severityThreshold != "" {
+		args = append(args, "--severity-threshold", severityThreshold)
 	}
 
-	// Add compliance threshold
-	if config.ComplianceThreshold > 0 {
-		args = append(args, "--compliance-threshold", fmt.Sprintf("%.2f", config.ComplianceThreshold))
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		return "", fmt.Errorf("failed to scan cluster: %w\nStderr: %s", err, stderr)
 	}
 
-	// Add namespace filter
-	if config.Namespace != "" {
-		args = append(args, "--include-namespaces", config.Namespace)
-	}
-
-	// Add resource filter
-	if len(config.IncludeResources) > 0 {
-		for _, resource := range config.IncludeResources {
-			args = append(args, "--include-resources", resource)
-		}
-	}
-
-	// Exclude kube-system by default unless specified
-	if !config.IncludeKubeSystem {
-		args = append(args, "--exclude-namespaces", "kube-system")
-	}
-
-	// Enable verbose output
-	if config.Verbose {
-		args = append(args, "--verbose")
-	}
-
-	return container.WithExec(args), nil
+	return output, nil
 }
 
 // ScanManifests scans Kubernetes manifest files
-func (m *KubescapeModule) ScanManifests(ctx context.Context, manifestsDir string, opts ...KubescapeOption) (*dagger.Container, error) {
-	config := &KubescapeConfig{
-		KubescapeVersion: "v3.0.15",
-		Framework:        "nsa",
-		Format:           "pretty-printer",
-	}
-
-	for _, opt := range opts {
-		opt(config)
-	}
-
+func (m *KubescapeModule) ScanManifests(ctx context.Context, manifestsDir string, framework string, format string, severityThreshold string) (string, error) {
 	container := m.client.Container().
-		From("quay.io/kubescape/kubescape:" + config.KubescapeVersion).
+		From("quay.io/kubescape/kubescape:v3.0.15").
 		WithWorkdir("/workspace")
 
 	// Mount manifests directory
@@ -111,53 +71,41 @@ func (m *KubescapeModule) ScanManifests(ctx context.Context, manifestsDir string
 		container = container.WithMountedDirectory("/workspace/manifests", m.client.Host().Directory(manifestsDir))
 	}
 
-	args := []string{"scan", "framework", config.Framework}
-
-	// Add format
-	if config.Format != "" {
-		args = append(args, "--format", config.Format)
+	// Add framework (default to nsa if not specified)
+	if framework == "" {
+		framework = "nsa"
 	}
 
-	// Add output file
-	if config.Output != "" {
-		args = append(args, "--output", config.Output)
+	args := []string{kubescapeBinary, "scan", "framework", framework}
+
+	// Add format
+	if format != "" {
+		args = append(args, "--format", format)
 	}
 
 	// Add severity threshold
-	if config.SeverityThreshold != "" {
-		args = append(args, "--severity-threshold", config.SeverityThreshold)
-	}
-
-	// Add compliance threshold
-	if config.ComplianceThreshold > 0 {
-		args = append(args, "--compliance-threshold", fmt.Sprintf("%.2f", config.ComplianceThreshold))
-	}
-
-	// Enable verbose output
-	if config.Verbose {
-		args = append(args, "--verbose")
+	if severityThreshold != "" {
+		args = append(args, "--severity-threshold", severityThreshold)
 	}
 
 	// Add manifests directory
 	args = append(args, "/workspace/manifests")
 
-	return container.WithExec(args), nil
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		return "", fmt.Errorf("failed to scan manifests: %w\nStderr: %s", err, stderr)
+	}
+
+	return output, nil
 }
 
 // ScanHelm scans Helm charts for security issues
-func (m *KubescapeModule) ScanHelm(ctx context.Context, chartPath string, opts ...KubescapeOption) (*dagger.Container, error) {
-	config := &KubescapeConfig{
-		KubescapeVersion: "v3.0.15",
-		Framework:        "nsa",
-		Format:           "pretty-printer",
-	}
-
-	for _, opt := range opts {
-		opt(config)
-	}
-
+func (m *KubescapeModule) ScanHelm(ctx context.Context, chartPath string, framework string, format string) (string, error) {
 	container := m.client.Container().
-		From("quay.io/kubescape/kubescape:" + config.KubescapeVersion).
+		From("quay.io/kubescape/kubescape:v3.0.15").
 		WithWorkdir("/workspace")
 
 	// Mount chart directory
@@ -165,48 +113,36 @@ func (m *KubescapeModule) ScanHelm(ctx context.Context, chartPath string, opts .
 		container = container.WithMountedDirectory("/workspace/chart", m.client.Host().Directory(chartPath))
 	}
 
-	args := []string{"scan", "framework", config.Framework}
+	// Add framework (default to nsa if not specified)
+	if framework == "" {
+		framework = "nsa"
+	}
+
+	args := []string{kubescapeBinary, "scan", "framework", framework}
 
 	// Add format
-	if config.Format != "" {
-		args = append(args, "--format", config.Format)
+	if format != "" {
+		args = append(args, "--format", format)
 	}
 
-	// Add output file
-	if config.Output != "" {
-		args = append(args, "--output", config.Output)
+	// Add chart path with helm prefix
+	args = append(args, "helm", "/workspace/chart")
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		return "", fmt.Errorf("failed to scan Helm chart: %w\nStderr: %s", err, stderr)
 	}
 
-	// Add severity threshold
-	if config.SeverityThreshold != "" {
-		args = append(args, "--severity-threshold", config.SeverityThreshold)
-	}
-
-	// Enable verbose output
-	if config.Verbose {
-		args = append(args, "--verbose")
-	}
-
-	// Add chart path
-	args = append(args, "/workspace/chart")
-
-	return container.WithExec(args), nil
+	return output, nil
 }
 
-// ScanRepository scans a Git repository for security issues
-func (m *KubescapeModule) ScanRepository(ctx context.Context, repoPath string, opts ...KubescapeOption) (*dagger.Container, error) {
-	config := &KubescapeConfig{
-		KubescapeVersion: "v3.0.15",
-		Framework:        "nsa",
-		Format:           "pretty-printer",
-	}
-
-	for _, opt := range opts {
-		opt(config)
-	}
-
+// ScanRepository scans a Git repository for Kubernetes manifests
+func (m *KubescapeModule) ScanRepository(ctx context.Context, repoPath string, framework string, format string) (string, error) {
 	container := m.client.Container().
-		From("quay.io/kubescape/kubescape:" + config.KubescapeVersion).
+		From("quay.io/kubescape/kubescape:v3.0.15").
 		WithWorkdir("/workspace")
 
 	// Mount repository directory
@@ -214,81 +150,112 @@ func (m *KubescapeModule) ScanRepository(ctx context.Context, repoPath string, o
 		container = container.WithMountedDirectory("/workspace/repo", m.client.Host().Directory(repoPath))
 	}
 
-	args := []string{"scan", "framework", config.Framework}
+	// Add framework (default to nsa if not specified)
+	if framework == "" {
+		framework = "nsa"
+	}
+
+	args := []string{kubescapeBinary, "scan", "framework", framework}
 
 	// Add format
-	if config.Format != "" {
-		args = append(args, "--format", config.Format)
+	if format != "" {
+		args = append(args, "--format", format)
 	}
-
-	// Add output file
-	if config.Output != "" {
-		args = append(args, "--output", config.Output)
-	}
-
-	// Add severity threshold
-	if config.SeverityThreshold != "" {
-		args = append(args, "--severity-threshold", config.SeverityThreshold)
-	}
-
-	// Enable verbose output
-	if config.Verbose {
-		args = append(args, "--verbose")
-	}
-
-	// Enable repository scanning
-	args = append(args, "--enable-host-scan")
 
 	// Add repository path
 	args = append(args, "/workspace/repo")
 
-	return container.WithExec(args), nil
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		return "", fmt.Errorf("failed to scan repository: %w\nStderr: %s", err, stderr)
+	}
+
+	return output, nil
 }
 
-// GenerateReport generates a comprehensive security report
-func (m *KubescapeModule) GenerateReport(ctx context.Context, opts ...KubescapeOption) (*dagger.Container, error) {
-	config := &KubescapeConfig{
-		KubescapeVersion: "v3.0.15",
-		Framework:        "allframeworks",
-		Format:           "html",
-	}
-
-	for _, opt := range opts {
-		opt(config)
-	}
-
+// GetVersion returns the version of kubescape
+func (m *KubescapeModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
-		From("quay.io/kubescape/kubescape:" + config.KubescapeVersion).
+		From("quay.io/kubescape/kubescape:v3.0.15").
+		WithExec([]string{kubescapeBinary, "version"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get kubescape version: %w", err)
+	}
+
+	return output, nil
+}
+
+// ListFrameworks lists all available security frameworks
+func (m *KubescapeModule) ListFrameworks(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("quay.io/kubescape/kubescape:v3.0.15").
+		WithExec([]string{kubescapeBinary, "list", "frameworks"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		return "", fmt.Errorf("failed to list frameworks: %w\nStderr: %s", err, stderr)
+	}
+
+	return output, nil
+}
+
+// ListControls lists all available security controls
+func (m *KubescapeModule) ListControls(ctx context.Context, framework string) (string, error) {
+	container := m.client.Container().
+		From("quay.io/kubescape/kubescape:v3.0.15")
+
+	args := []string{kubescapeBinary, "list", "controls"}
+	
+	// Add framework filter if specified
+	if framework != "" {
+		args = append(args, "--framework", framework)
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		return "", fmt.Errorf("failed to list controls: %w\nStderr: %s", err, stderr)
+	}
+
+	return output, nil
+}
+
+// DownloadArtifacts downloads kubescape artifacts for offline use
+func (m *KubescapeModule) DownloadArtifacts(ctx context.Context, outputDir string) (string, error) {
+	container := m.client.Container().
+		From("quay.io/kubescape/kubescape:v3.0.15").
 		WithWorkdir("/workspace")
 
-	// Mount kubeconfig if provided
-	if config.KubeconfigPath != "" {
-		container = container.WithMountedFile("/root/.kube/config", m.client.Host().File(config.KubeconfigPath))
+	// Mount output directory
+	if outputDir != "" {
+		container = container.WithMountedDirectory("/workspace/output", m.client.Host().Directory(outputDir))
 	}
 
-	args := []string{"scan", "framework", config.Framework}
+	args := []string{kubescapeBinary, "download", "artifacts", "--output", "/workspace/output"}
 
-	// Add format for comprehensive report
-	args = append(args, "--format", config.Format)
+	container = container.WithExec(args)
 
-	// Add output file
-	if config.Output != "" {
-		args = append(args, "--output", config.Output)
-	} else {
-		args = append(args, "--output", "/workspace/kubescape-report.html")
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		return "", fmt.Errorf("failed to download artifacts: %w\nStderr: %s", err, stderr)
 	}
 
-	// Include all severity levels for comprehensive report
-	args = append(args, "--severity-threshold", "low")
-
-	// Enable verbose output
-	args = append(args, "--verbose")
-
-	return container.WithExec(args), nil
+	return output, nil
 }
 
+// KubescapeConfig holds configuration options - no longer needed for simplified functions
 type KubescapeConfig struct {
 	KubescapeVersion    string
+	KubeconfigPath      string
 	Framework           string
 	Format              string
 	Output              string
@@ -297,74 +264,8 @@ type KubescapeConfig struct {
 	Namespace           string
 	IncludeResources    []string
 	IncludeKubeSystem   bool
-	KubeconfigPath      string
 	Verbose             bool
 }
 
+// KubescapeOption is a function that modifies the KubescapeConfig - no longer needed for simplified functions
 type KubescapeOption func(*KubescapeConfig)
-
-func WithKubescapeVersion(version string) KubescapeOption {
-	return func(c *KubescapeConfig) {
-		c.KubescapeVersion = version
-	}
-}
-
-func WithFramework(framework string) KubescapeOption {
-	return func(c *KubescapeConfig) {
-		c.Framework = framework
-	}
-}
-
-func WithKubescapeFormat(format string) KubescapeOption {
-	return func(c *KubescapeConfig) {
-		c.Format = format
-	}
-}
-
-func WithKubescapeOutput(output string) KubescapeOption {
-	return func(c *KubescapeConfig) {
-		c.Output = output
-	}
-}
-
-func WithSeverityThreshold(threshold string) KubescapeOption {
-	return func(c *KubescapeConfig) {
-		c.SeverityThreshold = threshold
-	}
-}
-
-func WithComplianceThreshold(threshold float64) KubescapeOption {
-	return func(c *KubescapeConfig) {
-		c.ComplianceThreshold = threshold
-	}
-}
-
-func WithKubescapeNamespace(namespace string) KubescapeOption {
-	return func(c *KubescapeConfig) {
-		c.Namespace = namespace
-	}
-}
-
-func WithIncludeResources(resources []string) KubescapeOption {
-	return func(c *KubescapeConfig) {
-		c.IncludeResources = resources
-	}
-}
-
-func WithIncludeKubeSystem(include bool) KubescapeOption {
-	return func(c *KubescapeConfig) {
-		c.IncludeKubeSystem = include
-	}
-}
-
-func WithKubescapeKubeconfig(path string) KubescapeOption {
-	return func(c *KubescapeConfig) {
-		c.KubeconfigPath = path
-	}
-}
-
-func WithKubescapeVerbose(verbose bool) KubescapeOption {
-	return func(c *KubescapeConfig) {
-		c.Verbose = verbose
-	}
-}

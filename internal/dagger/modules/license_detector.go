@@ -7,6 +7,13 @@ import (
 	"dagger.io/dagger"
 )
 
+// Binary paths for license detection tools
+const (
+	licenseeBinary         = "/usr/local/bin/licensee"
+	askalonoBinary         = "/usr/local/bin/askalono"
+	goLicenseDetectorBinary = "/usr/local/bin/license-detector"
+)
+
 // LicenseDetectorModule detects and analyzes software licenses
 type LicenseDetectorModule struct {
 	client *dagger.Client
@@ -30,7 +37,7 @@ func (m *LicenseDetectorModule) DetectLicenses(ctx context.Context, dir string) 
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			"licensee", "detect",
+			licenseeBinary, "detect",
 			"--json",
 			".",
 		})
@@ -110,9 +117,9 @@ func (m *LicenseDetectorModule) AskalonoIdentify(ctx context.Context, filePath s
 		WithExec([]string{"sh", "-c", "curl -L https://github.com/amzn/askalono/releases/latest/download/askalono-Linux.tar.gz | tar xz && mv askalono /usr/local/bin/"}).
 		WithFile("/workspace/license.txt", m.client.Host().File(filePath))
 
-	args := []string{"askalono", "id", "/workspace/license.txt"}
+	args := []string{askalonoBinary, "id", "/workspace/license.txt"}
 	if optimize {
-		args = []string{"askalono", "id", "--optimize", "/workspace/license.txt"}
+		args = []string{askalonoBinary, "id", "--optimize", "/workspace/license.txt"}
 	}
 
 	container = container.WithExec(args)
@@ -133,7 +140,7 @@ func (m *LicenseDetectorModule) AskalonoCrawl(ctx context.Context, dir string) (
 		WithExec([]string{"sh", "-c", "curl -L https://github.com/amzn/askalono/releases/latest/download/askalono-Linux.tar.gz | tar xz && mv askalono /usr/local/bin/"}).
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"askalono", "crawl", "."})
+		WithExec([]string{askalonoBinary, "crawl", "."})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

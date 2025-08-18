@@ -13,6 +13,8 @@ type CertManagerModule struct {
 	name   string
 }
 
+const cmctlBinary = "/usr/local/bin/cmctl"
+
 // NewCertManagerModule creates a new cert-manager module
 func NewCertManagerModule(client *dagger.Client) *CertManagerModule {
 	return &CertManagerModule{
@@ -31,7 +33,7 @@ func (m *CertManagerModule) GetCertificates(ctx context.Context, namespace strin
 	}
 
 	container = container.WithExec([]string{
-		"cmctl",
+		cmctlBinary,
 		"status", "certificate",
 		"--namespace", namespace,
 		"--output", "json",
@@ -55,7 +57,7 @@ func (m *CertManagerModule) CheckCertificate(ctx context.Context, name string, n
 	}
 
 	container = container.WithExec([]string{
-		"cmctl",
+		cmctlBinary,
 		"status", "certificate", name,
 		"--namespace", namespace,
 		"--output", "json",
@@ -79,7 +81,7 @@ func (m *CertManagerModule) RenewCertificate(ctx context.Context, name string, n
 	}
 
 	container = container.WithExec([]string{
-		"cmctl",
+		cmctlBinary,
 		"renew", name,
 		"--namespace", namespace,
 	})
@@ -140,7 +142,7 @@ func (m *CertManagerModule) CheckInstallation(ctx context.Context, namespace str
 
 // CreateCertificateRequest creates a CertificateRequest using cmctl
 func (m *CertManagerModule) CreateCertificateRequest(ctx context.Context, name string, fromCertificateFile string, fetchCertificate bool, timeout string, kubeconfig string) (string, error) {
-	args := []string{"cmctl", "create", "certificaterequest", name}
+	args := []string{cmctlBinary, "create", "certificaterequest", name}
 	if fromCertificateFile != "" {
 		args = append(args, "--from-certificate-file", "/tmp/cert.yaml")
 	}
@@ -197,11 +199,35 @@ func (m *CertManagerModule) ListCertificates(ctx context.Context, namespace stri
 	return output, nil
 }
 
+// RenewAllCertificates renews all certificates in a namespace
+func (m *CertManagerModule) RenewAllCertificates(ctx context.Context, namespace string, kubeconfig string) (string, error) {
+	args := []string{cmctlBinary, "renew", "--all"}
+	if namespace != "" {
+		args = append(args, "-n", namespace)
+	}
+
+	container := m.client.Container().
+		From("quay.io/jetstack/cert-manager-ctl:latest")
+
+	if kubeconfig != "" {
+		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
+	}
+
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to renew all certificates: %w", err)
+	}
+
+	return output, nil
+}
+
 // GetVersion returns the version of cert-manager
 func (m *CertManagerModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("quay.io/jetstack/cert-manager-ctl:latest").
-		WithExec([]string{"cmctl", "version"})
+		WithExec([]string{cmctlBinary, "version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

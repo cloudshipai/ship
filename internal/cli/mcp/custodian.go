@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
+	"dagger.io/dagger"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // AddCustodianTools adds Cloud Custodian (cloud governance engine) MCP tool implementations
 func AddCustodianTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addCustodianToolsDirect(s)
+}
+
+// addCustodianToolsDirect implements direct Dagger calls for custodian tools
+func addCustodianToolsDirect(s *server.MCPServer) {
 	// Custodian run policy tool
 	runPolicyTool := mcp.NewTool("custodian_run_policy",
 		mcp.WithDescription("Run Cloud Custodian policy for cloud governance"),
@@ -26,11 +35,28 @@ func AddCustodianTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 	)
 	s.AddTool(runPolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		policyFile := request.GetString("policy_file", "")
-		args := []string{"custodian", "run", "-s", "out", policyFile}
-		if region := request.GetString("region", ""); region != "" {
-			args = append(args, "--region", region)
+		region := request.GetString("region", "")
+		
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create custodian module and run policy
+		custodianModule := modules.NewCustodianModule(client)
+		result, err := custodianModule.RunPolicy(ctx, policyFile, "out")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("custodian run failed: %v", err)), nil
+		}
+
+		// Note: Region parameter not yet supported in Dagger module
+		if region != "" {
+			result = fmt.Sprintf("Note: --region %s parameter not yet implemented in Dagger module\n\n%s", region, result)
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Custodian dry run policy tool
@@ -49,12 +75,28 @@ func AddCustodianTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 	)
 	s.AddTool(dryRunTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		policyFile := request.GetString("policy_file", "")
-		outputDir := request.GetString("output_dir", "out")
-		args := []string{"custodian", "run", "--dryrun", "-s", outputDir, policyFile}
-		if region := request.GetString("region", ""); region != "" {
-			args = append(args, "--region", region)
+		region := request.GetString("region", "")
+		
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create custodian module and run dry run
+		custodianModule := modules.NewCustodianModule(client)
+		result, err := custodianModule.DryRun(ctx, policyFile)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("custodian dry run failed: %v", err)), nil
+		}
+
+		// Note: Region parameter not yet supported in Dagger module
+		if region != "" {
+			result = fmt.Sprintf("Note: --region %s parameter not yet implemented in Dagger module\n\n%s", region, result)
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Custodian validate policy tool
@@ -67,8 +109,22 @@ func AddCustodianTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 	)
 	s.AddTool(validateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		policyFile := request.GetString("policy_file", "")
-		args := []string{"custodian", "validate", policyFile}
-		return executeShipCommand(args)
+		
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create custodian module and validate policy
+		custodianModule := modules.NewCustodianModule(client)
+		result, err := custodianModule.ValidatePolicy(ctx, policyFile)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("custodian validate failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Custodian schema tool
@@ -79,11 +135,23 @@ func AddCustodianTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		),
 	)
 	s.AddTool(schemaTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"custodian", "schema"}
-		if resourceType := request.GetString("resource_type", ""); resourceType != "" {
-			args = append(args, resourceType)
+		resourceType := request.GetString("resource_type", "")
+		
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create custodian module and get schema
+		custodianModule := modules.NewCustodianModule(client)
+		result, err := custodianModule.Schema(ctx, resourceType)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("custodian schema failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Custodian get version tool
@@ -91,7 +159,20 @@ func AddCustodianTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		mcp.WithDescription("Get Cloud Custodian version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"custodian", "version"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create custodian module and get version
+		custodianModule := modules.NewCustodianModule(client)
+		result, err := custodianModule.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("custodian version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 }

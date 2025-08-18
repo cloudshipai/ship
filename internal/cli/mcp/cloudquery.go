@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
+	"dagger.io/dagger"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // AddCloudQueryTools adds CloudQuery (cloud asset inventory) MCP tool implementations
 func AddCloudQueryTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addCloudQueryToolsDirect(s)
+}
+
+// addCloudQueryToolsDirect implements direct Dagger calls for CloudQuery tools
+func addCloudQueryToolsDirect(s *server.MCPServer) {
 	// CloudQuery sync resources from sources to destinations
 	syncTool := mcp.NewTool("cloudquery_sync",
 		mcp.WithDescription("Sync resources from source plugins to destinations"),
@@ -25,17 +34,26 @@ func AddCloudQueryTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(syncTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		configPath := request.GetString("config_path", "")
-		args := []string{"cloudquery", "sync", configPath}
-		
-		if logLevel := request.GetString("log_level", ""); logLevel != "" {
-			args = append(args, "--log-level", logLevel)
+		logLevel := request.GetString("log_level", "")
+		noMigrate := request.GetBool("no_migrate", false)
+
+		// Create CloudQuery module and sync
+		cloudQueryModule := modules.NewCloudQueryModule(client)
+		result, err := cloudQueryModule.SyncWithOptions(ctx, configPath, logLevel, noMigrate)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cloudquery sync failed: %v", err)), nil
 		}
-		if request.GetBool("no_migrate", false) {
-			args = append(args, "--no-migrate")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// CloudQuery migrate destination schema
@@ -51,14 +69,25 @@ func AddCloudQueryTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(migrateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		configPath := request.GetString("config_path", "")
-		args := []string{"cloudquery", "migrate", configPath}
-		
-		if logLevel := request.GetString("log_level", ""); logLevel != "" {
-			args = append(args, "--log-level", logLevel)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		configPath := request.GetString("config_path", "")
+		logLevel := request.GetString("log_level", "")
+
+		// Create CloudQuery module and migrate
+		cloudQueryModule := modules.NewCloudQueryModule(client)
+		result, err := cloudQueryModule.MigrateWithOptions(ctx, configPath, logLevel)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cloudquery migrate failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// CloudQuery init - generate initial configuration
@@ -72,16 +101,25 @@ func AddCloudQueryTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(initTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"cloudquery", "init"}
-		
-		if source := request.GetString("source", ""); source != "" {
-			args = append(args, "--source", source)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if destination := request.GetString("destination", ""); destination != "" {
-			args = append(args, "--destination", destination)
+		defer client.Close()
+
+		// Get parameters
+		source := request.GetString("source", "")
+		destination := request.GetString("destination", "")
+
+		// Create CloudQuery module and init
+		cloudQueryModule := modules.NewCloudQueryModule(client)
+		result, err := cloudQueryModule.InitConfig(ctx, source, destination)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cloudquery init failed: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// CloudQuery validate configuration
@@ -93,9 +131,24 @@ func AddCloudQueryTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(validateConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		configPath := request.GetString("config_path", "")
-		args := []string{"cloudquery", "validate-config", configPath}
-		return executeShipCommand(args)
+
+		// Create CloudQuery module and validate config
+		cloudQueryModule := modules.NewCloudQueryModule(client)
+		result, err := cloudQueryModule.ValidateConfig(ctx, configPath)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cloudquery validate config failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// CloudQuery test connection
@@ -107,9 +160,24 @@ func AddCloudQueryTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(testConnectionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		configPath := request.GetString("config_path", "")
-		args := []string{"cloudquery", "test-connection", configPath}
-		return executeShipCommand(args)
+
+		// Create CloudQuery module and test connection
+		cloudQueryModule := modules.NewCloudQueryModule(client)
+		result, err := cloudQueryModule.TestConnection(ctx, configPath)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cloudquery test connection failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// CloudQuery tables - generate table documentation
@@ -127,19 +195,26 @@ func AddCloudQueryTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(tablesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"cloudquery", "tables"}
-		
-		if source := request.GetString("source", ""); source != "" {
-			args = append(args, source)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if outputDir := request.GetString("output_dir", ""); outputDir != "" {
-			args = append(args, "--output-dir", outputDir)
+		defer client.Close()
+
+		// Get parameters
+		source := request.GetString("source", "")
+		outputDir := request.GetString("output_dir", "")
+		format := request.GetString("format", "")
+
+		// Create CloudQuery module and get tables
+		cloudQueryModule := modules.NewCloudQueryModule(client)
+		result, err := cloudQueryModule.GetTables(ctx, source, outputDir, format)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cloudquery get tables failed: %v", err)), nil
 		}
-		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--format", format)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// CloudQuery login
@@ -147,8 +222,21 @@ func AddCloudQueryTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		mcp.WithDescription("Login to CloudQuery Hub"),
 	)
 	s.AddTool(loginTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"cloudquery", "login"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create CloudQuery module and login
+		cloudQueryModule := modules.NewCloudQueryModule(client)
+		result, err := cloudQueryModule.Login(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cloudquery login failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// CloudQuery logout
@@ -156,8 +244,21 @@ func AddCloudQueryTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		mcp.WithDescription("Logout from CloudQuery Hub"),
 	)
 	s.AddTool(logoutTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"cloudquery", "logout"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create CloudQuery module and logout
+		cloudQueryModule := modules.NewCloudQueryModule(client)
+		result, err := cloudQueryModule.Logout(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cloudquery logout failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// CloudQuery plugin install
@@ -169,9 +270,24 @@ func AddCloudQueryTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(pluginInstallTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		pluginName := request.GetString("plugin_name", "")
-		args := []string{"cloudquery", "plugin", "install", pluginName}
-		return executeShipCommand(args)
+
+		// Create CloudQuery module and install plugin
+		cloudQueryModule := modules.NewCloudQueryModule(client)
+		result, err := cloudQueryModule.InstallPlugin(ctx, pluginName)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cloudquery install plugin failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// CloudQuery switch
@@ -179,7 +295,20 @@ func AddCloudQueryTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		mcp.WithDescription("Switch between CloudQuery contexts or configurations"),
 	)
 	s.AddTool(switchTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"cloudquery", "switch"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create CloudQuery module and switch
+		cloudQueryModule := modules.NewCloudQueryModule(client)
+		result, err := cloudQueryModule.Switch(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cloudquery switch failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 }

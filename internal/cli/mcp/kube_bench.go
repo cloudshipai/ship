@@ -2,13 +2,23 @@ package mcp
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddKubeBenchTools adds Kube-bench (Kubernetes CIS benchmark) MCP tool implementations using real CLI commands
+// AddKubeBenchTools adds Kube-bench (Kubernetes CIS benchmark) MCP tool implementations using direct Dagger calls
 func AddKubeBenchTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addKubeBenchToolsDirect(s)
+}
+
+// addKubeBenchToolsDirect adds Kube-bench tools using direct Dagger module calls
+func addKubeBenchToolsDirect(s *server.MCPServer) {
 	// Kube-bench run tool
 	runTool := mcp.NewTool("kube_bench_run",
 		mcp.WithDescription("Run CIS Kubernetes benchmark using kube-bench"),
@@ -37,36 +47,60 @@ func AddKubeBenchTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		mcp.WithString("outputfile",
 			mcp.Description("Write results to output file when using JSON or JUnit"),
 		),
+		mcp.WithString("kubeconfig",
+			mcp.Description("Path to kubeconfig file"),
+		),
 	)
 	s.AddTool(runTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"kube-bench", "run"}
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKubeBenchModule(client)
+
+		// Get parameters
+		kubeconfig := request.GetString("kubeconfig", "")
+		targets := request.GetString("targets", "")
 		
-		if targets := request.GetString("targets", ""); targets != "" {
-			args = append(args, "--targets", targets)
+		// Determine which specific function to call based on targets
+		var output string
+		if targets != "" {
+			// Check for specific target types
+			if strings.Contains(targets, "master") {
+				output, err = module.RunMasterBenchmark(ctx, kubeconfig)
+			} else if strings.Contains(targets, "node") {
+				output, err = module.RunNodeBenchmark(ctx, kubeconfig)
+			} else {
+				// General benchmark with targets
+				output, err = module.RunBenchmark(ctx, kubeconfig)
+			}
+		} else {
+			// General benchmark run
+			output, err = module.RunBenchmark(ctx, kubeconfig)
 		}
-		if benchmark := request.GetString("benchmark", ""); benchmark != "" {
-			args = append(args, "--benchmark", benchmark)
+
+		// If specific output format requested, use custom output function
+		if request.GetBool("json", false) || request.GetBool("junit", false) {
+			outputFormat := ""
+			if request.GetBool("json", false) {
+				outputFormat = "json"
+			} else if request.GetBool("junit", false) {
+				outputFormat = "junit"
+			}
+			outputFile := request.GetString("outputfile", "")
+			
+			output, err = module.RunWithCustomOutput(ctx, kubeconfig, outputFormat, outputFile)
 		}
-		if version := request.GetString("version", ""); version != "" {
-			args = append(args, "--version", version)
+
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("kube-bench run failed: %v", err)), nil
 		}
-		if configDir := request.GetString("config_dir", ""); configDir != "" {
-			args = append(args, "--config-dir", configDir)
-		}
-		if config := request.GetString("config", ""); config != "" {
-			args = append(args, "--config", config)
-		}
-		if request.GetBool("json", false) {
-			args = append(args, "--json")
-		}
-		if request.GetBool("junit", false) {
-			args = append(args, "--junit")
-		}
-		if outputfile := request.GetString("outputfile", ""); outputfile != "" {
-			args = append(args, "--outputfile", outputfile)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Kube-bench with specific checks
@@ -88,32 +122,43 @@ func AddKubeBenchTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		mcp.WithString("outputfile",
 			mcp.Description("Write results to output file"),
 		),
+		mcp.WithString("kubeconfig",
+			mcp.Description("Path to kubeconfig file"),
+		),
 	)
 	s.AddTool(runChecksTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKubeBenchModule(client)
+
+		// Get parameters
 		checks := request.GetString("checks", "")
-		args := []string{"kube-bench", "--check", checks}
-		
-		if benchmark := request.GetString("benchmark", ""); benchmark != "" {
-			args = append(args, "--benchmark", benchmark)
-		}
-		if configDir := request.GetString("config_dir", ""); configDir != "" {
-			args = append(args, "--config-dir", configDir)
-		}
-		if request.GetBool("json", false) {
-			args = append(args, "--json")
-		}
-		if outputfile := request.GetString("outputfile", ""); outputfile != "" {
-			args = append(args, "--outputfile", outputfile)
+		if checks == "" {
+			return mcp.NewToolResultError("checks is required"), nil
 		}
 		
-		return executeShipCommand(args)
+		kubeconfig := request.GetString("kubeconfig", "")
+
+		// Run with specific checks
+		output, err := module.RunWithChecks(ctx, kubeconfig, checks)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("kube-bench run with checks failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Kube-bench with skipped checks
+	// Kube-bench with skip checks
 	runSkipTool := mcp.NewTool("kube_bench_run_skip",
-		mcp.WithDescription("Run CIS benchmark skipping specific checks using kube-bench"),
+		mcp.WithDescription("Run CIS benchmark with skipped checks using kube-bench"),
 		mcp.WithString("skip",
-			mcp.Description("Comma-delimited list of check IDs or groups to skip"),
+			mcp.Description("Comma-delimited list of check IDs to skip"),
 			mcp.Required(),
 		),
 		mcp.WithString("targets",
@@ -128,127 +173,162 @@ func AddKubeBenchTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		mcp.WithString("outputfile",
 			mcp.Description("Write results to output file"),
 		),
+		mcp.WithString("kubeconfig",
+			mcp.Description("Path to kubeconfig file"),
+		),
 	)
 	s.AddTool(runSkipTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKubeBenchModule(client)
+
+		// Get parameters
 		skip := request.GetString("skip", "")
-		args := []string{"kube-bench", "--skip", skip}
-		
-		if targets := request.GetString("targets", ""); targets != "" {
-			args = append(args, "run", "--targets", targets)
-		}
-		if benchmark := request.GetString("benchmark", ""); benchmark != "" {
-			args = append(args, "--benchmark", benchmark)
-		}
-		if request.GetBool("json", false) {
-			args = append(args, "--json")
-		}
-		if outputfile := request.GetString("outputfile", ""); outputfile != "" {
-			args = append(args, "--outputfile", outputfile)
+		if skip == "" {
+			return mcp.NewToolResultError("skip is required"), nil
 		}
 		
-		return executeShipCommand(args)
+		kubeconfig := request.GetString("kubeconfig", "")
+
+		// Run with skip
+		output, err := module.RunWithSkip(ctx, kubeconfig, skip)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("kube-bench run with skip failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Kube-bench with output options
+	// Kube-bench with custom output
 	runCustomOutputTool := mcp.NewTool("kube_bench_run_custom_output",
-		mcp.WithDescription("Run CIS benchmark with custom output options using kube-bench"),
+		mcp.WithDescription("Run CIS benchmark with custom output format using kube-bench"),
+		mcp.WithString("output_format",
+			mcp.Description("Output format"),
+			mcp.Required(),
+			mcp.Enum("json", "junit", "text", "asff"),
+		),
+		mcp.WithString("outputfile",
+			mcp.Description("Write results to output file"),
+		),
 		mcp.WithString("targets",
 			mcp.Description("Comma-delimited list of targets to run"),
 		),
 		mcp.WithString("benchmark",
 			mcp.Description("Manually specify CIS benchmark version"),
 		),
-		mcp.WithBoolean("noremediations",
-			mcp.Description("Disable printing of remediations section"),
-		),
-		mcp.WithBoolean("noresults",
-			mcp.Description("Disable printing of results section"),
-		),
-		mcp.WithBoolean("nosummary",
-			mcp.Description("Disable printing of summary section"),
-		),
-		mcp.WithBoolean("nototals",
-			mcp.Description("Disable printing of totals for failed, passed checks"),
-		),
-		mcp.WithBoolean("scored",
-			mcp.Description("Run only scored CIS checks"),
-		),
-		mcp.WithBoolean("unscored",
-			mcp.Description("Run only unscored CIS checks"),
-		),
-		mcp.WithString("exit_code",
-			mcp.Description("Specify exit code for when checks fail"),
+		mcp.WithString("kubeconfig",
+			mcp.Description("Path to kubeconfig file"),
 		),
 	)
 	s.AddTool(runCustomOutputTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"kube-bench"}
-		
-		if targets := request.GetString("targets", ""); targets != "" {
-			args = append(args, "run", "--targets", targets)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if benchmark := request.GetString("benchmark", ""); benchmark != "" {
-			args = append(args, "--benchmark", benchmark)
-		}
-		if request.GetBool("noremediations", false) {
-			args = append(args, "--noremediations")
-		}
-		if request.GetBool("noresults", false) {
-			args = append(args, "--noresults")
-		}
-		if request.GetBool("nosummary", false) {
-			args = append(args, "--nosummary")
-		}
-		if request.GetBool("nototals", false) {
-			args = append(args, "--nototals")
-		}
-		if request.GetBool("scored", false) {
-			args = append(args, "--scored")
-		}
-		if request.GetBool("unscored", false) {
-			args = append(args, "--unscored")
-		}
-		if exitCode := request.GetString("exit_code", ""); exitCode != "" {
-			args = append(args, "--exit-code", exitCode)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKubeBenchModule(client)
+
+		// Get parameters
+		outputFormat := request.GetString("output_format", "")
+		if outputFormat == "" {
+			return mcp.NewToolResultError("output_format is required"), nil
 		}
 		
-		return executeShipCommand(args)
+		outputFile := request.GetString("outputfile", "")
+		kubeconfig := request.GetString("kubeconfig", "")
+
+		// Run with custom output
+		output, err := module.RunWithCustomOutput(ctx, kubeconfig, outputFormat, outputFile)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("kube-bench custom output failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Kube-bench version
 	versionTool := mcp.NewTool("kube_bench_version",
-		mcp.WithDescription("Get kube-bench version information"),
+		mcp.WithDescription("Get kube-bench version"),
 	)
 	s.AddTool(versionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"kube-bench", "version"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKubeBenchModule(client)
+
+		// Get version
+		output, err := module.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to get kube-bench version: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Kube-bench with AWS Security Hub integration
+	// Kube-bench ASFF output
 	runAsffTool := mcp.NewTool("kube_bench_run_asff",
-		mcp.WithDescription("Run CIS benchmark and send results to AWS Security Hub using kube-bench"),
-		mcp.WithString("targets",
-			mcp.Description("Comma-delimited list of targets to run"),
+		mcp.WithDescription("Run CIS benchmark with AWS Security Hub ASFF output using kube-bench"),
+		mcp.WithString("aws_account",
+			mcp.Description("AWS account ID"),
 		),
-		mcp.WithString("benchmark",
-			mcp.Description("Manually specify CIS benchmark version"),
+		mcp.WithString("aws_region",
+			mcp.Description("AWS region"),
 		),
-		mcp.WithBoolean("asff",
-			mcp.Description("Send results to AWS Security Hub"),
+		mcp.WithString("cluster_arn",
+			mcp.Description("EKS cluster ARN"),
+		),
+		mcp.WithString("outputfile",
+			mcp.Description("Write ASFF results to output file"),
+		),
+		mcp.WithString("kubeconfig",
+			mcp.Description("Path to kubeconfig file"),
 		),
 	)
 	s.AddTool(runAsffTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"kube-bench"}
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKubeBenchModule(client)
+
+		// Get kubeconfig
+		kubeconfig := request.GetString("kubeconfig", "")
+
+		// Run ASFF
+		output, err := module.RunASFF(ctx, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("kube-bench ASFF output failed: %v", err)), nil
+		}
+
+		// Add AWS metadata if provided
+		awsAccount := request.GetString("aws_account", "")
+		awsRegion := request.GetString("aws_region", "")
+		clusterArn := request.GetString("cluster_arn", "")
 		
-		if targets := request.GetString("targets", ""); targets != "" {
-			args = append(args, "run", "--targets", targets)
+		if awsAccount != "" || awsRegion != "" || clusterArn != "" {
+			metadata := fmt.Sprintf("\n# AWS Metadata:\n# Account: %s\n# Region: %s\n# Cluster ARN: %s\n", 
+				awsAccount, awsRegion, clusterArn)
+			output = metadata + output
 		}
-		if benchmark := request.GetString("benchmark", ""); benchmark != "" {
-			args = append(args, "--benchmark", benchmark)
-		}
-		if request.GetBool("asff", false) {
-			args = append(args, "--asff")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 }

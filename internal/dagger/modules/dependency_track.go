@@ -10,6 +10,14 @@ type DependencyTrackModule struct {
 	Client *dagger.Client
 }
 
+// Common binary paths for dependency track tools
+const (
+	dtrackCliBinary = "/usr/local/bin/dtrack-cli"
+	dependencyTrackSyftBinary = "/usr/local/bin/syft"
+	cyclonedxNpmBinary = "/usr/local/bin/cyclonedx-npm"
+	cyclonedxPyBinary = "/usr/local/bin/cyclonedx-py"
+)
+
 // NewDependencyTrackModule creates a new DependencyTrack module
 func NewDependencyTrackModule(client *dagger.Client) *DependencyTrackModule {
 	return &DependencyTrackModule{
@@ -26,7 +34,7 @@ func (m *DependencyTrackModule) ScanSBOM(ctx context.Context, sbomPath string) (
 		WithExec([]string{"npm", "install", "-g", "@fjbarrena/dtrack-cli"}).
 		WithFile("/app/sbom.json", sbomFile).
 		WithExec([]string{
-			"dtrack-cli", 
+			dtrackCliBinary, 
 			"--bom-path", "/app/sbom.json",
 			"--project-name", "default-project",
 			"--project-version", "latest",
@@ -47,9 +55,9 @@ func (m *DependencyTrackModule) AnalyzeProject(ctx context.Context, projectPath 
 		WithExec([]string{"sh", "-c", "curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin"}).
 		WithDirectory("/app/project", projectDir).
 		WithWorkdir("/app/project").
-		WithExec([]string{"syft", ".", "-o", "cyclonedx-json=sbom.json"}).
+		WithExec([]string{dependencyTrackSyftBinary, ".", "-o", "cyclonedx-json=sbom.json"}).
 		WithExec([]string{
-			"dtrack-cli",
+			dtrackCliBinary,
 			"--bom-path", "sbom.json",
 			"--project-name", projectName,
 			"--project-version", projectVersion,
@@ -83,9 +91,9 @@ func (m *DependencyTrackModule) ValidateComponents(ctx context.Context, projectP
 		WithExec([]string{"sh", "-c", "curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin"}).
 		WithDirectory("/app/project", projectDir).
 		WithWorkdir("/app/project").
-		WithExec([]string{"syft", ".", "-o", "cyclonedx-json=sbom.json"}).
+		WithExec([]string{dependencyTrackSyftBinary, ".", "-o", "cyclonedx-json=sbom.json"}).
 		WithExec([]string{
-			"dtrack-cli",
+			dtrackCliBinary,
 			"--bom-path", "sbom.json",
 			"--project-name", projectName,
 			"--project-version", projectVersion,
@@ -106,14 +114,140 @@ func (m *DependencyTrackModule) TrackDependencies(ctx context.Context, projectPa
 		WithExec([]string{"sh", "-c", "curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin"}).
 		WithDirectory("/app/project", projectDir).
 		WithWorkdir("/app/project").
-		WithExec([]string{"syft", ".", "-o", "cyclonedx-json=sbom.json"}).
+		WithExec([]string{dependencyTrackSyftBinary, ".", "-o", "cyclonedx-json=sbom.json"}).
 		WithExec([]string{
-			"dtrack-cli",
+			dtrackCliBinary,
 			"--bom-path", "sbom.json",
 			"--project-name", projectName,
 			"--project-version", projectVersion,
 			"--auto-create", "true",
 		})
+
+	return result.Stdout(ctx)
+}
+
+// UploadBOM uploads BOM file to Dependency Track using dtrack-cli
+func (m *DependencyTrackModule) UploadBOM(ctx context.Context, bomPath string, projectName string, projectVersion string, serverURL string, apiKey string) (string, error) {
+	bomFile := m.Client.Host().File(bomPath)
+	
+	args := []string{
+		"dtrack-cli",
+		"--bom-path", "/app/bom.json",
+		"--project-name", projectName,
+		"--auto-create", "true",
+	}
+	
+	if projectVersion != "" {
+		args = append(args, "--project-version", projectVersion)
+	}
+	if serverURL != "" {
+		args = append(args, "--server", serverURL)
+	}
+	if apiKey != "" {
+		args = append(args, "--api-key", apiKey)
+	}
+
+	result := m.Client.Container().
+		From("node:alpine").
+		WithExec([]string{"npm", "install", "-g", "@fjbarrena/dtrack-cli"}).
+		WithFile("/app/bom.json", bomFile).
+		WithExec(args)
+
+	return result.Stdout(ctx)
+}
+
+// UploadBOMAPI uploads BOM to Dependency Track via REST API using curl
+func (m *DependencyTrackModule) UploadBOMAPI(ctx context.Context, bomPath string, serverURL string, apiKey string, projectName string, projectVersion string, autoCreate bool) (string, error) {
+	bomFile := m.Client.Host().File(bomPath)
+	
+	args := []string{
+		"curl", "-X", "POST", serverURL + "/api/v1/bom",
+		"-H", "Content-Type: multipart/form-data",
+		"-H", "X-Api-Key: " + apiKey,
+		"-F", "bom=@/app/bom.json",
+	}
+	
+	if projectName != "" {
+		args = append(args, "-F", "projectName=" + projectName)
+	}
+	if projectVersion != "" {
+		args = append(args, "-F", "projectVersion=" + projectVersion)
+	}
+	if autoCreate {
+		args = append(args, "-F", "autoCreate=true")
+	}
+
+	result := m.Client.Container().
+		From("alpine:latest").
+		WithExec([]string{"apk", "add", "--no-cache", "curl"}).
+		WithFile("/app/bom.json", bomFile).
+		WithExec(args)
+
+	return result.Stdout(ctx)
+}
+
+// GenerateBOM generates CycloneDX BOM using various build tools
+func (m *DependencyTrackModule) GenerateBOM(ctx context.Context, projectType string, projectPath string, outputFile string) (string, error) {
+	projectDir := m.Client.Host().Directory(projectPath)
+	
+	var result *dagger.Container
+	
+	switch projectType {
+	case "npm":
+		result = m.Client.Container().
+			From("node:alpine").
+			WithExec([]string{"npm", "install", "-g", "@cyclonedx/cyclonedx-npm"}).
+			WithDirectory("/app/project", projectDir).
+			WithWorkdir("/app/project").
+			WithExec([]string{cyclonedxNpmBinary, "-o", "bom.json"})
+		
+	case "maven":
+		result = m.Client.Container().
+			From("maven:3-openjdk-11").
+			WithDirectory("/app/project", projectDir).
+			WithWorkdir("/app/project").
+			WithExec([]string{"mvn", "org.cyclonedx:cyclonedx-maven-plugin:makeBom"})
+		
+	case "gradle":
+		result = m.Client.Container().
+			From("gradle:jdk11").
+			WithDirectory("/app/project", projectDir).
+			WithWorkdir("/app/project").
+			WithExec([]string{"gradle", "cyclonedxBom"})
+		
+	case "pip":
+		result = m.Client.Container().
+			From("python:3.9-alpine").
+			WithExec([]string{"pip", "install", "cyclonedx-bom"}).
+			WithDirectory("/app/project", projectDir).
+			WithWorkdir("/app/project").
+			WithExec([]string{cyclonedxPyBinary, "-o", "bom.json"})
+		
+	case "composer":
+		result = m.Client.Container().
+			From("composer:latest").
+			WithExec([]string{"composer", "global", "require", "cyclonedx/cyclonedx-php-composer"}).
+			WithDirectory("/app/project", projectDir).
+			WithWorkdir("/app/project").
+			WithExec([]string{"cyclonedx-php", "composer"})
+		
+	case "dotnet":
+		result = m.Client.Container().
+			From("mcr.microsoft.com/dotnet/sdk:6.0").
+			WithExec([]string{"dotnet", "tool", "install", "--global", "CycloneDX"}).
+			WithDirectory("/app/project", projectDir).
+			WithWorkdir("/app/project").
+			WithExec([]string{"cyclonedx", "dotnet"})
+		
+	default:
+		// Default to npm
+		result = m.Client.Container().
+			From("node:alpine").
+			WithExec([]string{"npm", "install", "-g", "@cyclonedx/cyclonedx-npm"}).
+			WithDirectory("/app/project", projectDir).
+			WithWorkdir("/app/project").
+			WithExec([]string{cyclonedxNpmBinary, "-o", "bom.json"})
+	}
 
 	return result.Stdout(ctx)
 }

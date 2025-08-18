@@ -4,26 +4,113 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"dagger.io/dagger"
 )
 
-// InfraScanModule runs Trivy for security scanning of Terraform code
-// Using Trivy instead of InfraScan as it provides better Terraform security scanning
+// InfraScanModule runs infrastructure scanning tools
+// Supports both AWS infrastructure mapping (infrascan) and security scanning (Trivy)
 type InfraScanModule struct {
 	client *dagger.Client
 	name   string
 }
 
-// NewInfraScanModule creates a new InfraScan module (using Trivy)
+const (
+	infrascanBinary     = "/usr/local/bin/infrascan"
+	infrascanTrivyBinary = "/usr/local/bin/trivy"
+)
+
+// NewInfraScanModule creates a new InfraScan module
 func NewInfraScanModule(client *dagger.Client) *InfraScanModule {
 	return &InfraScanModule{
 		client: client,
-		name:   "trivy",
+		name:   "infrascan",
 	}
 }
 
-// ScanDirectory scans a directory for security issues
+// ScanAWSInfrastructure scans AWS infrastructure and generates a system map
+func (m *InfraScanModule) ScanAWSInfrastructure(ctx context.Context, regions []string, outputDir string) (string, error) {
+	// Create container with infrascan CLI
+	container := m.client.Container().
+		From("node:18-alpine").
+		WithExec([]string{"apk", "add", "--no-cache", "git", "aws-cli"}).
+		WithExec([]string{"npm", "install", "-g", "@infrascan/cli"}).
+		WithMountedDirectory("/workspace", m.client.Host().Directory(".")).
+		WithWorkdir("/workspace")
+
+	// Build command
+	args := []string{infrascanBinary, "scan", "-o", outputDir}
+	
+	// Add regions
+	for _, region := range regions {
+		region = strings.TrimSpace(region)
+		if region != "" {
+			args = append(args, "--region", region)
+		}
+	}
+
+	// Execute scan
+	result := container.WithExec(args)
+
+	output, err := result.Stdout(ctx)
+	if err != nil {
+		stderr, _ := result.Stderr(ctx)
+		return "", fmt.Errorf("failed to scan AWS infrastructure: %w\nStderr: %s", err, stderr)
+	}
+
+	return output, nil
+}
+
+// GenerateGraph generates a graph from scan results
+func (m *InfraScanModule) GenerateGraph(ctx context.Context, inputDir string) (string, error) {
+	// Create container with infrascan CLI
+	container := m.client.Container().
+		From("node:18-alpine").
+		WithExec([]string{"npm", "install", "-g", "@infrascan/cli"}).
+		WithMountedDirectory("/workspace", m.client.Host().Directory(".")).
+		WithWorkdir("/workspace")
+
+	// Execute graph generation
+	result := container.WithExec([]string{infrascanBinary, "graph", "-i", inputDir})
+
+	output, err := result.Stdout(ctx)
+	if err != nil {
+		stderr, _ := result.Stderr(ctx)
+		return "", fmt.Errorf("failed to generate graph: %w\nStderr: %s", err, stderr)
+	}
+
+	return output, nil
+}
+
+// RenderGraph renders an infrastructure graph
+func (m *InfraScanModule) RenderGraph(ctx context.Context, inputFile string, openBrowser bool) (string, error) {
+	// Create container with infrascan CLI
+	container := m.client.Container().
+		From("node:18-alpine").
+		WithExec([]string{"npm", "install", "-g", "@infrascan/cli"}).
+		WithMountedDirectory("/workspace", m.client.Host().Directory(".")).
+		WithWorkdir("/workspace")
+
+	// Build command
+	args := []string{infrascanBinary, "render", "-i", inputFile}
+	if openBrowser {
+		args = append(args, "--browser")
+	}
+
+	// Execute render
+	result := container.WithExec(args)
+
+	output, err := result.Stdout(ctx)
+	if err != nil {
+		stderr, _ := result.Stderr(ctx)
+		return "", fmt.Errorf("failed to render graph: %w\nStderr: %s", err, stderr)
+	}
+
+	return output, nil
+}
+
+// ScanDirectory scans a directory for security issues (using Trivy)
 func (m *InfraScanModule) ScanDirectory(ctx context.Context, dir string) (string, error) {
 	// Mount the directory and run Trivy
 	container := m.client.Container().
@@ -31,7 +118,7 @@ func (m *InfraScanModule) ScanDirectory(ctx context.Context, dir string) (string
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			"trivy",
+			infrascanTrivyBinary,
 			"fs",
 			".",
 			"--scanners", "misconfig",
@@ -47,7 +134,7 @@ func (m *InfraScanModule) ScanDirectory(ctx context.Context, dir string) (string
 	return output, nil
 }
 
-// ScanFile scans a specific Terraform file
+// ScanFile scans a specific Terraform file (using Trivy)
 func (m *InfraScanModule) ScanFile(ctx context.Context, filePath string) (string, error) {
 	dir := filepath.Dir(filePath)
 	filename := filepath.Base(filePath)
@@ -57,7 +144,7 @@ func (m *InfraScanModule) ScanFile(ctx context.Context, filePath string) (string
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			"trivy",
+			infrascanTrivyBinary,
 			"fs",
 			filename,
 			"--scanners", "misconfig",
@@ -73,7 +160,7 @@ func (m *InfraScanModule) ScanFile(ctx context.Context, filePath string) (string
 	return output, nil
 }
 
-// ScanWithRules scans using custom rule set
+// ScanWithRules scans using custom rule set (using Trivy)
 func (m *InfraScanModule) ScanWithRules(ctx context.Context, dir string, rulesFile string) (string, error) {
 	container := m.client.Container().
 		From("aquasec/trivy:latest").
@@ -83,7 +170,7 @@ func (m *InfraScanModule) ScanWithRules(ctx context.Context, dir string, rulesFi
 	if rulesFile != "" {
 		container = container.WithFile("/policy.rego", m.client.Host().File(rulesFile))
 		container = container.WithExec([]string{
-			"trivy",
+			infrascanTrivyBinary,
 			"fs",
 			"/workspace",
 			"--scanners", "misconfig",
@@ -93,7 +180,7 @@ func (m *InfraScanModule) ScanWithRules(ctx context.Context, dir string, rulesFi
 		})
 	} else {
 		container = container.WithExec([]string{
-			"trivy",
+			infrascanTrivyBinary,
 			"fs",
 			"/workspace",
 			"--scanners", "misconfig",
@@ -110,15 +197,24 @@ func (m *InfraScanModule) ScanWithRules(ctx context.Context, dir string, rulesFi
 	return output, nil
 }
 
-// GetVersion returns the version of Trivy
+// GetVersion returns the version of the scanner (infrascan)
 func (m *InfraScanModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
-		From("aquasec/trivy:latest").
-		WithExec([]string{"trivy", "--version"})
+		From("node:18-alpine").
+		WithExec([]string{"npm", "install", "-g", "@infrascan/cli"}).
+		WithExec([]string{infrascanBinary, "--version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to get trivy version: %w", err)
+		// Fallback to Trivy version if infrascan not available
+		container = m.client.Container().
+			From("aquasec/trivy:latest").
+			WithExec([]string{infrascanTrivyBinary, "--version"})
+		
+		output, err = container.Stdout(ctx)
+		if err != nil {
+			return "", fmt.Errorf("failed to get version: %w", err)
+		}
 	}
 
 	return output, nil

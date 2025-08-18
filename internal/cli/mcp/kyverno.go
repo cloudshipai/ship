@@ -2,214 +2,225 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddKyvernoTools adds Kyverno policy management MCP tool implementations using real CLI commands
+// AddKyvernoTools adds Kyverno policy management MCP tool implementations using direct Dagger calls
 func AddKyvernoTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// Kyverno install with Helm tool
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addKyvernoToolsDirect(s)
+}
+
+// addKyvernoToolsDirect adds Kyverno tools using direct Dagger module calls
+func addKyvernoToolsDirect(s *server.MCPServer) {
+	// Kyverno install tool
 	installTool := mcp.NewTool("kyverno_install",
 		mcp.WithDescription("Install Kyverno in Kubernetes cluster using Helm"),
 		mcp.WithString("namespace",
 			mcp.Description("Kubernetes namespace for Kyverno installation (default: kyverno)"),
 		),
-		mcp.WithString("version",
-			mcp.Description("Kyverno Helm chart version to install"),
-		),
-		mcp.WithString("values_file",
-			mcp.Description("Path to Helm values file for customization"),
-		),
-		mcp.WithBoolean("create_namespace",
-			mcp.Description("Create namespace if it doesn't exist"),
-		),
-		mcp.WithBoolean("wait",
-			mcp.Description("Wait for installation to complete"),
+		mcp.WithString("kubeconfig",
+			mcp.Description("Path to kubeconfig file"),
 		),
 	)
 	s.AddTool(installTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		// First add Kyverno Helm repository
-		namespace := request.GetString("namespace", "kyverno")
-		args := []string{"sh", "-c", "helm repo add kyverno https://kyverno.github.io/kyverno/ && helm repo update"}
-		
-		// Execute repo setup first, then install
-		_, err := executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
 		if err != nil {
-			return nil, err
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		// Now install Kyverno
-		installArgs := []string{"helm", "install", "kyverno", "kyverno/kyverno", "--namespace", namespace}
-		
-		if request.GetBool("create_namespace", false) {
-			installArgs = append(installArgs, "--create-namespace")
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKyvernoModule(client)
+
+		// Get parameters
+		namespace := request.GetString("namespace", "kyverno")
+		kubeconfig := request.GetString("kubeconfig", "")
+
+		// Install Kyverno
+		output, err := module.Install(ctx, namespace, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("kyverno install failed: %v", err)), nil
 		}
-		if version := request.GetString("version", ""); version != "" {
-			installArgs = append(installArgs, "--version", version)
-		}
-		if valuesFile := request.GetString("values_file", ""); valuesFile != "" {
-			installArgs = append(installArgs, "--values", valuesFile)
-		}
-		if request.GetBool("wait", false) {
-			installArgs = append(installArgs, "--wait")
-		}
-		
-		return executeShipCommand(installArgs)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Kyverno apply policy using CLI
+	// Kyverno apply policy tool
 	applyPolicyTool := mcp.NewTool("kyverno_apply",
-		mcp.WithDescription("Test policies against resources using kyverno apply command"),
-		mcp.WithString("policy",
-			mcp.Description("Path to policy file or directory"),
+		mcp.WithDescription("Apply Kyverno policies to cluster"),
+		mcp.WithString("policies_path",
+			mcp.Description("Path to directory containing Kyverno policy files"),
 			mcp.Required(),
 		),
-		mcp.WithString("resource",
-			mcp.Description("Path to resource file or directory to test against"),
-		),
-		mcp.WithBoolean("cluster",
-			mcp.Description("Apply policies against existing cluster resources"),
-		),
-		mcp.WithString("namespace",
-			mcp.Description("Namespace to apply policies in"),
-		),
-		mcp.WithString("output",
-			mcp.Description("Output format"),
-			mcp.Enum("table", "json", "yaml"),
-		),
-		mcp.WithBoolean("auto_generate_rules",
-			mcp.Description("Enable auto-generation of rules"),
+		mcp.WithString("kubeconfig",
+			mcp.Description("Path to kubeconfig file"),
 		),
 	)
 	s.AddTool(applyPolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		policy := request.GetString("policy", "")
-		args := []string{"kyverno", "apply", policy}
-		
-		if resource := request.GetString("resource", ""); resource != "" {
-			args = append(args, "--resource", resource)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if request.GetBool("cluster", false) {
-			args = append(args, "--cluster")
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKyvernoModule(client)
+
+		// Get parameters
+		policiesPath := request.GetString("policies_path", "")
+		if policiesPath == "" {
+			return mcp.NewToolResultError("policies_path is required"), nil
 		}
-		if namespace := request.GetString("namespace", ""); namespace != "" {
-			args = append(args, "--namespace", namespace)
+		kubeconfig := request.GetString("kubeconfig", "")
+
+		// Apply policies
+		output, err := module.ApplyPolicies(ctx, policiesPath, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("kyverno apply policies failed: %v", err)), nil
 		}
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "--output", output)
-		}
-		if request.GetBool("auto_generate_rules", false) {
-			args = append(args, "--auto-gen-rules")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Kyverno test policy using CLI
+	// Kyverno test policy tool
 	testPolicyTool := mcp.NewTool("kyverno_test",
-		mcp.WithDescription("Test Kyverno policies using kyverno test command"),
-		mcp.WithString("policy",
-			mcp.Description("Path to policy file or directory"),
+		mcp.WithDescription("Test Kyverno policies against resources"),
+		mcp.WithString("policies_path",
+			mcp.Description("Path to directory containing Kyverno policy files"),
 			mcp.Required(),
 		),
-		mcp.WithString("resource",
-			mcp.Description("Path to resource file or directory to test against"),
-		),
-		mcp.WithString("values",
-			mcp.Description("Path to file containing values for policy variables"),
-		),
-		mcp.WithString("user_info",
-			mcp.Description("Path to file containing user information for admission context"),
-		),
-		mcp.WithString("output",
-			mcp.Description("Output format"),
-			mcp.Enum("table", "json", "yaml"),
-		),
-		mcp.WithBoolean("audit",
-			mcp.Description("Run policies in audit mode"),
+		mcp.WithString("resources_path",
+			mcp.Description("Path to directory containing Kubernetes resource files for testing"),
+			mcp.Required(),
 		),
 	)
 	s.AddTool(testPolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		policy := request.GetString("policy", "")
-		args := []string{"kyverno", "test", policy}
-		
-		if resource := request.GetString("resource", ""); resource != "" {
-			args = append(args, "--resource", resource)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if values := request.GetString("values", ""); values != "" {
-			args = append(args, "--values", values)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKyvernoModule(client)
+
+		// Get parameters
+		policiesPath := request.GetString("policies_path", "")
+		if policiesPath == "" {
+			return mcp.NewToolResultError("policies_path is required"), nil
 		}
-		if userInfo := request.GetString("user_info", ""); userInfo != "" {
-			args = append(args, "--user-info", userInfo)
+		resourcesPath := request.GetString("resources_path", "")
+		if resourcesPath == "" {
+			return mcp.NewToolResultError("resources_path is required"), nil
 		}
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "--output", output)
+
+		// Test policies
+		output, err := module.TestPolicies(ctx, policiesPath, resourcesPath)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("kyverno test policies failed: %v", err)), nil
 		}
-		if request.GetBool("audit", false) {
-			args = append(args, "--audit")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Kyverno create cluster role
+	// Kyverno create cluster role tool
 	createClusterRoleTool := mcp.NewTool("kyverno_create_cluster_role",
-		mcp.WithDescription("Create cluster role for Kyverno using kyverno create cluster-role"),
-		mcp.WithString("output",
-			mcp.Description("Output format"),
-			mcp.Enum("yaml", "json"),
+		mcp.WithDescription("Create cluster role for Kyverno"),
+		mcp.WithString("kubeconfig",
+			mcp.Description("Path to kubeconfig file"),
 		),
 	)
 	s.AddTool(createClusterRoleTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"kyverno", "create", "cluster-role"}
-		
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "--output", output)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKyvernoModule(client)
+
+		// Get parameters
+		kubeconfig := request.GetString("kubeconfig", "")
+
+		// Create cluster role
+		output, err := module.CreateClusterRole(ctx, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("kyverno create cluster role failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Kyverno version
+	// Kyverno version tool
 	versionTool := mcp.NewTool("kyverno_version",
-		mcp.WithDescription("Get Kyverno CLI version using kyverno version"),
+		mcp.WithDescription("Get Kyverno CLI version"),
 	)
 	s.AddTool(versionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"kyverno", "version"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKyvernoModule(client)
+
+		// Get version
+		output, err := module.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to get kyverno version: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// List Kyverno policies using kubectl
+	// Kyverno list policies tool
 	listPoliciesTool := mcp.NewTool("kyverno_list_policies",
-		mcp.WithDescription("List Kyverno policies using kubectl"),
+		mcp.WithDescription("List Kyverno policies in cluster"),
 		mcp.WithString("namespace",
-			mcp.Description("Kubernetes namespace to list policies from (empty for cluster policies)"),
+			mcp.Description("Namespace to list policies from (empty for all namespaces)"),
 		),
-		mcp.WithString("output",
-			mcp.Description("Output format"),
-			mcp.Enum("table", "yaml", "json", "wide"),
+		mcp.WithString("kubeconfig",
+			mcp.Description("Path to kubeconfig file"),
 		),
 	)
 	s.AddTool(listPoliciesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKyvernoModule(client)
+
+		// Get parameters
 		namespace := request.GetString("namespace", "")
-		
-		var args []string
-		if namespace != "" {
-			// List namespaced policies
-			args = []string{"kubectl", "get", "policy", "-n", namespace}
-		} else {
-			// List cluster policies
-			args = []string{"kubectl", "get", "clusterpolicy"}
+		kubeconfig := request.GetString("kubeconfig", "")
+
+		// List policies
+		output, err := module.ListPolicies(ctx, namespace, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("kyverno list policies failed: %v", err)), nil
 		}
-		
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "-o", output)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Apply Kyverno policy using kubectl
+	// Kyverno apply policy file tool
 	applyPolicyFileTool := mcp.NewTool("kyverno_apply_policy_file",
 		mcp.WithDescription("Apply Kyverno policy file to cluster using kubectl"),
 		mcp.WithString("file",
@@ -219,65 +230,107 @@ func AddKyvernoTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandF
 		mcp.WithString("namespace",
 			mcp.Description("Namespace for namespaced policies"),
 		),
+		mcp.WithString("kubeconfig",
+			mcp.Description("Path to kubeconfig file"),
+		),
 		mcp.WithBoolean("dry_run",
 			mcp.Description("Perform dry run without applying"),
 		),
 	)
 	s.AddTool(applyPolicyFileTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKyvernoModule(client)
+
+		// Get parameters
 		file := request.GetString("file", "")
-		args := []string{"kubectl", "apply", "-f", file}
-		
-		if namespace := request.GetString("namespace", ""); namespace != "" {
-			args = append(args, "-n", namespace)
+		if file == "" {
+			return mcp.NewToolResultError("file is required"), nil
 		}
-		if request.GetBool("dry_run", false) {
-			args = append(args, "--dry-run=client")
+		namespace := request.GetString("namespace", "")
+		kubeconfig := request.GetString("kubeconfig", "")
+		dryRun := request.GetBool("dry_run", false)
+
+		// Apply policy file
+		output, err := module.ApplyPolicyFile(ctx, file, namespace, kubeconfig, dryRun)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("kyverno apply policy file failed: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Get PolicyReports using kubectl
+	// Kyverno get policy reports tool
 	getPolicyReportsTool := mcp.NewTool("kyverno_get_policy_reports",
-		mcp.WithDescription("Get Kyverno PolicyReports using kubectl"),
+		mcp.WithDescription("Get Kyverno policy reports"),
 		mcp.WithString("namespace",
-			mcp.Description("Namespace to get reports from (empty for ClusterPolicyReports)"),
+			mcp.Description("Namespace to get policy reports from (empty for all namespaces)"),
 		),
-		mcp.WithString("output",
-			mcp.Description("Output format"),
-			mcp.Enum("table", "yaml", "json", "wide"),
+		mcp.WithString("kubeconfig",
+			mcp.Description("Path to kubeconfig file"),
 		),
 	)
 	s.AddTool(getPolicyReportsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKyvernoModule(client)
+
+		// Get parameters
 		namespace := request.GetString("namespace", "")
-		
-		var args []string
-		if namespace != "" {
-			// Get namespaced PolicyReports
-			args = []string{"kubectl", "get", "policyreport", "-n", namespace}
-		} else {
-			// Get ClusterPolicyReports
-			args = []string{"kubectl", "get", "clusterpolicyreport"}
+		kubeconfig := request.GetString("kubeconfig", "")
+
+		// Get policy reports
+		output, err := module.GetPolicyReports(ctx, namespace, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("kyverno get policy reports failed: %v", err)), nil
 		}
-		
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "-o", output)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Check Kyverno status using kubectl
+	// Kyverno status tool
 	statusTool := mcp.NewTool("kyverno_status",
-		mcp.WithDescription("Check Kyverno installation status using kubectl"),
+		mcp.WithDescription("Get Kyverno installation status"),
 		mcp.WithString("namespace",
-			mcp.Description("Kyverno namespace (default: kyverno)"),
+			mcp.Description("Namespace where Kyverno is installed (default: kyverno)"),
+		),
+		mcp.WithString("kubeconfig",
+			mcp.Description("Path to kubeconfig file"),
 		),
 	)
 	s.AddTool(statusTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKyvernoModule(client)
+
+		// Get parameters
 		namespace := request.GetString("namespace", "kyverno")
-		args := []string{"kubectl", "get", "pods", "-n", namespace, "-l", "app.kubernetes.io/name=kyverno"}
-		
-		return executeShipCommand(args)
+		kubeconfig := request.GetString("kubeconfig", "")
+
+		// Get status
+		output, err := module.GetStatus(ctx, namespace, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("kyverno status failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 }

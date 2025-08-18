@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
+	"dagger.io/dagger"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // AddGitHubAdminTools adds GitHub administration MCP tool implementations using gh CLI
 func AddGitHubAdminTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addGitHubAdminToolsDirect(s)
+}
+
+// addGitHubAdminToolsDirect implements direct Dagger calls for GitHub Admin tools
+func addGitHubAdminToolsDirect(s *server.MCPServer) {
 	// GitHub list organization repositories
 	listOrgReposTool := mcp.NewTool("github_admin_list_org_repos",
 		mcp.WithDescription("List GitHub organization repositories using gh CLI"),
@@ -22,12 +31,25 @@ func AddGitHubAdminTools(s *server.MCPServer, executeShipCommand ExecuteShipComm
 		),
 	)
 	s.AddTool(listOrgReposTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		organization := request.GetString("organization", "")
-		args := []string{"gh", "repo", "list", organization}
-		if visibility := request.GetString("visibility", ""); visibility != "" {
-			args = append(args, "--visibility", visibility)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		organization := request.GetString("organization", "")
+		visibility := request.GetString("visibility", "")
+
+		// Create GitHub Admin module and list org repos
+		githubAdminModule := modules.NewGitHubAdminModule(client)
+		result, err := githubAdminModule.ListOrgReposSimple(ctx, organization, visibility)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("github admin list org repos failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// GitHub create repository in organization
@@ -50,18 +72,27 @@ func AddGitHubAdminTools(s *server.MCPServer, executeShipCommand ExecuteShipComm
 		),
 	)
 	s.AddTool(createOrgRepoTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		organization := request.GetString("organization", "")
 		repoName := request.GetString("repo_name", "")
-		args := []string{"gh", "repo", "create", organization + "/" + repoName}
-		
-		if visibility := request.GetString("visibility", ""); visibility != "" {
-			args = append(args, "--" + visibility)
+		visibility := request.GetString("visibility", "")
+		description := request.GetString("description", "")
+
+		// Create GitHub Admin module and create org repo
+		githubAdminModule := modules.NewGitHubAdminModule(client)
+		result, err := githubAdminModule.CreateOrgRepoSimple(ctx, organization, repoName, visibility, description)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("github admin create org repo failed: %v", err)), nil
 		}
-		if description := request.GetString("description", ""); description != "" {
-			args = append(args, "--description", description)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// GitHub get repository information
@@ -73,9 +104,24 @@ func AddGitHubAdminTools(s *server.MCPServer, executeShipCommand ExecuteShipComm
 		),
 	)
 	s.AddTool(getRepoInfoTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		repository := request.GetString("repository", "")
-		args := []string{"gh", "repo", "view", repository}
-		return executeShipCommand(args)
+
+		// Create GitHub Admin module and get repo info
+		githubAdminModule := modules.NewGitHubAdminModule(client)
+		result, err := githubAdminModule.GetRepoInfoSimple(ctx, repository)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("github admin get repo info failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// GitHub list issues in organization
@@ -91,12 +137,25 @@ func AddGitHubAdminTools(s *server.MCPServer, executeShipCommand ExecuteShipComm
 		),
 	)
 	s.AddTool(listOrgIssuesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		organization := request.GetString("organization", "")
-		args := []string{"gh", "issue", "list", "--search", "org:" + organization}
-		if state := request.GetString("state", ""); state != "" {
-			args = append(args, "--state", state)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		organization := request.GetString("organization", "")
+		state := request.GetString("state", "")
+
+		// Create GitHub Admin module and list org issues
+		githubAdminModule := modules.NewGitHubAdminModule(client)
+		result, err := githubAdminModule.ListOrgIssuesSimple(ctx, organization, state)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("github admin list org issues failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// GitHub list pull requests in organization
@@ -112,12 +171,25 @@ func AddGitHubAdminTools(s *server.MCPServer, executeShipCommand ExecuteShipComm
 		),
 	)
 	s.AddTool(listOrgPRsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		organization := request.GetString("organization", "")
-		args := []string{"gh", "pr", "list", "--search", "org:" + organization}
-		if state := request.GetString("state", ""); state != "" {
-			args = append(args, "--state", state)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		organization := request.GetString("organization", "")
+		state := request.GetString("state", "")
+
+		// Create GitHub Admin module and list org PRs
+		githubAdminModule := modules.NewGitHubAdminModule(client)
+		result, err := githubAdminModule.ListOrgPRsSimple(ctx, organization, state)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("github admin list org prs failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// GitHub CLI version
@@ -125,7 +197,20 @@ func AddGitHubAdminTools(s *server.MCPServer, executeShipCommand ExecuteShipComm
 		mcp.WithDescription("Get GitHub CLI version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"gh", "--version"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create GitHub Admin module and get version
+		githubAdminModule := modules.NewGitHubAdminModule(client)
+		result, err := githubAdminModule.GetVersionSimple(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("github admin get version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 }

@@ -2,13 +2,23 @@ package mcp
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddInfraMapTools adds InfraMap (infrastructure diagram generator) MCP tool implementations using real CLI commands
+// AddInfraMapTools adds InfraMap (infrastructure diagram generator) MCP tool implementations using direct Dagger calls
 func AddInfraMapTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addInfraMapToolsDirect(s)
+}
+
+// addInfraMapToolsDirect adds InfraMap tools using direct Dagger module calls
+func addInfraMapToolsDirect(s *server.MCPServer) {
 	// InfraMap generate tool
 	generateTool := mcp.NewTool("inframap_generate",
 		mcp.WithDescription("Generate infrastructure graph using inframap generate"),
@@ -31,28 +41,77 @@ func AddInfraMapTools(s *server.MCPServer, executeShipCommand ExecuteShipCommand
 		mcp.WithBoolean("clean",
 			mcp.Description("Remove unconnected nodes (default: true)"),
 		),
+		mcp.WithString("format",
+			mcp.Description("Output format: dot, png, svg, pdf (default: dot)"),
+			mcp.Enum("dot", "png", "svg", "pdf"),
+		),
+		mcp.WithString("provider",
+			mcp.Description("Filter by provider (aws, google, azurerm, etc.)"),
+		),
 	)
 	s.AddTool(generateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewInfraMapModule(client)
+
+		// Get parameters
 		input := request.GetString("input", "")
-		args := []string{"inframap", "generate", input}
+		if input == "" {
+			return mcp.NewToolResultError("input is required"), nil
+		}
+
+		// Determine if input is HCL or tfstate
+		isHCL := request.GetBool("hcl", false)
+		isTFState := request.GetBool("tfstate", false)
+		format := request.GetString("format", "dot")
+
+		// Check if we need to use GenerateWithOptions for advanced features
+		raw := request.GetBool("raw", false)
+		clean := request.GetBool("clean", true)
+		provider := request.GetString("provider", "")
 		
-		if request.GetBool("hcl", false) {
-			args = append(args, "--hcl")
+		// If we have options specified, use GenerateWithOptions
+		if raw || !clean || provider != "" {
+			opts := modules.InfraMapOptions{
+				Raw:      raw,
+				Clean:    clean,
+				Provider: provider,
+				Format:   format,
+			}
+			
+			output, err := module.GenerateWithOptions(ctx, input, opts)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("failed to generate diagram: %v", err)), nil
+			}
+			return mcp.NewToolResultText(output), nil
 		}
-		if request.GetBool("tfstate", false) {
-			args = append(args, "--tfstate")
+
+		// Otherwise use the specific generate functions
+		var output string
+		if isHCL || (!isTFState && strings.HasSuffix(input, "/")) {
+			// If HCL is specified or input is a directory, use GenerateFromHCL
+			output, err = module.GenerateFromHCL(ctx, input, format)
+		} else {
+			// Otherwise assume it's a state file
+			output, err = module.GenerateFromState(ctx, input, format)
 		}
+
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to generate diagram: %v", err)), nil
+		}
+
+		// Add note about connections if disabled
 		if !request.GetBool("connections", true) {
-			args = append(args, "--connections=false")
+			output = "Note: Connections disabled in graph\n\n" + output
 		}
-		if request.GetBool("raw", false) {
-			args = append(args, "--raw")
-		}
-		if !request.GetBool("clean", true) {
-			args = append(args, "--clean=false")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// InfraMap prune tool
@@ -64,10 +123,28 @@ func AddInfraMapTools(s *server.MCPServer, executeShipCommand ExecuteShipCommand
 		),
 	)
 	s.AddTool(pruneTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewInfraMapModule(client)
+
+		// Get input
 		input := request.GetString("input", "")
-		args := []string{"inframap", "prune", input}
-		return executeShipCommand(args)
+		if input == "" {
+			return mcp.NewToolResultError("input is required"), nil
+		}
+
+		// Prune the state/HCL
+		output, err := module.PruneState(ctx, input)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to prune: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
-
-
 }

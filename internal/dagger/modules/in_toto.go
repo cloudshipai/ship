@@ -11,6 +11,12 @@ type InTotoModule struct {
 	client *dagger.Client
 }
 
+const (
+	inTotoRunBinary    = "/usr/local/bin/in-toto-run"
+	inTotoVerifyBinary = "/usr/local/bin/in-toto-verify"  
+	inTotoRecordBinary = "/usr/local/bin/in-toto-record"
+)
+
 func NewInTotoModule(client *dagger.Client) *InTotoModule {
 	return &InTotoModule{
 		client: client,
@@ -39,7 +45,7 @@ func (m *InTotoModule) RunStep(ctx context.Context, stepName string, command []s
 		container = container.WithMountedDirectory("/workspace/materials", m.client.Host().Directory(config.MaterialDir))
 	}
 
-	args := []string{"in-toto-run", "--step-name", stepName}
+	args := []string{inTotoRunBinary, "--step-name", stepName}
 
 	// Add key if provided
 	if config.KeyPath != "" {
@@ -90,7 +96,7 @@ func (m *InTotoModule) VerifySupplyChain(ctx context.Context, layoutPath string,
 		container = container.WithMountedDirectory("/workspace/links", m.client.Host().Directory(config.LinkDir))
 	}
 
-	args := []string{"in-toto-verify", "--layout", "/workspace/layout.json"}
+	args := []string{inTotoVerifyBinary, "--layout", "/workspace/layout.json"}
 
 	if config.LinkDir != "" {
 		args = append(args, "--link-dir", "/workspace/links")
@@ -141,7 +147,7 @@ func (m *InTotoModule) RecordMetadata(ctx context.Context, stepName string, opts
 		WithExec([]string{"pip", "install", "in-toto"}).
 		WithWorkdir("/workspace")
 
-	args := []string{"in-toto-record", "--step-name", stepName}
+	args := []string{inTotoRecordBinary, "--step-name", stepName}
 
 	// Add key if provided
 	if config.KeyPath != "" {

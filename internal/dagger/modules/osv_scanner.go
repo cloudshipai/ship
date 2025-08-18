@@ -13,11 +13,13 @@ type OSVScannerModule struct {
 	name   string
 }
 
+const osvScannerBinary = "/usr/local/bin/osv-scanner"
+
 // NewOSVScannerModule creates a new OSV Scanner module
 func NewOSVScannerModule(client *dagger.Client) *OSVScannerModule {
 	return &OSVScannerModule{
 		client: client,
-		name:   "osv-scanner",
+		name:   osvScannerBinary,
 	}
 }
 
@@ -28,7 +30,7 @@ func (m *OSVScannerModule) ScanDirectory(ctx context.Context, dir string) (strin
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			"osv-scanner",
+			osvScannerBinary,
 			"--format", "json",
 			".",
 		})
@@ -47,7 +49,7 @@ func (m *OSVScannerModule) ScanLockfile(ctx context.Context, lockfilePath string
 		From("ghcr.io/google/osv-scanner:latest").
 		WithFile("/lockfile", m.client.Host().File(lockfilePath)).
 		WithExec([]string{
-			"osv-scanner",
+			osvScannerBinary,
 			"--format", "json",
 			"--lockfile", "/lockfile",
 		})
@@ -66,7 +68,7 @@ func (m *OSVScannerModule) ScanSBOM(ctx context.Context, sbomPath string) (strin
 		From("ghcr.io/google/osv-scanner:latest").
 		WithFile("/sbom.json", m.client.Host().File(sbomPath)).
 		WithExec([]string{
-			"osv-scanner",
+			osvScannerBinary,
 			"--format", "json",
 			"--sbom", "/sbom.json",
 		})
@@ -83,7 +85,7 @@ func (m *OSVScannerModule) ScanSBOM(ctx context.Context, sbomPath string) (strin
 func (m *OSVScannerModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("ghcr.io/google/osv-scanner:latest").
-		WithExec([]string{"osv-scanner", "--version"})
+		WithExec([]string{osvScannerBinary, "--version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -98,7 +100,7 @@ func (m *OSVScannerModule) ScanImage(ctx context.Context, image string, output s
 	container := m.client.Container().
 		From("ghcr.io/google/osv-scanner:latest")
 
-	args := []string{"osv-scanner", "scan", "image", image}
+	args := []string{osvScannerBinary, "scan", "image", image}
 	if output != "" {
 		args = append(args, "--output", output)
 	}
@@ -126,7 +128,7 @@ func (m *OSVScannerModule) ScanManifest(ctx context.Context, manifestPath string
 		From("ghcr.io/google/osv-scanner:latest").
 		WithFile("/manifest", m.client.Host().File(manifestPath))
 
-	args := []string{"osv-scanner", "-M", "/manifest"}
+	args := []string{osvScannerBinary, "-M", "/manifest"}
 	if output != "" {
 		args = append(args, "--output", output)
 	}
@@ -150,9 +152,9 @@ func (m *OSVScannerModule) LicenseScan(ctx context.Context, path string, allowed
 		From("ghcr.io/google/osv-scanner:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(path))
 
-	args := []string{"osv-scanner", "--licenses"}
+	args := []string{osvScannerBinary, "--licenses"}
 	if allowedLicenses != "" {
-		args = []string{"osv-scanner", "--licenses=" + allowedLicenses}
+		args = []string{osvScannerBinary, "--licenses=" + allowedLicenses}
 	}
 	if output != "" {
 		args = append(args, "--output", output)
@@ -175,7 +177,7 @@ func (m *OSVScannerModule) OfflineScan(ctx context.Context, path string, offline
 		From("ghcr.io/google/osv-scanner:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(path))
 
-	args := []string{"osv-scanner", "--offline"}
+	args := []string{osvScannerBinary, "--offline"}
 	if downloadDatabases {
 		args = append(args, "--download-offline-databases")
 	}
@@ -210,7 +212,7 @@ func (m *OSVScannerModule) Fix(ctx context.Context, manifestPath string, lockfil
 		container = container.WithFile("/lockfile", m.client.Host().File(lockfilePath))
 	}
 
-	args := []string{"osv-scanner", "fix"}
+	args := []string{osvScannerBinary, "fix"}
 	if manifestPath != "" {
 		args = append(args, "-M", "/manifest")
 	}
@@ -246,7 +248,7 @@ func (m *OSVScannerModule) ServeReport(ctx context.Context, path string, port st
 		From("ghcr.io/google/osv-scanner:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(path))
 
-	args := []string{"osv-scanner", "--serve"}
+	args := []string{osvScannerBinary, "--serve"}
 	if port != "" {
 		args = append(args, "--port", port)
 	}
@@ -271,7 +273,7 @@ func (m *OSVScannerModule) VerboseScan(ctx context.Context, path string, verbosi
 		From("ghcr.io/google/osv-scanner:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(path))
 
-	args := []string{"osv-scanner"}
+	args := []string{osvScannerBinary}
 	if verbosity != "" {
 		args = append(args, "--verbosity", verbosity)
 	}

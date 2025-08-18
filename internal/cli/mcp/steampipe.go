@@ -4,245 +4,305 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddSteampipeTools adds Steampipe (cloud asset querying) MCP tool implementations using real steampipe CLI commands
+// AddSteampipeTools adds Steampipe (cloud asset querying) MCP tool implementations using direct Dagger calls
 // NOTE: Steampipe is typically configured as an external MCP server via npx @turbot/steampipe-mcp
 // These tools provide Dagger-based execution as an alternative
 func AddSteampipeTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addSteampipeToolsDirect(s)
+}
+
+// addSteampipeToolsDirect adds Steampipe tools using direct Dagger module calls
+func addSteampipeToolsDirect(s *server.MCPServer) {
 	// Steampipe query tool
 	queryTool := mcp.NewTool("steampipe_query",
-		mcp.WithDescription("Execute SQL query against cloud resources using real steampipe CLI"),
+		mcp.WithDescription("Execute SQL query against cloud resources using real Steampipe CLI"),
 		mcp.WithString("query",
 			mcp.Description("SQL query to execute"),
 			mcp.Required(),
 		),
-		mcp.WithString("output",
-			mcp.Description("Output format"),
-			mcp.Enum("line", "csv", "json", "table", "snapshot"),
-		),
-		mcp.WithString("export",
-			mcp.Description("Export query output to a file"),
-		),
-		mcp.WithBoolean("header",
-			mcp.Description("Include column headers in output"),
-		),
-		mcp.WithString("timing",
-			mcp.Description("Show query execution timing"),
-			mcp.Enum("off", "on", "verbose"),
-		),
-		mcp.WithString("search_path",
-			mcp.Description("Set custom search path for connections"),
-		),
-		mcp.WithNumber("query_timeout",
-			mcp.Description("Query timeout in seconds"),
+		mcp.WithString("plugin",
+			mcp.Description("Plugin to install and use for the query"),
+			mcp.Required(),
 		),
 	)
 	s.AddTool(queryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSteampipeModule(client)
+
+		// Get parameters
 		query := request.GetString("query", "")
-		args := []string{"steampipe", "query", query}
-		
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "--output", output)
+		plugin := request.GetString("plugin", "")
+
+		// Execute query
+		output, err := module.Query(ctx, query, plugin)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Steampipe query failed: %v", err)), nil
 		}
-		if export := request.GetString("export", ""); export != "" {
-			args = append(args, "--export", export)
-		}
-		if request.GetBool("header", true) {
-			args = append(args, "--header=true")
-		} else {
-			args = append(args, "--header=false")
-		}
-		if timing := request.GetString("timing", ""); timing != "" {
-			args = append(args, "--timing", timing)
-		}
-		if searchPath := request.GetString("search_path", ""); searchPath != "" {
-			args = append(args, "--search-path", searchPath)
-		}
-		if timeout := request.GetInt("query_timeout", 0); timeout > 0 {
-			args = append(args, "--query-timeout", fmt.Sprintf("%d", timeout))
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Steampipe interactive query tool
 	interactiveQueryTool := mcp.NewTool("steampipe_query_interactive",
-		mcp.WithDescription("Start interactive SQL query shell using real steampipe CLI"),
-		mcp.WithString("workspace",
-			mcp.Description("Steampipe workspace profile to use"),
+		mcp.WithDescription("Start interactive SQL query session (limited in containers) using real Steampipe CLI"),
+		mcp.WithString("plugin",
+			mcp.Description("Plugin to install for the interactive session"),
+			mcp.Required(),
 		),
 	)
 	s.AddTool(interactiveQueryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"steampipe", "query"}
-		
-		if workspace := request.GetString("workspace", ""); workspace != "" {
-			args = append(args, "--workspace", workspace)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSteampipeModule(client)
+
+		// Get parameters
+		plugin := request.GetString("plugin", "")
+
+		// Start interactive query
+		output, err := module.QueryInteractive(ctx, plugin)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Steampipe interactive query failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Steampipe plugin list tool
 	pluginListTool := mcp.NewTool("steampipe_plugin_list",
-		mcp.WithDescription("List installed Steampipe plugins using real steampipe CLI"),
+		mcp.WithDescription("List installed and available plugins using real Steampipe CLI"),
 	)
 	s.AddTool(pluginListTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"steampipe", "plugin", "list"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSteampipeModule(client)
+
+		// List plugins
+		output, err := module.ListPlugins(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Steampipe plugin list failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Steampipe plugin install tool
 	pluginInstallTool := mcp.NewTool("steampipe_plugin_install",
-		mcp.WithDescription("Install Steampipe plugins using real steampipe CLI"),
-		mcp.WithString("plugin_name",
-			mcp.Description("Name of the plugin to install (e.g., aws, azure, gcp)"),
+		mcp.WithDescription("Install plugin using real Steampipe CLI"),
+		mcp.WithString("plugin",
+			mcp.Description("Plugin name to install (e.g., aws, azure, gcp)"),
 			mcp.Required(),
-		),
-		mcp.WithString("version",
-			mcp.Description("Specific version to install (e.g., @0.107.0)"),
-		),
-		mcp.WithBoolean("skip_config",
-			mcp.Description("Skip creating the default config file"),
 		),
 	)
 	s.AddTool(pluginInstallTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		pluginName := request.GetString("plugin_name", "")
-		args := []string{"steampipe", "plugin", "install"}
-		
-		if version := request.GetString("version", ""); version != "" {
-			args = append(args, pluginName+"@"+version)
-		} else {
-			args = append(args, pluginName)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		if request.GetBool("skip_config", false) {
-			args = append(args, "--skip-config")
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSteampipeModule(client)
+
+		// Get parameters
+		plugin := request.GetString("plugin", "")
+
+		// Install plugin
+		output, err := module.InstallPlugin(ctx, plugin)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Steampipe plugin install failed: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Steampipe plugin update tool
 	pluginUpdateTool := mcp.NewTool("steampipe_plugin_update",
-		mcp.WithDescription("Update Steampipe plugins using real steampipe CLI"),
-		mcp.WithString("plugin_name",
-			mcp.Description("Name of specific plugin to update (leave empty to update all)"),
-		),
-		mcp.WithBoolean("all",
-			mcp.Description("Update all installed plugins"),
+		mcp.WithDescription("Update plugin using real Steampipe CLI"),
+		mcp.WithString("plugin",
+			mcp.Description("Plugin name to update (e.g., aws, azure, gcp)"),
+			mcp.Required(),
 		),
 	)
 	s.AddTool(pluginUpdateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"steampipe", "plugin", "update"}
-		
-		if request.GetBool("all", false) {
-			args = append(args, "--all")
-		} else if pluginName := request.GetString("plugin_name", ""); pluginName != "" {
-			args = append(args, pluginName)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSteampipeModule(client)
+
+		// Get parameters
+		plugin := request.GetString("plugin", "")
+
+		// Update plugin
+		output, err := module.UpdatePlugin(ctx, plugin)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Steampipe plugin update failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Steampipe plugin uninstall tool
 	pluginUninstallTool := mcp.NewTool("steampipe_plugin_uninstall",
-		mcp.WithDescription("Uninstall Steampipe plugins using real steampipe CLI"),
-		mcp.WithString("plugin_name",
-			mcp.Description("Name of the plugin to uninstall"),
+		mcp.WithDescription("Uninstall plugin using real Steampipe CLI"),
+		mcp.WithString("plugin",
+			mcp.Description("Plugin name to uninstall (e.g., aws, azure, gcp)"),
 			mcp.Required(),
 		),
 	)
 	s.AddTool(pluginUninstallTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		pluginName := request.GetString("plugin_name", "")
-		args := []string{"steampipe", "plugin", "uninstall", pluginName}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSteampipeModule(client)
+
+		// Get parameters
+		plugin := request.GetString("plugin", "")
+
+		// Uninstall plugin
+		output, err := module.UninstallPlugin(ctx, plugin)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Steampipe plugin uninstall failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Steampipe service start tool
 	serviceStartTool := mcp.NewTool("steampipe_service_start",
-		mcp.WithDescription("Start Steampipe database service using real steampipe CLI"),
-		mcp.WithString("database_listen",
-			mcp.Description("Database connection scope"),
-			mcp.Enum("local", "network"),
-		),
-		mcp.WithNumber("database_port",
-			mcp.Description("Database service port (default 9193)"),
-		),
-		mcp.WithString("database_password",
-			mcp.Description("Database password for the session"),
-		),
-		mcp.WithBoolean("foreground",
-			mcp.Description("Run service in the foreground"),
-		),
-		mcp.WithBoolean("show_password",
-			mcp.Description("View database connection password"),
+		mcp.WithDescription("Start Steampipe service using real Steampipe CLI"),
+		mcp.WithNumber("port",
+			mcp.Description("Port to run the service on (default: 9193)"),
 		),
 	)
 	s.AddTool(serviceStartTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"steampipe", "service", "start"}
-		
-		if listen := request.GetString("database_listen", ""); listen != "" {
-			args = append(args, "--database-listen", listen)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if port := request.GetInt("database_port", 0); port > 0 {
-			args = append(args, "--database-port", fmt.Sprintf("%d", port))
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSteampipeModule(client)
+
+		// Get parameters
+		port := int(request.GetFloat("port", 9193))
+
+		// Start service
+		output, err := module.StartService(ctx, port)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Steampipe service start failed: %v", err)), nil
 		}
-		if password := request.GetString("database_password", ""); password != "" {
-			args = append(args, "--database-password", password)
-		}
-		if request.GetBool("foreground", false) {
-			args = append(args, "--foreground")
-		}
-		if request.GetBool("show_password", false) {
-			args = append(args, "--show-password")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Steampipe service status tool
 	serviceStatusTool := mcp.NewTool("steampipe_service_status",
-		mcp.WithDescription("Check Steampipe service status using real steampipe CLI"),
-		mcp.WithBoolean("all",
-			mcp.Description("Show status of all running services"),
-		),
+		mcp.WithDescription("Check Steampipe service status using real Steampipe CLI"),
 	)
 	s.AddTool(serviceStatusTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"steampipe", "service", "status"}
-		
-		if request.GetBool("all", false) {
-			args = append(args, "--all")
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSteampipeModule(client)
+
+		// Get service status
+		output, err := module.GetServiceStatus(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Steampipe service status failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Steampipe service stop tool
 	serviceStopTool := mcp.NewTool("steampipe_service_stop",
-		mcp.WithDescription("Stop Steampipe service using real steampipe CLI"),
-		mcp.WithBoolean("force",
-			mcp.Description("Force service shutdown"),
-		),
+		mcp.WithDescription("Stop Steampipe service using real Steampipe CLI"),
 	)
 	s.AddTool(serviceStopTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"steampipe", "service", "stop"}
-		
-		if request.GetBool("force", false) {
-			args = append(args, "--force")
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSteampipeModule(client)
+
+		// Stop service
+		output, err := module.StopService(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Steampipe service stop failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Steampipe version tool
 	versionTool := mcp.NewTool("steampipe_version",
-		mcp.WithDescription("Get Steampipe version information using real steampipe CLI"),
+		mcp.WithDescription("Get Steampipe version information using real Steampipe CLI"),
 	)
 	s.AddTool(versionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"steampipe", "--version"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSteampipeModule(client)
+
+		// Get version
+		output, err := module.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Steampipe get version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 }

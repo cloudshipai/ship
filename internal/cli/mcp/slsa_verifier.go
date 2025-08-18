@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddSLSAVerifierTools adds SLSA Verifier MCP tool implementations using real slsa-verifier CLI commands
+// AddSLSAVerifierTools adds SLSA Verifier MCP tool implementations using direct Dagger calls
 func AddSLSAVerifierTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addSLSAVerifierToolsDirect(s)
+}
+
+// addSLSAVerifierToolsDirect adds SLSA Verifier tools using direct Dagger module calls
+func addSLSAVerifierToolsDirect(s *server.MCPServer) {
 	// SLSA Verifier verify artifact tool
 	verifyArtifactTool := mcp.NewTool("slsa_verifier_verify_artifact",
 		mcp.WithDescription("Verify SLSA provenance for artifact using real slsa-verifier CLI"),
@@ -38,25 +47,32 @@ func AddSLSAVerifierTools(s *server.MCPServer, executeShipCommand ExecuteShipCom
 		),
 	)
 	s.AddTool(verifyArtifactTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSLSAVerifierModule(client)
+
+		// Get parameters
 		artifact := request.GetString("artifact", "")
 		provenancePath := request.GetString("provenance_path", "")
 		sourceURI := request.GetString("source_uri", "")
-		args := []string{"slsa-verifier", "verify-artifact", artifact, "--provenance-path", provenancePath, "--source-uri", sourceURI}
-		
-		if sourceTag := request.GetString("source_tag", ""); sourceTag != "" {
-			args = append(args, "--source-tag", sourceTag)
+		sourceTag := request.GetString("source_tag", "")
+		sourceBranch := request.GetString("source_branch", "")
+		builderID := request.GetString("builder_id", "")
+		printProvenance := request.GetBool("print_provenance", false)
+
+		// Verify artifact
+		output, err := module.VerifyArtifact(ctx, artifact, provenancePath, sourceURI, sourceTag, sourceBranch, builderID, printProvenance)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("SLSA verifier artifact verification failed: %v", err)), nil
 		}
-		if sourceBranch := request.GetString("source_branch", ""); sourceBranch != "" {
-			args = append(args, "--source-branch", sourceBranch)
-		}
-		if builderID := request.GetString("builder_id", ""); builderID != "" {
-			args = append(args, "--builder-id", builderID)
-		}
-		if request.GetBool("print_provenance", false) {
-			args = append(args, "--print-provenance")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// SLSA Verifier verify container image tool
@@ -84,24 +100,31 @@ func AddSLSAVerifierTools(s *server.MCPServer, executeShipCommand ExecuteShipCom
 		),
 	)
 	s.AddTool(verifyImageTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSLSAVerifierModule(client)
+
+		// Get parameters
 		image := request.GetString("image", "")
 		sourceURI := request.GetString("source_uri", "")
-		args := []string{"slsa-verifier", "verify-image", image, "--source-uri", sourceURI}
-		
-		if sourceTag := request.GetString("source_tag", ""); sourceTag != "" {
-			args = append(args, "--source-tag", sourceTag)
+		sourceTag := request.GetString("source_tag", "")
+		sourceBranch := request.GetString("source_branch", "")
+		builderID := request.GetString("builder_id", "")
+		printProvenance := request.GetBool("print_provenance", false)
+
+		// Verify image
+		output, err := module.VerifyImage(ctx, image, sourceURI, sourceTag, sourceBranch, builderID, printProvenance)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("SLSA verifier image verification failed: %v", err)), nil
 		}
-		if sourceBranch := request.GetString("source_branch", ""); sourceBranch != "" {
-			args = append(args, "--source-branch", sourceBranch)
-		}
-		if builderID := request.GetString("builder_id", ""); builderID != "" {
-			args = append(args, "--builder-id", builderID)
-		}
-		if request.GetBool("print_provenance", false) {
-			args = append(args, "--print-provenance")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// SLSA Verifier verify npm package tool (experimental)
@@ -131,21 +154,31 @@ func AddSLSAVerifierTools(s *server.MCPServer, executeShipCommand ExecuteShipCom
 		),
 	)
 	s.AddTool(verifyNpmTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSLSAVerifierModule(client)
+
+		// Get parameters
 		packageTarball := request.GetString("package_tarball", "")
 		attestationsPath := request.GetString("attestations_path", "")
 		packageName := request.GetString("package_name", "")
 		packageVersion := request.GetString("package_version", "")
-		
-		args := []string{"slsa-verifier", "verify-npm-package", packageTarball, "--attestations-path", attestationsPath, "--package-name", packageName, "--package-version", packageVersion}
-		
-		if sourceURI := request.GetString("source_uri", ""); sourceURI != "" {
-			args = append(args, "--source-uri", sourceURI)
+		sourceURI := request.GetString("source_uri", "")
+		printProvenance := request.GetBool("print_provenance", false)
+
+		// Verify npm package
+		output, err := module.VerifyNpmPackage(ctx, packageTarball, attestationsPath, packageName, packageVersion, sourceURI, printProvenance)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("SLSA verifier npm package verification failed: %v", err)), nil
 		}
-		if request.GetBool("print_provenance", false) {
-			args = append(args, "--print-provenance")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// SLSA Verifier version tool
@@ -153,7 +186,22 @@ func AddSLSAVerifierTools(s *server.MCPServer, executeShipCommand ExecuteShipCom
 		mcp.WithDescription("Get SLSA Verifier version information using real slsa-verifier CLI"),
 	)
 	s.AddTool(versionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"slsa-verifier", "version"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSLSAVerifierModule(client)
+
+		// Get version
+		output, err := module.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("SLSA verifier get version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 }

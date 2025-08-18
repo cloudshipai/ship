@@ -2,16 +2,25 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddStepCATools adds Step CA (Certificate Authority) MCP tool implementations
+// AddStepCATools adds Step CA (Certificate Authority) MCP tool implementations using direct Dagger calls
 func AddStepCATools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addStepCAToolsDirect(s)
+}
+
+// addStepCAToolsDirect adds Step CA tools using direct Dagger module calls
+func addStepCAToolsDirect(s *server.MCPServer) {
 	// Step CA init tool
 	initTool := mcp.NewTool("step_ca_init",
-		mcp.WithDescription("Initialize Step CA certificate authority"),
+		mcp.WithDescription("Initialize Step CA certificate authority using real Step CA CLI"),
 		mcp.WithString("ca_name",
 			mcp.Description("Name of the certificate authority"),
 			mcp.Required(),
@@ -20,89 +29,167 @@ func AddStepCATools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 			mcp.Description("DNS name for the CA"),
 			mcp.Required(),
 		),
-		mcp.WithString("provisioner",
-			mcp.Description("Default provisioner name"),
-		),
 	)
 	s.AddTool(initTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewStepCAModule(client)
+
+		// Get parameters
 		caName := request.GetString("ca_name", "")
 		dnsName := request.GetString("dns_name", "")
-		args := []string{"step", "ca", "init", caName, dnsName}
-		if provisioner := request.GetString("provisioner", ""); provisioner != "" {
-			args = append(args, "--provisioner", provisioner)
+
+		// Initialize CA
+		output, err := module.InitCA(ctx, caName, dnsName)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Step CA init failed: %v", err)), nil
 		}
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Step CA create certificate tool
 	createCertificateTool := mcp.NewTool("step_ca_create_certificate",
-		mcp.WithDescription("Create certificate using Step CA"),
+		mcp.WithDescription("Create certificate using real Step CA CLI"),
 		mcp.WithString("subject",
 			mcp.Description("Certificate subject (CN)"),
 			mcp.Required(),
 		),
-		mcp.WithString("cert_file",
-			mcp.Description("Output certificate file path"),
+		mcp.WithString("ca_url",
+			mcp.Description("Certificate authority URL"),
 			mcp.Required(),
 		),
-		mcp.WithString("key_file",
-			mcp.Description("Output private key file path"),
+		mcp.WithString("root_cert",
+			mcp.Description("Root certificate path"),
 			mcp.Required(),
 		),
 	)
 	s.AddTool(createCertificateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewStepCAModule(client)
+
+		// Get parameters
 		subject := request.GetString("subject", "")
-		certFile := request.GetString("cert_file", "")
-		keyFile := request.GetString("key_file", "")
-		args := []string{"step", "ca", "certificate", subject, certFile, keyFile}
-		return executeShipCommand(args)
+		caURL := request.GetString("ca_url", "")
+		rootCert := request.GetString("root_cert", "")
+
+		// Create certificate
+		output, err := module.CreateCertificate(ctx, subject, caURL, rootCert)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Step CA create certificate failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Step CA provisioner add tool
-	provisionerAddTool := mcp.NewTool("step_ca_provisioner_add",
-		mcp.WithDescription("Add a new provisioner to the CA using real step CLI"),
-		mcp.WithString("name",
-			mcp.Description("Name of the provisioner"),
+	// Step CA renew certificate tool
+	renewCertificateTool := mcp.NewTool("step_ca_renew_certificate",
+		mcp.WithDescription("Renew certificate using real Step CA CLI"),
+		mcp.WithString("cert_path",
+			mcp.Description("Certificate file path"),
 			mcp.Required(),
 		),
-		mcp.WithString("type",
-			mcp.Description("Type of provisioner"),
-			mcp.Enum("JWK", "OIDC", "X5C", "K8s", "ACME", "SSHPOP", "NEBULA"),
+		mcp.WithString("key_path",
+			mcp.Description("Private key file path"),
+			mcp.Required(),
+		),
+		mcp.WithString("ca_url",
+			mcp.Description("Certificate authority URL"),
+			mcp.Required(),
+		),
+	)
+	s.AddTool(renewCertificateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewStepCAModule(client)
+
+		// Get parameters
+		certPath := request.GetString("cert_path", "")
+		keyPath := request.GetString("key_path", "")
+		caURL := request.GetString("ca_url", "")
+
+		// Renew certificate
+		output, err := module.RenewCertificate(ctx, certPath, keyPath, caURL)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Step CA renew certificate failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
+	})
+
+	// Step CA add provisioner tool
+	addProvisionerTool := mcp.NewTool("step_ca_add_provisioner",
+		mcp.WithDescription("Add provisioner to Step CA using real Step CA CLI"),
+		mcp.WithString("provisioner_name",
+			mcp.Description("Provisioner name"),
+			mcp.Required(),
+		),
+		mcp.WithString("provisioner_type",
+			mcp.Description("Provisioner type (e.g., JWK, OIDC, ACME)"),
 			mcp.Required(),
 		),
 		mcp.WithString("ca_config",
-			mcp.Description("Path to CA configuration file"),
-		),
-		mcp.WithString("ca_url",
-			mcp.Description("CA server URL"),
-		),
-		mcp.WithString("root",
-			mcp.Description("Path to root certificate"),
+			mcp.Description("CA configuration file path"),
+			mcp.Required(),
 		),
 	)
-	s.AddTool(provisionerAddTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		name := request.GetString("name", "")
-		provType := request.GetString("type", "")
-		args := []string{"step", "ca", "provisioner", "add", name, "--type", provType}
-		
-		if caConfig := request.GetString("ca_config", ""); caConfig != "" {
-			args = append(args, "--ca-config", caConfig)
+	s.AddTool(addProvisionerTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if caUrl := request.GetString("ca_url", ""); caUrl != "" {
-			args = append(args, "--ca-url", caUrl)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewStepCAModule(client)
+
+		// Get parameters
+		name := request.GetString("provisioner_name", "")
+		provisionerType := request.GetString("provisioner_type", "")
+		caConfig := request.GetString("ca_config", "")
+
+		// Add provisioner
+		output, err := module.AddProvisioner(ctx, name, provisionerType, caConfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Step CA add provisioner failed: %v", err)), nil
 		}
-		if root := request.GetString("root", ""); root != "" {
-			args = append(args, "--root", root)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Step CA revoke certificate tool
 	revokeCertificateTool := mcp.NewTool("step_ca_revoke_certificate",
-		mcp.WithDescription("Revoke certificate using Step CA"),
-		mcp.WithString("cert_file",
-			mcp.Description("Path to certificate file to revoke"),
+		mcp.WithDescription("Revoke certificate using real Step CA CLI"),
+		mcp.WithString("cert_path",
+			mcp.Description("Certificate file path"),
+			mcp.Required(),
+		),
+		mcp.WithString("key_path",
+			mcp.Description("Private key file path"),
+			mcp.Required(),
+		),
+		mcp.WithString("ca_url",
+			mcp.Description("Certificate authority URL"),
 			mcp.Required(),
 		),
 		mcp.WithString("reason",
@@ -110,39 +197,52 @@ func AddStepCATools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(revokeCertificateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		certFile := request.GetString("cert_file", "")
-		args := []string{"step", "ca", "revoke", certFile}
-		if reason := request.GetString("reason", ""); reason != "" {
-			args = append(args, "--reason", reason)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewStepCAModule(client)
+
+		// Get parameters
+		certPath := request.GetString("cert_path", "")
+		keyPath := request.GetString("key_path", "")
+		caURL := request.GetString("ca_url", "")
+		reason := request.GetString("reason", "")
+
+		// Revoke certificate
+		output, err := module.RevokeCertificate(ctx, certPath, keyPath, caURL, reason)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Step CA revoke certificate failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Step CA renew certificate tool
-	renewCertificateTool := mcp.NewTool("step_ca_renew_certificate",
-		mcp.WithDescription("Renew certificate using Step CA"),
-		mcp.WithString("cert_file",
-			mcp.Description("Path to certificate file to renew"),
-			mcp.Required(),
-		),
-		mcp.WithString("key_file",
-			mcp.Description("Path to private key file"),
-			mcp.Required(),
-		),
+	// Step CA version tool
+	versionTool := mcp.NewTool("step_ca_version",
+		mcp.WithDescription("Get Step CA version information using real Step CA CLI"),
 	)
-	s.AddTool(renewCertificateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		certFile := request.GetString("cert_file", "")
-		keyFile := request.GetString("key_file", "")
-		args := []string{"step", "ca", "renew", certFile, keyFile}
-		return executeShipCommand(args)
-	})
+	s.AddTool(versionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
 
-	// Step CA get version tool
-	getVersionTool := mcp.NewTool("step_ca_get_version",
-		mcp.WithDescription("Get Step CA version information"),
-	)
-	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"step", "version"}
-		return executeShipCommand(args)
+		// Create module instance
+		module := modules.NewStepCAModule(client)
+
+		// Get version
+		output, err := module.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Step CA get version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 }

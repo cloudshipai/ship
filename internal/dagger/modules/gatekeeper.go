@@ -2,6 +2,7 @@ package modules
 
 import (
 	"context"
+	"fmt"
 
 	"dagger.io/dagger"
 )
@@ -9,6 +10,12 @@ import (
 type GatekeeperModule struct {
 	client *dagger.Client
 }
+
+const (
+	gatekeeperKubectlBinary = "/usr/local/bin/kubectl"
+	gatekeeperHelmBinary = "/usr/local/bin/helm"
+	gatekeeperManagerBinary = "/manager"
+)
 
 func NewGatekeeperModule(client *dagger.Client) *GatekeeperModule {
 	return &GatekeeperModule{
@@ -248,7 +255,7 @@ kubectl get events --all-namespaces --field-selector reason=ConstraintViolation 
 func (m *GatekeeperModule) GetVersion(ctx context.Context) (*dagger.Container, error) {
 	container := m.client.Container().
 		From("openpolicyagent/gatekeeper:v3.17.1").
-		WithExec([]string{"manager", "--version"})
+		WithExec([]string{gatekeeperManagerBinary, "--version"})
 
 	return container, nil
 }
@@ -333,4 +340,150 @@ func WithCoverage(coverage bool) GatekeeperOption {
 	return func(c *GatekeeperConfig) {
 		c.Coverage = coverage
 	}
+}
+
+// InstallGatekeeper installs Gatekeeper using kubectl or Helm (MCP compatible)
+func (m *GatekeeperModule) InstallGatekeeper(ctx context.Context, version string, useHelm bool) (string, error) {
+	if version == "" {
+		version = "v3.20.0"
+	}
+
+	if useHelm {
+		container := m.client.Container().
+			From("alpine/helm:latest").
+			WithExec([]string{gatekeeperHelmBinary, "install", "gatekeeper", "gatekeeper/gatekeeper", 
+				"--namespace", "gatekeeper-system", "--create-namespace"})
+
+		output, err := container.Stdout(ctx)
+		if err != nil {
+			return "", fmt.Errorf("failed to install gatekeeper with helm: %w", err)
+		}
+		return output, nil
+	} else {
+		url := "https://raw.githubusercontent.com/open-policy-agent/gatekeeper/" + version + "/deploy/gatekeeper.yaml"
+		container := m.client.Container().
+			From("bitnami/kubectl:latest").
+			WithExec([]string{gatekeeperKubectlBinary, "apply", "-f", url})
+
+		output, err := container.Stdout(ctx)
+		if err != nil {
+			return "", fmt.Errorf("failed to install gatekeeper with kubectl: %w", err)
+		}
+		return output, nil
+	}
+}
+
+// UninstallGatekeeper uninstalls Gatekeeper (MCP compatible)
+func (m *GatekeeperModule) UninstallGatekeeper(ctx context.Context, version string, useHelm bool) (string, error) {
+	if version == "" {
+		version = "v3.20.0"
+	}
+
+	if useHelm {
+		container := m.client.Container().
+			From("alpine/helm:latest").
+			WithExec([]string{gatekeeperHelmBinary, "delete", "gatekeeper", "--namespace", "gatekeeper-system"})
+
+		output, err := container.Stdout(ctx)
+		if err != nil {
+			return "", fmt.Errorf("failed to uninstall gatekeeper with helm: %w", err)
+		}
+		return output, nil
+	} else {
+		url := "https://raw.githubusercontent.com/open-policy-agent/gatekeeper/" + version + "/deploy/gatekeeper.yaml"
+		container := m.client.Container().
+			From("bitnami/kubectl:latest").
+			WithExec([]string{gatekeeperKubectlBinary, "delete", "-f", url})
+
+		output, err := container.Stdout(ctx)
+		if err != nil {
+			return "", fmt.Errorf("failed to uninstall gatekeeper with kubectl: %w", err)
+		}
+		return output, nil
+	}
+}
+
+// ApplyConstraintTemplate applies Gatekeeper constraint template using kubectl (MCP compatible)
+func (m *GatekeeperModule) ApplyConstraintTemplate(ctx context.Context, templateFile string) (string, error) {
+	templateFileObj := m.client.Host().File(templateFile)
+	
+	container := m.client.Container().
+		From("bitnami/kubectl:latest").
+		WithFile("/template.yaml", templateFileObj).
+		WithExec([]string{gatekeeperKubectlBinary, "apply", "-f", "/template.yaml"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to apply constraint template: %w", err)
+	}
+
+	return output, nil
+}
+
+// ApplyConstraint applies Gatekeeper constraint using kubectl (MCP compatible)
+func (m *GatekeeperModule) ApplyConstraint(ctx context.Context, constraintFile string) (string, error) {
+	constraintFileObj := m.client.Host().File(constraintFile)
+	
+	container := m.client.Container().
+		From("bitnami/kubectl:latest").
+		WithFile("/constraint.yaml", constraintFileObj).
+		WithExec([]string{gatekeeperKubectlBinary, "apply", "-f", "/constraint.yaml"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to apply constraint: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetConstraintTemplates lists Gatekeeper constraint templates (MCP compatible)
+func (m *GatekeeperModule) GetConstraintTemplates(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("bitnami/kubectl:latest").
+		WithExec([]string{gatekeeperKubectlBinary, "get", "constrainttemplates"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get constraint templates: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetConstraints lists Gatekeeper constraints (MCP compatible)
+func (m *GatekeeperModule) GetConstraints(ctx context.Context, constraintType string) (string, error) {
+	var args []string
+	
+	if constraintType != "" {
+		args = []string{"kubectl", "get", constraintType}
+	} else {
+		// List all constraint types by getting constraint templates first
+		args = []string{"kubectl", "get", "constrainttemplates", "-o", "name"}
+	}
+
+	container := m.client.Container().
+		From("bitnami/kubectl:latest").
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get constraints: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetStatus gets Gatekeeper system status (MCP compatible)
+func (m *GatekeeperModule) GetStatus(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("bitnami/kubectl:latest").
+		WithExec([]string{gatekeeperKubectlBinary, "get", "pods", "-n", "gatekeeper-system"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get gatekeeper status: %w", err)
+	}
+
+	return output, nil
 }

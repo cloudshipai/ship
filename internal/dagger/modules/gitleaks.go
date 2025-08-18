@@ -13,6 +13,8 @@ type GitleaksModule struct {
 	name   string
 }
 
+const gitleaksBinary = "/usr/bin/gitleaks"
+
 // NewGitleaksModule creates a new Gitleaks module
 func NewGitleaksModule(client *dagger.Client) *GitleaksModule {
 	return &GitleaksModule{
@@ -27,7 +29,7 @@ func (m *GitleaksModule) ScanDirectory(ctx context.Context, dir string) (string,
 		From("zricethezav/gitleaks:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"gitleaks", "dir", ".", "--report-format", "json"})
+		WithExec([]string{gitleaksBinary, "dir", ".", "--report-format", "json"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -49,7 +51,7 @@ func (m *GitleaksModule) ScanFile(ctx context.Context, filePath string) (string,
 		From("zricethezav/gitleaks:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"gitleaks", "dir", filename, "--report-format", "json"})
+		WithExec([]string{gitleaksBinary, "dir", filename, "--report-format", "json"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -67,7 +69,7 @@ func (m *GitleaksModule) ScanGitRepo(ctx context.Context, repoDir string) (strin
 		From("zricethezav/gitleaks:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(repoDir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"gitleaks", "git", ".", "--report-format", "json"})
+		WithExec([]string{gitleaksBinary, "git", ".", "--report-format", "json"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -85,7 +87,7 @@ func (m *GitleaksModule) ScanWithConfig(ctx context.Context, dir string, configF
 		From("zricethezav/gitleaks:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"gitleaks", "dir", ".", "--config", configFile, "--report-format", "json"})
+		WithExec([]string{gitleaksBinary, "dir", ".", "--config", configFile, "--report-format", "json"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -117,7 +119,7 @@ func (m *GitleaksModule) ScanStdin(ctx context.Context, input string) (string, e
 func (m *GitleaksModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("zricethezav/gitleaks:latest").
-		WithExec([]string{"gitleaks", "version"})
+		WithExec([]string{gitleaksBinary, "version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

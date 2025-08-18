@@ -14,6 +14,8 @@ type CosignModule struct {
 	name   string
 }
 
+const cosignBinary = "/ko-app/cosign"
+
 // NewCosignModule creates a new Cosign module
 func NewCosignModule(client *dagger.Client) *CosignModule {
 	return &CosignModule{
@@ -27,7 +29,7 @@ func (m *CosignModule) VerifyImage(ctx context.Context, imageName string) (strin
 	container := m.client.Container().
 		From("gcr.io/projectsigstore/cosign:latest").
 		WithEnvVariable("COSIGN_EXPERIMENTAL", "1").
-		WithExec([]string{"cosign", "verify", imageName})
+		WithExec([]string{cosignBinary, "verify", imageName})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -46,7 +48,7 @@ func (m *CosignModule) VerifyImageWithKey(ctx context.Context, imageName string,
 	container := m.client.Container().
 		From("gcr.io/projectsigstore/cosign:latest").
 		WithFile("/tmp/public.key", m.client.Host().File(publicKeyPath)).
-		WithExec([]string{"cosign", "verify", "--key", "/tmp/public.key", imageName})
+		WithExec([]string{cosignBinary, "verify", "--key", "/tmp/public.key", imageName})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -140,7 +142,7 @@ func (m *CosignModule) GenerateKeyPair(ctx context.Context, outputDir string) (s
 		From("gcr.io/projectsigstore/cosign:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(outputDir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"cosign", "generate-key-pair"})
+		WithExec([]string{cosignBinary, "generate-key-pair"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -248,7 +250,7 @@ func (m *CosignModule) UploadBlob(ctx context.Context, blobPath string, registry
 	container := m.client.Container().
 		From("gcr.io/projectsigstore/cosign:latest").
 		WithFile("/tmp/blob", m.client.Host().File(blobPath)).
-		WithExec([]string{"cosign", "upload", "blob", "-f", "/tmp/blob", registryURL})
+		WithExec([]string{cosignBinary, "upload", "blob", "-f", "/tmp/blob", registryURL})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -263,7 +265,7 @@ func (m *CosignModule) UploadWasm(ctx context.Context, wasmPath string, registry
 	container := m.client.Container().
 		From("gcr.io/projectsigstore/cosign:latest").
 		WithFile("/tmp/wasm", m.client.Host().File(wasmPath)).
-		WithExec([]string{"cosign", "upload", "wasm", "-f", "/tmp/wasm", registryURL})
+		WithExec([]string{cosignBinary, "upload", "wasm", "-f", "/tmp/wasm", registryURL})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -277,7 +279,7 @@ func (m *CosignModule) UploadWasm(ctx context.Context, wasmPath string, registry
 func (m *CosignModule) CopyImage(ctx context.Context, sourceImage string, destinationImage string) (string, error) {
 	container := m.client.Container().
 		From("gcr.io/projectsigstore/cosign:latest").
-		WithExec([]string{"cosign", "copy", sourceImage, destinationImage})
+		WithExec([]string{cosignBinary, "copy", sourceImage, destinationImage})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -291,11 +293,140 @@ func (m *CosignModule) CopyImage(ctx context.Context, sourceImage string, destin
 func (m *CosignModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("gcr.io/projectsigstore/cosign:latest").
-		WithExec([]string{"cosign", "version"})
+		WithExec([]string{cosignBinary, "version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get cosign version: %w", err)
+	}
+
+	return output, nil
+}
+
+// SignImageWithOptions signs container image with comprehensive options
+func (m *CosignModule) SignImageWithOptions(ctx context.Context, imageName string, keyPath string, keyless bool) (string, error) {
+	args := []string{"cosign", "sign"}
+	
+	container := m.client.Container().
+		From("gcr.io/projectsigstore/cosign:latest").
+		WithEnvVariable("COSIGN_EXPERIMENTAL", "1")
+
+	if keyless {
+		// Use keyless signing
+		if os.Getenv("COSIGN_IDENTITY_TOKEN") != "" {
+			container = container.WithEnvVariable("COSIGN_IDENTITY_TOKEN", os.Getenv("COSIGN_IDENTITY_TOKEN"))
+		}
+	} else if keyPath != "" {
+		// Use key-based signing
+		args = append(args, "--key", "/tmp/private.key")
+		container = container.WithFile("/tmp/private.key", m.client.Host().File(keyPath))
+		if os.Getenv("COSIGN_PASSWORD") != "" {
+			container = container.WithEnvVariable("COSIGN_PASSWORD", os.Getenv("COSIGN_PASSWORD"))
+		}
+	}
+
+	args = append(args, imageName)
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed to sign image with options: %w", err)
+	}
+
+	return output, nil
+}
+
+// VerifyImageWithOptions verifies container image with comprehensive options
+func (m *CosignModule) VerifyImageWithOptions(ctx context.Context, imageName string, keyPath string, keyless bool) (string, error) {
+	args := []string{"cosign", "verify"}
+	
+	container := m.client.Container().
+		From("gcr.io/projectsigstore/cosign:latest").
+		WithEnvVariable("COSIGN_EXPERIMENTAL", "1")
+
+	if !keyless && keyPath != "" {
+		args = append(args, "--key", "/tmp/public.key")
+		container = container.WithFile("/tmp/public.key", m.client.Host().File(keyPath))
+	}
+
+	args = append(args, imageName)
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed to verify image with options: %w", err)
+	}
+
+	return output, nil
+}
+
+// AttestWithOptions creates attestation with comprehensive options
+func (m *CosignModule) AttestWithOptions(ctx context.Context, imageName string, predicatePath string, keyPath string) (string, error) {
+	args := []string{"cosign", "attest", "--predicate", "/tmp/predicate.json"}
+	
+	container := m.client.Container().
+		From("gcr.io/projectsigstore/cosign:latest").
+		WithFile("/tmp/predicate.json", m.client.Host().File(predicatePath)).
+		WithEnvVariable("COSIGN_EXPERIMENTAL", "1")
+
+	if keyPath != "" {
+		args = append(args, "--key", "/tmp/private.key")
+		container = container.WithFile("/tmp/private.key", m.client.Host().File(keyPath))
+		if os.Getenv("COSIGN_PASSWORD") != "" {
+			container = container.WithEnvVariable("COSIGN_PASSWORD", os.Getenv("COSIGN_PASSWORD"))
+		}
+	}
+
+	args = append(args, imageName)
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed to attest with options: %w", err)
+	}
+
+	return output, nil
+}
+
+// VerifyAttestationWithOptions verifies attestation with comprehensive options
+func (m *CosignModule) VerifyAttestationWithOptions(ctx context.Context, imageName string, keyPath string, policyPath string) (string, error) {
+	args := []string{"cosign", "verify-attestation"}
+	
+	container := m.client.Container().
+		From("gcr.io/projectsigstore/cosign:latest").
+		WithEnvVariable("COSIGN_EXPERIMENTAL", "1")
+
+	if keyPath != "" {
+		args = append(args, "--key", "/tmp/public.key")
+		container = container.WithFile("/tmp/public.key", m.client.Host().File(keyPath))
+	}
+	if policyPath != "" {
+		args = append(args, "--policy", "/tmp/policy.json")
+		container = container.WithFile("/tmp/policy.json", m.client.Host().File(policyPath))
+	}
+
+	args = append(args, imageName)
+	container = container.WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed to verify attestation with options: %w", err)
 	}
 
 	return output, nil

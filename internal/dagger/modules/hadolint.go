@@ -13,6 +13,8 @@ type HadolintModule struct {
 	name   string
 }
 
+const hadolintBinary = "/bin/hadolint"
+
 // NewHadolintModule creates a new Hadolint module
 func NewHadolintModule(client *dagger.Client) *HadolintModule {
 	return &HadolintModule{
@@ -28,7 +30,7 @@ func (m *HadolintModule) ScanDockerfile(ctx context.Context, dockerfilePath stri
 		WithFile("/workspace/Dockerfile", m.client.Host().File(dockerfilePath)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			"hadolint",
+			hadolintBinary,
 			"--format", "json",
 			"Dockerfile",
 		}, dagger.ContainerWithExecOpts{
@@ -85,7 +87,7 @@ func (m *HadolintModule) ScanWithConfig(ctx context.Context, dockerfilePath stri
 		WithFile("/workspace/.hadolint.yaml", m.client.Host().File(configPath)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			"hadolint",
+			hadolintBinary,
 			"--config", ".hadolint.yaml",
 			"--format", "json",
 			"Dockerfile",

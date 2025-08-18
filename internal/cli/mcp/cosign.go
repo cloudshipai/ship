@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
+	"dagger.io/dagger"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // AddCosignTools adds Cosign (container signing and verification) MCP tool implementations
 func AddCosignTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addCosignToolsDirect(s)
+}
+
+// addCosignToolsDirect implements direct Dagger calls for Cosign tools
+func addCosignToolsDirect(s *server.MCPServer) {
 	// Cosign sign container image tool
 	signImageTool := mcp.NewTool("cosign_sign_image",
 		mcp.WithDescription("Sign container image using Cosign"),
@@ -24,13 +33,26 @@ func AddCosignTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(signImageTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		imageName := request.GetString("image_name", "")
-		args := []string{"cosign", "sign"}
-		if keyPath := request.GetString("key_path", ""); keyPath != "" {
-			args = append(args, "--key", keyPath)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		args = append(args, imageName)
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		imageName := request.GetString("image_name", "")
+		keyPath := request.GetString("key_path", "")
+		keyless := request.GetBool("keyless", false)
+
+		// Create Cosign module and sign image with options
+		cosignModule := modules.NewCosignModule(client)
+		result, err := cosignModule.SignImageWithOptions(ctx, imageName, keyPath, keyless)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cosign sign image failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cosign verify container image tool
@@ -48,13 +70,26 @@ func AddCosignTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(verifyImageTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		imageName := request.GetString("image_name", "")
-		args := []string{"cosign", "verify"}
-		if keyPath := request.GetString("key_path", ""); keyPath != "" {
-			args = append(args, "--key", keyPath)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		args = append(args, imageName)
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		imageName := request.GetString("image_name", "")
+		keyPath := request.GetString("key_path", "")
+		keyless := request.GetBool("keyless", false)
+
+		// Create Cosign module and verify image with options
+		cosignModule := modules.NewCosignModule(client)
+		result, err := cosignModule.VerifyImageWithOptions(ctx, imageName, keyPath, keyless)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cosign verify image failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cosign generate key pair tool
@@ -65,8 +100,24 @@ func AddCosignTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(generateKeyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"cosign", "generate-key-pair"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
+		outputPath := request.GetString("output_path", "/tmp")
+
+		// Create Cosign module and generate key pair
+		cosignModule := modules.NewCosignModule(client)
+		result, err := cosignModule.GenerateKeyPair(ctx, outputPath)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cosign generate key failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cosign attest and sign tool
@@ -85,14 +136,26 @@ func AddCosignTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(attestTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		imageName := request.GetString("image_name", "")
 		predicatePath := request.GetString("predicate_path", "")
-		args := []string{"cosign", "attest", "--predicate", predicatePath}
-		if keyPath := request.GetString("key_path", ""); keyPath != "" {
-			args = append(args, "--key", keyPath)
+		keyPath := request.GetString("key_path", "")
+
+		// Create Cosign module and attest with options
+		cosignModule := modules.NewCosignModule(client)
+		result, err := cosignModule.AttestWithOptions(ctx, imageName, predicatePath, keyPath)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cosign attest failed: %v", err)), nil
 		}
-		args = append(args, imageName)
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cosign verify attestation tool
@@ -110,16 +173,26 @@ func AddCosignTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(verifyAttestationTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		imageName := request.GetString("image_name", "")
-		args := []string{"cosign", "verify-attestation"}
-		if keyPath := request.GetString("key_path", ""); keyPath != "" {
-			args = append(args, "--key", keyPath)
+		keyPath := request.GetString("key_path", "")
+		policyPath := request.GetString("policy_path", "")
+
+		// Create Cosign module and verify attestation with options
+		cosignModule := modules.NewCosignModule(client)
+		result, err := cosignModule.VerifyAttestationWithOptions(ctx, imageName, keyPath, policyPath)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cosign verify attestation failed: %v", err)), nil
 		}
-		if policyPath := request.GetString("policy_path", ""); policyPath != "" {
-			args = append(args, "--policy", policyPath)
-		}
-		args = append(args, imageName)
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cosign sign blob tool
@@ -137,16 +210,26 @@ func AddCosignTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(signBlobTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		blobPath := request.GetString("blob_path", "")
-		args := []string{"cosign", "sign-blob"}
-		if keyPath := request.GetString("key_path", ""); keyPath != "" {
-			args = append(args, "--key", keyPath)
+		keyPath := request.GetString("key_path", "")
+		outputSignature := request.GetString("output_signature", "")
+
+		// Create Cosign module and sign blob
+		cosignModule := modules.NewCosignModule(client)
+		result, err := cosignModule.SignBlob(ctx, blobPath, keyPath, outputSignature)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cosign sign blob failed: %v", err)), nil
 		}
-		if outputSig := request.GetString("output_signature", ""); outputSig != "" {
-			args = append(args, "--output-signature", outputSig)
-		}
-		args = append(args, blobPath)
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cosign verify blob tool
@@ -165,14 +248,26 @@ func AddCosignTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(verifyBlobTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		blobPath := request.GetString("blob_path", "")
 		signaturePath := request.GetString("signature_path", "")
-		args := []string{"cosign", "verify-blob", "--signature", signaturePath}
-		if keyPath := request.GetString("key_path", ""); keyPath != "" {
-			args = append(args, "--key", keyPath)
+		keyPath := request.GetString("key_path", "")
+
+		// Create Cosign module and verify blob
+		cosignModule := modules.NewCosignModule(client)
+		result, err := cosignModule.VerifyBlob(ctx, blobPath, signaturePath, keyPath)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cosign verify blob failed: %v", err)), nil
 		}
-		args = append(args, blobPath)
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cosign upload blob tool
@@ -188,10 +283,25 @@ func AddCosignTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(uploadBlobTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		blobPath := request.GetString("blob_path", "")
 		registryURL := request.GetString("registry_url", "")
-		args := []string{"cosign", "upload", "blob", "-f", blobPath, registryURL}
-		return executeShipCommand(args)
+
+		// Create Cosign module and upload blob
+		cosignModule := modules.NewCosignModule(client)
+		result, err := cosignModule.UploadBlob(ctx, blobPath, registryURL)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cosign upload blob failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cosign upload wasm tool
@@ -207,10 +317,25 @@ func AddCosignTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(uploadWasmTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		wasmPath := request.GetString("wasm_path", "")
 		registryURL := request.GetString("registry_url", "")
-		args := []string{"cosign", "upload", "wasm", "-f", wasmPath, registryURL}
-		return executeShipCommand(args)
+
+		// Create Cosign module and upload wasm
+		cosignModule := modules.NewCosignModule(client)
+		result, err := cosignModule.UploadWasm(ctx, wasmPath, registryURL)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cosign upload wasm failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cosign download/copy image tool (using copy command)
@@ -226,10 +351,25 @@ func AddCosignTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(copyImageTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		sourceImage := request.GetString("source_image", "")
 		destinationImage := request.GetString("destination_image", "")
-		args := []string{"cosign", "copy", sourceImage, destinationImage}
-		return executeShipCommand(args)
+
+		// Create Cosign module and copy image
+		cosignModule := modules.NewCosignModule(client)
+		result, err := cosignModule.CopyImage(ctx, sourceImage, destinationImage)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cosign copy image failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cosign sign wasm tool
@@ -247,13 +387,26 @@ func AddCosignTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		),
 	)
 	s.AddTool(signWasmTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		wasmArtifact := request.GetString("wasm_artifact", "")
-		args := []string{"cosign", "sign"}
-		if keyPath := request.GetString("key_path", ""); keyPath != "" {
-			args = append(args, "--key", keyPath)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		args = append(args, wasmArtifact)
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		wasmArtifact := request.GetString("wasm_artifact", "")
+		keyPath := request.GetString("key_path", "")
+		keyless := request.GetBool("keyless", false)
+
+		// Create Cosign module and sign wasm artifact (reuse SignImageWithOptions)
+		cosignModule := modules.NewCosignModule(client)
+		result, err := cosignModule.SignImageWithOptions(ctx, wasmArtifact, keyPath, keyless)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cosign sign wasm failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cosign get version tool
@@ -261,7 +414,20 @@ func AddCosignTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		mcp.WithDescription("Get Cosign version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"cosign", "version"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create Cosign module and get version
+		cosignModule := modules.NewCosignModule(client)
+		result, err := cosignModule.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cosign get version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 }

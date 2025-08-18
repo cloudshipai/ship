@@ -2,14 +2,23 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
+	"dagger.io/dagger"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // AddActionlintTools adds Actionlint (GitHub Actions linter) MCP tool implementations
 func AddActionlintTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addActionlintToolsDirect(s)
+}
+
+// addActionlintToolsDirect implements direct Dagger calls for actionlint tools
+func addActionlintToolsDirect(s *server.MCPServer) {
 	// Actionlint scan workflows tool (basic usage)
 	scanWorkflowsTool := mcp.NewTool("actionlint_scan_workflows",
 		mcp.WithDescription("Scan GitHub Actions workflow files for issues"),
@@ -27,38 +36,44 @@ func AddActionlintTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(scanWorkflowsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"actionlint"}
+		workflowFiles := request.GetString("workflow_files", "")
+		formatTemplate := request.GetString("format_template", "")
+		ignorePatterns := request.GetString("ignore_patterns", "")
+		color := request.GetBool("color", false)
 		
-		// Add specific workflow files if provided
-		if workflowFiles := request.GetString("workflow_files", ""); workflowFiles != "" {
-			// Split comma-separated files and add them
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create actionlint module
+		actionlintModule := modules.NewActionlintModule(client)
+		
+		var result string
+		if workflowFiles != "" {
+			// Scan specific workflow files
 			files := strings.Split(workflowFiles, ",")
+			var cleanFiles []string
 			for _, file := range files {
 				file = strings.TrimSpace(file)
 				if file != "" {
-					args = append(args, file)
+					cleanFiles = append(cleanFiles, file)
 				}
 			}
+			// Use current directory as workspace
+			result, err = actionlintModule.ScanSpecificFiles(ctx, ".", cleanFiles, formatTemplate, ignorePatterns, color)
+		} else {
+			// Scan all workflows in directory
+			result, err = actionlintModule.ScanDirectoryWithOptions(ctx, ".", formatTemplate, ignorePatterns, color)
 		}
 		
-		if formatTemplate := request.GetString("format_template", ""); formatTemplate != "" {
-			args = append(args, "-format", formatTemplate)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("actionlint scan failed: %v", err)), nil
 		}
-		if ignorePatterns := request.GetString("ignore_patterns", ""); ignorePatterns != "" {
-			// Split comma-separated patterns and add each with -ignore flag
-			patterns := strings.Split(ignorePatterns, ",")
-			for _, pattern := range patterns {
-				pattern = strings.TrimSpace(pattern)
-				if pattern != "" {
-					args = append(args, "-ignore", pattern)
-				}
-			}
-		}
-		if request.GetBool("color", false) {
-			args = append(args, "-color")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Actionlint scan with external tools tool
@@ -78,30 +93,32 @@ func AddActionlintTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(scanWithExternalToolsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"actionlint"}
+		workflowFiles := request.GetString("workflow_files", "")
+		shellcheckPath := request.GetString("shellcheck_path", "")
+		pyflakesPath := request.GetString("pyflakes_path", "")
+		color := request.GetBool("color", false)
 		
-		// Add specific workflow files if provided
-		if workflowFiles := request.GetString("workflow_files", ""); workflowFiles != "" {
-			files := strings.Split(workflowFiles, ",")
-			for _, file := range files {
-				file = strings.TrimSpace(file)
-				if file != "" {
-					args = append(args, file)
-				}
-			}
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
+		defer client.Close()
+
+		// Create actionlint module and scan with external tools
+		actionlintModule := modules.NewActionlintModule(client)
 		
-		if shellcheckPath := request.GetString("shellcheck_path", ""); shellcheckPath != "" {
-			args = append(args, "-shellcheck", shellcheckPath)
+		result, err := actionlintModule.ScanWithExternalTools(ctx, ".", shellcheckPath, pyflakesPath, color)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("actionlint external tools scan failed: %v", err)), nil
 		}
-		if pyflakesPath := request.GetString("pyflakes_path", ""); pyflakesPath != "" {
-			args = append(args, "-pyflakes", pyflakesPath)
+
+		// Add note if specific files were requested but not supported
+		if workflowFiles != "" {
+			result = fmt.Sprintf("Note: Specific workflow files (%s) not yet supported with external tools, scanned directory instead.\n\n%s", workflowFiles, result)
 		}
-		if request.GetBool("color", false) {
-			args = append(args, "-color")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Actionlint get version tool
@@ -109,7 +126,20 @@ func AddActionlintTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		mcp.WithDescription("Get Actionlint version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"actionlint", "-version"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create actionlint module and get version
+		actionlintModule := modules.NewActionlintModule(client)
+		result, err := actionlintModule.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("actionlint version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 }

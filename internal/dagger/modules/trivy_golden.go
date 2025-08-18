@@ -13,6 +13,8 @@ type TrivyGoldenModule struct {
 	name   string
 }
 
+const trivyGoldenBinary = "/usr/local/bin/trivy"
+
 // NewTrivyGoldenModule creates a new Trivy Golden module
 func NewTrivyGoldenModule(client *dagger.Client) *TrivyGoldenModule {
 	return &TrivyGoldenModule{
@@ -26,7 +28,7 @@ func (m *TrivyGoldenModule) ScanGoldenImage(ctx context.Context, imageName strin
 	container := m.client.Container().
 		From("aquasec/trivy:latest").
 		WithExec([]string{
-			"trivy",
+			trivyGoldenBinary,
 			"image",
 			"--format", "json",
 			"--severity", "HIGH,CRITICAL",
@@ -72,7 +74,7 @@ func (m *TrivyGoldenModule) ValidateImagePolicy(ctx context.Context, imageName s
 		From("aquasec/trivy:latest").
 		WithFile("/policy.rego", m.client.Host().File(policyPath)).
 		WithExec([]string{
-			"trivy",
+			trivyGoldenBinary,
 			"image",
 			"--format", "json",
 			"--severity", "HIGH,CRITICAL",
@@ -93,7 +95,7 @@ func (m *TrivyGoldenModule) GenerateImageAttestation(ctx context.Context, imageN
 	container := m.client.Container().
 		From("aquasec/trivy:latest").
 		WithExec([]string{
-			"trivy",
+			trivyGoldenBinary,
 			"image",
 			"--format", "cosign-vuln",
 			imageName,
@@ -111,7 +113,7 @@ func (m *TrivyGoldenModule) GenerateImageAttestation(ctx context.Context, imageN
 func (m *TrivyGoldenModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("aquasec/trivy:latest").
-		WithExec([]string{"trivy", "version"})
+		WithExec([]string{trivyGoldenBinary, "version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

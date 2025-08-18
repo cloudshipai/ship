@@ -14,6 +14,8 @@ type ToolService struct {
 	port   int
 }
 
+const goBinary = "/usr/local/go/bin/go"
+
 // SteampipeService exposes Steampipe as an HTTP API service
 func NewSteampipeService(client *dagger.Client) *dagger.Service {
 	// Create a container that runs an HTTP API for Steampipe
@@ -21,7 +23,7 @@ func NewSteampipeService(client *dagger.Client) *dagger.Service {
 		From("golang:1.21-alpine").
 		WithExec([]string{"apk", "add", "--no-cache", "curl"}).
 		WithNewFile("/app/server.go", steampipeServerCode).
-		WithExec([]string{"go", "run", "/app/server.go"}).
+		WithExec([]string{goBinary, "run", "/app/server.go"}).
 		WithExposedPort(8001).
 		WithEnvVariable("SERVICE_NAME", "steampipe").
 		AsService()
@@ -34,7 +36,7 @@ func NewOpenInfraQuoteService(client *dagger.Client) *dagger.Service {
 	container := client.Container().
 		From("golang:1.21-alpine").
 		WithNewFile("/app/server.go", costAnalysisServerCode).
-		WithExec([]string{"go", "run", "/app/server.go"}).
+		WithExec([]string{goBinary, "run", "/app/server.go"}).
 		WithExposedPort(8002).
 		WithEnvVariable("SERVICE_NAME", "openinfraquote").
 		AsService()
@@ -47,7 +49,7 @@ func NewTerraformDocsService(client *dagger.Client) *dagger.Service {
 	container := client.Container().
 		From("golang:1.21-alpine").
 		WithNewFile("/app/server.go", terraformDocsServerCode).
-		WithExec([]string{"go", "run", "/app/server.go"}).
+		WithExec([]string{goBinary, "run", "/app/server.go"}).
 		WithExposedPort(8003).
 		WithEnvVariable("SERVICE_NAME", "terraform-docs").
 		AsService()
@@ -60,7 +62,7 @@ func NewInfraMapService(client *dagger.Client) *dagger.Service {
 	container := client.Container().
 		From("golang:1.21-alpine").
 		WithNewFile("/app/server.go", infraMapServerCode).
-		WithExec([]string{"go", "run", "/app/server.go"}).
+		WithExec([]string{goBinary, "run", "/app/server.go"}).
 		WithExposedPort(8005).
 		WithEnvVariable("SERVICE_NAME", "inframap").
 		AsService()
@@ -76,7 +78,7 @@ func NewToolRegistryService(client *dagger.Client, services map[string]*dagger.S
 	registryContainer := client.Container().
 		From("golang:1.21-alpine").
 		WithNewFile("/app/registry.go", registryCode).
-		WithExec([]string{"go", "run", "/app/registry.go"}).
+		WithExec([]string{goBinary, "run", "/app/registry.go"}).
 		WithExposedPort(8000)
 
 	// Bind all services to the registry container

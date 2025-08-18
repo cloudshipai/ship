@@ -2,14 +2,23 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddHadolintTools adds Hadolint (Dockerfile linter) MCP tool implementations
+// AddHadolintTools adds Hadolint (Dockerfile linter) MCP tool implementations using direct Dagger calls
 func AddHadolintTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addHadolintToolsDirect(s)
+}
+
+// addHadolintToolsDirect adds Hadolint tools using direct Dagger module calls
+func addHadolintToolsDirect(s *server.MCPServer) {
 	// Hadolint scan Dockerfile tool
 	scanDockerfileTool := mcp.NewTool("hadolint_scan_dockerfile",
 		mcp.WithDescription("Scan Dockerfile for best practices and security issues"),
@@ -23,12 +32,29 @@ func AddHadolintTools(s *server.MCPServer, executeShipCommand ExecuteShipCommand
 		),
 	)
 	s.AddTool(scanDockerfileTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		dockerfilePath := request.GetString("dockerfile_path", "")
-		args := []string{"hadolint", dockerfilePath}
-		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--format", format)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewHadolintModule(client)
+
+		// Get Dockerfile path
+		dockerfilePath := request.GetString("dockerfile_path", "")
+		if dockerfilePath == "" {
+			return mcp.NewToolResultError("dockerfile_path is required"), nil
+		}
+
+		// Scan Dockerfile
+		output, err := module.ScanDockerfile(ctx, dockerfilePath)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to scan Dockerfile: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Hadolint scan directory tool
@@ -44,14 +70,29 @@ func AddHadolintTools(s *server.MCPServer, executeShipCommand ExecuteShipCommand
 		),
 	)
 	s.AddTool(scanDirectoryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		directory := request.GetString("directory", "")
-		// Hadolint doesn't support directory scanning directly - scan individual Dockerfiles
-		args := []string{"sh", "-c", "find " + directory + " -name 'Dockerfile*' -exec hadolint {} +"}
-		if format := request.GetString("format", ""); format != "" {
-			// Add format to find command
-			args = []string{"sh", "-c", "find " + directory + " -name 'Dockerfile*' -exec hadolint --format " + format + " {} +"}
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewHadolintModule(client)
+
+		// Get directory
+		directory := request.GetString("directory", "")
+		if directory == "" {
+			return mcp.NewToolResultError("directory is required"), nil
+		}
+
+		// Scan directory
+		output, err := module.ScanDirectory(ctx, directory)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to scan directory: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Hadolint scan with config tool
@@ -71,13 +112,34 @@ func AddHadolintTools(s *server.MCPServer, executeShipCommand ExecuteShipCommand
 		),
 	)
 	s.AddTool(scanWithConfigTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		dockerfilePath := request.GetString("dockerfile_path", "")
-		configFile := request.GetString("config_file", "")
-		args := []string{"hadolint", "--config", configFile, dockerfilePath}
-		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--format", format)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewHadolintModule(client)
+
+		// Get parameters
+		dockerfilePath := request.GetString("dockerfile_path", "")
+		if dockerfilePath == "" {
+			return mcp.NewToolResultError("dockerfile_path is required"), nil
+		}
+		
+		configFile := request.GetString("config_file", "")
+		if configFile == "" {
+			return mcp.NewToolResultError("config_file is required"), nil
+		}
+
+		// Scan with config
+		output, err := module.ScanWithConfig(ctx, dockerfilePath, configFile)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to scan with config: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Hadolint scan with ignore rules tool
@@ -96,21 +158,38 @@ func AddHadolintTools(s *server.MCPServer, executeShipCommand ExecuteShipCommand
 		),
 	)
 	s.AddTool(scanIgnoreRulesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewHadolintModule(client)
+
+		// Get parameters
 		dockerfilePath := request.GetString("dockerfile_path", "")
-		args := []string{"hadolint", dockerfilePath}
-		
-		if ignoreRules := request.GetString("ignore_rules", ""); ignoreRules != "" {
-			// Split comma-separated rules and add each as --ignore flag
-			rules := strings.Split(ignoreRules, ",")
+		if dockerfilePath == "" {
+			return mcp.NewToolResultError("dockerfile_path is required"), nil
+		}
+
+		// Parse ignore rules
+		var ignoreRules []string
+		if ignoreRulesStr := request.GetString("ignore_rules", ""); ignoreRulesStr != "" {
+			rules := strings.Split(ignoreRulesStr, ",")
 			for _, rule := range rules {
-				args = append(args, "--ignore", strings.TrimSpace(rule))
+				ignoreRules = append(ignoreRules, strings.TrimSpace(rule))
 			}
 		}
-		if format := request.GetString("format", ""); format != "" {
-			args = append(args, "--format", format)
+
+		// Scan with ignore rules
+		output, err := module.ScanIgnoreRules(ctx, dockerfilePath, ignoreRules)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to scan with ignore rules: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Hadolint get version tool
@@ -118,7 +197,22 @@ func AddHadolintTools(s *server.MCPServer, executeShipCommand ExecuteShipCommand
 		mcp.WithDescription("Get Hadolint version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"hadolint", "--version"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewHadolintModule(client)
+
+		// Get version
+		version, err := module.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to get version: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(version), nil
 	})
 }

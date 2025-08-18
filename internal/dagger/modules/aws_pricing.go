@@ -13,6 +13,8 @@ type AWSPricingModule struct {
 	name   string
 }
 
+const awsPricingCLIBinary = "/usr/local/bin/aws"
+
 // NewAWSPricingModule creates a new AWS pricing module
 func NewAWSPricingModule(client *dagger.Client) *AWSPricingModule {
 	return &AWSPricingModule{
@@ -32,7 +34,7 @@ func (m *AWSPricingModule) GetServicePricing(ctx context.Context, service, regio
 
 	container := m.client.Container().
 		From("amazon/aws-cli:latest").
-		WithExec([]string{"aws", "pricing", "describe-services", 
+		WithExec([]string{awsPricingCLIBinary, "pricing", "describe-services", 
 			"--service-code", service,
 			"--region", "us-east-1", // Pricing API is only available in us-east-1
 			"--format-version", "aws_v1",
@@ -58,7 +60,7 @@ func (m *AWSPricingModule) GetEC2Pricing(ctx context.Context, instanceType, regi
 	// Use AWS CLI to get EC2 pricing
 	container := m.client.Container().
 		From("amazon/aws-cli:latest").
-		WithExec([]string{"aws", "pricing", "get-products",
+		WithExec([]string{awsPricingCLIBinary, "pricing", "get-products",
 			"--service-code", "AmazonEC2",
 			"--region", "us-east-1", // Pricing API is only available in us-east-1
 			"--filters",
@@ -93,7 +95,7 @@ func (m *AWSPricingModule) GetRDSPricing(ctx context.Context, instanceClass, eng
 
 	container := m.client.Container().
 		From("amazon/aws-cli:latest").
-		WithExec([]string{"aws", "pricing", "get-products",
+		WithExec([]string{awsPricingCLIBinary, "pricing", "get-products",
 			"--service-code", "AmazonRDS",
 			"--region", "us-east-1", // Pricing API is only available in us-east-1
 			"--filters",
@@ -117,7 +119,7 @@ func (m *AWSPricingModule) GetRDSPricing(ctx context.Context, instanceClass, eng
 func (m *AWSPricingModule) ListServices(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("amazon/aws-cli:latest").
-		WithExec([]string{"aws", "pricing", "describe-services",
+		WithExec([]string{awsPricingCLIBinary, "pricing", "describe-services",
 			"--region", "us-east-1", // Pricing API is only available in us-east-1
 			"--format-version", "aws_v1",
 		})
@@ -209,6 +211,69 @@ esac
 	return output, nil
 }
 
+// DescribeServices gets metadata for AWS services and their pricing attributes
+func (m *AWSPricingModule) DescribeServices(ctx context.Context, serviceCode string, maxItems string) (string, error) {
+	args := []string{"aws", "pricing", "describe-services", "--region", "us-east-1"}
+	
+	if serviceCode != "" {
+		args = append(args, "--service-code", serviceCode)
+	}
+	if maxItems != "" {
+		args = append(args, "--max-items", maxItems)
+	}
+
+	container := m.client.Container().
+		From("amazon/aws-cli:latest").
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to describe services: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetProducts gets AWS pricing information for products that match filter criteria
+func (m *AWSPricingModule) GetProducts(ctx context.Context, serviceCode, filters, formatVersion, maxItems string) (string, error) {
+	args := []string{"aws", "pricing", "get-products", "--service-code", serviceCode, "--region", "us-east-1"}
+	
+	if filters != "" {
+		args = append(args, "--filters", filters)
+	}
+	if formatVersion != "" {
+		args = append(args, "--format-version", formatVersion)
+	}
+	if maxItems != "" {
+		args = append(args, "--max-items", maxItems)
+	}
+
+	container := m.client.Container().
+		From("amazon/aws-cli:latest").
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get products: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetVersion returns the AWS CLI version
+func (m *AWSPricingModule) GetVersion(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("amazon/aws-cli:latest").
+		WithExec([]string{awsPricingCLIBinary, "--version"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get AWS CLI version: %w", err)
+	}
+
+	return output, nil
+}
+
 // getLocationFromRegion converts AWS region to pricing API location format
 func getLocationFromRegion(region string) string {
 	regionMap := map[string]string{
@@ -237,14 +302,16 @@ func getLocationFromRegion(region string) string {
 }
 
 // GetAttributeValues gets available attribute values for AWS service pricing filters
-func (m *AWSPricingModule) GetAttributeValues(ctx context.Context, serviceCode, attributeName string) (string, error) {
+func (m *AWSPricingModule) GetAttributeValues(ctx context.Context, serviceCode, attributeName, maxItems string) (string, error) {
+	args := []string{"aws", "pricing", "get-attribute-values", "--service-code", serviceCode, "--attribute-name", attributeName, "--region", "us-east-1"}
+	
+	if maxItems != "" {
+		args = append(args, "--max-items", maxItems)
+	}
+
 	container := m.client.Container().
 		From("amazon/aws-cli:latest").
-		WithExec([]string{"aws", "pricing", "get-attribute-values",
-			"--service-code", serviceCode,
-			"--attribute-name", attributeName,
-			"--region", "us-east-1", // Pricing API is only available in us-east-1
-		})
+		WithExec(args)
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

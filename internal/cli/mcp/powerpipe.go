@@ -2,14 +2,22 @@ package mcp
 
 import (
 	"context"
-	"strconv"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddPowerpipeTools adds Powerpipe MCP tool implementations using real powerpipe CLI commands
+// AddPowerpipeTools adds Powerpipe MCP tool implementations using direct Dagger calls
 func AddPowerpipeTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addPowerpipeToolsDirect(s)
+}
+
+// addPowerpipeToolsDirect adds Powerpipe tools using direct Dagger module calls
+func addPowerpipeToolsDirect(s *server.MCPServer) {
 	// Powerpipe benchmark run tool
 	benchmarkRunTool := mcp.NewTool("powerpipe_benchmark_run",
 		mcp.WithDescription("Run security and compliance benchmarks using real powerpipe CLI"),
@@ -29,20 +37,35 @@ func AddPowerpipeTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		),
 	)
 	s.AddTool(benchmarkRunTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPowerpipeModule(client)
+
+		// Get parameters
 		benchmark := request.GetString("benchmark", "")
-		args := []string{"powerpipe", "benchmark", "run", benchmark}
-		
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "--output", output)
+		if benchmark == "" {
+			return mcp.NewToolResultError("benchmark is required"), nil
 		}
-		if modLocation := request.GetString("mod_location", ""); modLocation != "" {
-			args = append(args, "--mod-location", modLocation)
+		modLocation := request.GetString("mod_location", "")
+
+		// Note: Dagger module doesn't support output format and workspace options
+		if request.GetString("output", "") != "" || request.GetString("workspace", "") != "" {
+			return mcp.NewToolResultError("output format and workspace options not supported in Dagger module"), nil
 		}
-		if workspace := request.GetString("workspace", ""); workspace != "" {
-			args = append(args, "--workspace", workspace)
+
+		// Run benchmark
+		output, err := module.RunBenchmark(ctx, benchmark, modLocation)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("powerpipe benchmark run failed: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Powerpipe benchmark list tool
@@ -57,16 +80,31 @@ func AddPowerpipeTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		),
 	)
 	s.AddTool(benchmarkListTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"powerpipe", "benchmark", "list"}
-		
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "--output", output)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if modLocation := request.GetString("mod_location", ""); modLocation != "" {
-			args = append(args, "--mod-location", modLocation)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPowerpipeModule(client)
+
+		// Get parameters
+		modLocation := request.GetString("mod_location", "")
+
+		// Note: Dagger module doesn't support output format option
+		if request.GetString("output", "") != "" {
+			return mcp.NewToolResultError("output format option not supported in Dagger module"), nil
 		}
-		
-		return executeShipCommand(args)
+
+		// List benchmarks
+		output, err := module.ListBenchmarks(ctx, modLocation)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("powerpipe benchmark list failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Powerpipe query run tool
@@ -85,17 +123,35 @@ func AddPowerpipeTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		),
 	)
 	s.AddTool(queryRunTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPowerpipeModule(client)
+
+		// Get parameters
 		query := request.GetString("query", "")
-		args := []string{"powerpipe", "query", "run", query}
-		
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "--output", output)
+		if query == "" {
+			return mcp.NewToolResultError("query is required"), nil
 		}
-		if modLocation := request.GetString("mod_location", ""); modLocation != "" {
-			args = append(args, "--mod-location", modLocation)
+		modLocation := request.GetString("mod_location", "")
+
+		// Note: Dagger module doesn't support output format option
+		if request.GetString("output", "") != "" {
+			return mcp.NewToolResultError("output format option not supported in Dagger module"), nil
 		}
-		
-		return executeShipCommand(args)
+
+		// Run query
+		output, err := module.RunQuery(ctx, query, modLocation)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("powerpipe query run failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Powerpipe query list tool
@@ -110,16 +166,31 @@ func AddPowerpipeTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		),
 	)
 	s.AddTool(queryListTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"powerpipe", "query", "list"}
-		
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "--output", output)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if modLocation := request.GetString("mod_location", ""); modLocation != "" {
-			args = append(args, "--mod-location", modLocation)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPowerpipeModule(client)
+
+		// Get parameters
+		modLocation := request.GetString("mod_location", "")
+
+		// Note: Dagger module doesn't support output format option
+		if request.GetString("output", "") != "" {
+			return mcp.NewToolResultError("output format option not supported in Dagger module"), nil
 		}
-		
-		return executeShipCommand(args)
+
+		// List queries
+		output, err := module.ListQueries(ctx, modLocation)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("powerpipe query list failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Powerpipe server start tool
@@ -140,22 +211,32 @@ func AddPowerpipeTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		),
 	)
 	s.AddTool(serverTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"powerpipe", "server"}
-		
-		if listen := request.GetString("listen", ""); listen != "" {
-			args = append(args, "--listen", listen)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if port := request.GetInt("port", 0); port > 0 {
-			args = append(args, "--port", strconv.Itoa(port))
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPowerpipeModule(client)
+
+		// Get parameters
+		port := request.GetInt("port", 0)
+		modLocation := request.GetString("mod_location", "")
+
+		// Note: Dagger module doesn't support listen and workspace options
+		if request.GetString("listen", "") != "" || request.GetString("workspace", "") != "" {
+			return mcp.NewToolResultError("listen and workspace options not supported in Dagger module"), nil
 		}
-		if modLocation := request.GetString("mod_location", ""); modLocation != "" {
-			args = append(args, "--mod-location", modLocation)
+
+		// Start server
+		output, err := module.StartServer(ctx, modLocation, port)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("powerpipe server failed: %v", err)), nil
 		}
-		if workspace := request.GetString("workspace", ""); workspace != "" {
-			args = append(args, "--workspace", workspace)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Powerpipe dashboard list tool
@@ -170,16 +251,31 @@ func AddPowerpipeTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		),
 	)
 	s.AddTool(dashboardListTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"powerpipe", "dashboard", "list"}
-		
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "--output", output)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if modLocation := request.GetString("mod_location", ""); modLocation != "" {
-			args = append(args, "--mod-location", modLocation)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPowerpipeModule(client)
+
+		// Get parameters
+		modLocation := request.GetString("mod_location", "")
+
+		// Note: Dagger module doesn't support output format option
+		if request.GetString("output", "") != "" {
+			return mcp.NewToolResultError("output format option not supported in Dagger module"), nil
 		}
-		
-		return executeShipCommand(args)
+
+		// List dashboards
+		output, err := module.ListDashboards(ctx, modLocation)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("powerpipe dashboard list failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Powerpipe version tool
@@ -187,7 +283,22 @@ func AddPowerpipeTools(s *server.MCPServer, executeShipCommand ExecuteShipComman
 		mcp.WithDescription("Get Powerpipe version information using real powerpipe CLI"),
 	)
 	s.AddTool(versionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"powerpipe", "--version"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewPowerpipeModule(client)
+
+		// Get version
+		output, err := module.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("powerpipe version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 }

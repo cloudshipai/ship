@@ -13,6 +13,11 @@ type HistoryScrubModule struct {
 	name   string
 }
 
+const (
+	gitFilterRepoBinary = "/usr/local/bin/git-filter-repo"
+	historyScrubGitleaksBinary = "/usr/local/bin/gitleaks"
+)
+
 // NewHistoryScrubModule creates a new Git history scrub module
 func NewHistoryScrubModule(client *dagger.Client) *HistoryScrubModule {
 	return &HistoryScrubModule{
@@ -65,7 +70,7 @@ func (m *HistoryScrubModule) RemoveSecretsWithGitFilter(ctx context.Context, rep
 		container = container.WithFile("/patterns.txt", m.client.Host().File(patternsFile))
 	}
 
-	cmd := []string{"git-filter-repo", "--replace-text", "/patterns.txt"}
+	cmd := []string{gitFilterRepoBinary, "--replace-text", "/patterns.txt"}
 	if dryRun {
 		cmd = append(cmd, "--dry-run")
 	}
@@ -107,7 +112,7 @@ func (m *HistoryScrubModule) VerifyHistoryClean(ctx context.Context, repoPath st
 	case "gitleaks":
 		container = container.WithExec([]string{"wget", "-O", "/usr/local/bin/gitleaks", "https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_linux_x64"}).
 			WithExec([]string{"chmod", "+x", "/usr/local/bin/gitleaks"})
-		cmd = []string{"gitleaks", "detect", "--source", ".", "--format", "json"}
+		cmd = []string{historyScrubGitleaksBinary, "detect", "--source", ".", "--format", "json"}
 	case "git-secrets":
 		container = container.WithExec([]string{"apk", "add", "--no-cache", "bash"}).
 			WithExec([]string{"git", "clone", "https://github.com/awslabs/git-secrets.git", "/git-secrets"}).

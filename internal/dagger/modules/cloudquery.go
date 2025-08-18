@@ -13,6 +13,8 @@ type CloudQueryModule struct {
 	name   string
 }
 
+const cloudQueryBinary = "/app/cloudquery"
+
 // NewCloudQueryModule creates a new CloudQuery module
 func NewCloudQueryModule(client *dagger.Client) *CloudQueryModule {
 	return &CloudQueryModule{
@@ -27,7 +29,7 @@ func (m *CloudQueryModule) SyncWithConfig(ctx context.Context, configPath string
 		From("ghcr.io/cloudquery/cloudquery:latest").
 		WithDirectory("/config", m.client.Host().Directory(configPath)).
 		WithExec([]string{
-			"cloudquery",
+			cloudQueryBinary,
 			"sync",
 			"/config/config.yml",
 		})
@@ -46,7 +48,7 @@ func (m *CloudQueryModule) ValidateConfig(ctx context.Context, configPath string
 		From("ghcr.io/cloudquery/cloudquery:latest").
 		WithDirectory("/config", m.client.Host().Directory(configPath)).
 		WithExec([]string{
-			"cloudquery",
+			cloudQueryBinary,
 			"validate-config",
 			"/config/config.yml",
 		})
@@ -64,7 +66,7 @@ func (m *CloudQueryModule) ListProviders(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("ghcr.io/cloudquery/cloudquery:latest").
 		WithExec([]string{
-			"cloudquery",
+			cloudQueryBinary,
 			"provider",
 			"list",
 		})
@@ -83,7 +85,7 @@ func (m *CloudQueryModule) MigrateConfig(ctx context.Context, configPath string)
 		From("ghcr.io/cloudquery/cloudquery:latest").
 		WithDirectory("/config", m.client.Host().Directory(configPath)).
 		WithExec([]string{
-			"cloudquery",
+			cloudQueryBinary,
 			"migrate",
 			"/config/config.yml",
 		})
@@ -124,7 +126,7 @@ func (m *CloudQueryModule) TestConnection(ctx context.Context, configPath string
 		From("ghcr.io/cloudquery/cloudquery:latest").
 		WithDirectory("/config", m.client.Host().Directory(configPath)).
 		WithExec([]string{
-			"cloudquery",
+			cloudQueryBinary,
 			"test-connection",
 			"/config/config.yml",
 		})
@@ -213,6 +215,65 @@ func (m *CloudQueryModule) GetVersion(ctx context.Context) (string, error) {
 	output, err := container.Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get cloudquery version: %w", err)
+	}
+
+	return output, nil
+}
+
+// SyncWithOptions syncs cloud resources with configurable options
+func (m *CloudQueryModule) SyncWithOptions(ctx context.Context, configPath string, logLevel string, noMigrate bool) (string, error) {
+	args := []string{"cloudquery", "sync", "/config"}
+	
+	if logLevel != "" {
+		args = append(args, "--log-level", logLevel)
+	}
+	if noMigrate {
+		args = append(args, "--no-migrate")
+	}
+
+	container := m.client.Container().
+		From("ghcr.io/cloudquery/cloudquery:latest").
+		WithFile("/config", m.client.Host().File(configPath)).
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to run cloudquery sync with options: %w", err)
+	}
+
+	return output, nil
+}
+
+// MigrateWithOptions migrates schema with configurable options
+func (m *CloudQueryModule) MigrateWithOptions(ctx context.Context, configPath string, logLevel string) (string, error) {
+	args := []string{"cloudquery", "migrate", "/config"}
+	
+	if logLevel != "" {
+		args = append(args, "--log-level", logLevel)
+	}
+
+	container := m.client.Container().
+		From("ghcr.io/cloudquery/cloudquery:latest").
+		WithFile("/config", m.client.Host().File(configPath)).
+		WithExec(args)
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to run cloudquery migrate with options: %w", err)
+	}
+
+	return output, nil
+}
+
+// Switch between CloudQuery contexts or configurations
+func (m *CloudQueryModule) Switch(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("ghcr.io/cloudquery/cloudquery:latest").
+		WithExec([]string{"cloudquery", "switch"})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to run cloudquery switch: %w", err)
 	}
 
 	return output, nil

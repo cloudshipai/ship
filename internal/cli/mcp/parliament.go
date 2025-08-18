@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddParliamentTools adds Parliament (AWS IAM policy linter) MCP tool implementations using real CLI commands
+// AddParliamentTools adds Parliament (AWS IAM policy linter) MCP tool implementations using direct Dagger calls
 func AddParliamentTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addParliamentToolsDirect(s)
+}
+
+// addParliamentToolsDirect adds Parliament tools using direct Dagger module calls
+func addParliamentToolsDirect(s *server.MCPServer) {
 	// Parliament lint policy file tool
 	lintPolicyFileTool := mcp.NewTool("parliament_lint_file",
 		mcp.WithDescription("Lint AWS IAM policy file using real parliament CLI"),
@@ -24,17 +33,34 @@ func AddParliamentTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(lintPolicyFileTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewParliamentModule(client)
+
+		// Get parameters
 		policyPath := request.GetString("policy_path", "")
-		args := []string{"parliament", "--file", policyPath}
-		
-		if config := request.GetString("config", ""); config != "" {
-			args = append(args, "--config", config)
+		if policyPath == "" {
+			return mcp.NewToolResultError("policy_path is required"), nil
 		}
-		if request.GetBool("json_output", false) {
-			args = append(args, "--json")
+
+		// Note: Dagger module doesn't support config and json_output options for basic linting
+		if request.GetString("config", "") != "" || request.GetBool("json_output", false) {
+			return mcp.NewToolResultError("config and json_output options not supported in Dagger module for basic file linting"), nil
 		}
-		
-		return executeShipCommand(args)
+
+		// Lint policy file
+		output, err := module.LintPolicyFile(ctx, policyPath)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("parliament lint failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Parliament lint policy directory tool
@@ -58,23 +84,35 @@ func AddParliamentTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(lintPolicyDirectoryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewParliamentModule(client)
+
+		// Get parameters
 		directory := request.GetString("directory", "")
-		args := []string{"parliament", "--directory", directory}
-		
-		if config := request.GetString("config", ""); config != "" {
-			args = append(args, "--config", config)
+		if directory == "" {
+			return mcp.NewToolResultError("directory is required"), nil
 		}
-		if request.GetBool("json_output", false) {
-			args = append(args, "--json")
+
+		// Note: Dagger module doesn't support advanced directory options
+		if request.GetString("config", "") != "" || request.GetBool("json_output", false) ||
+			request.GetString("include_policy_extension", "") != "" || request.GetString("exclude_pattern", "") != "" {
+			return mcp.NewToolResultError("advanced directory options not supported in Dagger module"), nil
 		}
-		if extension := request.GetString("include_policy_extension", ""); extension != "" {
-			args = append(args, "--include_policy_extension", extension)
+
+		// Lint policy directory
+		output, err := module.LintPolicyDirectory(ctx, directory)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("parliament directory lint failed: %v", err)), nil
 		}
-		if pattern := request.GetString("exclude_pattern", ""); pattern != "" {
-			args = append(args, "--exclude_pattern", pattern)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Parliament lint policy string tool
@@ -92,17 +130,34 @@ func AddParliamentTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(lintPolicyStringTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewParliamentModule(client)
+
+		// Get parameters
 		policyJSON := request.GetString("policy_json", "")
-		args := []string{"parliament", "--string", policyJSON}
-		
-		if config := request.GetString("config", ""); config != "" {
-			args = append(args, "--config", config)
+		if policyJSON == "" {
+			return mcp.NewToolResultError("policy_json is required"), nil
 		}
-		if request.GetBool("json_output", false) {
-			args = append(args, "--json")
+
+		// Note: Dagger module doesn't support config and json_output options for string linting
+		if request.GetString("config", "") != "" || request.GetBool("json_output", false) {
+			return mcp.NewToolResultError("config and json_output options not supported in Dagger module for string linting"), nil
 		}
-		
-		return executeShipCommand(args)
+
+		// Lint policy string
+		output, err := module.LintPolicyString(ctx, policyJSON)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("parliament string lint failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Parliament lint with community auditors tool
@@ -120,17 +175,34 @@ func AddParliamentTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(lintWithCommunityAuditorsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewParliamentModule(client)
+
+		// Get parameters
 		policyPath := request.GetString("policy_path", "")
-		args := []string{"parliament", "--file", policyPath, "--include-community-auditors"}
-		
-		if config := request.GetString("config", ""); config != "" {
-			args = append(args, "--config", config)
+		if policyPath == "" {
+			return mcp.NewToolResultError("policy_path is required"), nil
 		}
-		if request.GetBool("json_output", false) {
-			args = append(args, "--json")
+
+		// Note: Dagger module doesn't support config and json_output options for community auditors
+		if request.GetString("config", "") != "" || request.GetBool("json_output", false) {
+			return mcp.NewToolResultError("config and json_output options not supported in Dagger module for community auditors"), nil
 		}
-		
-		return executeShipCommand(args)
+
+		// Lint with community auditors
+		output, err := module.LintWithCommunityAuditors(ctx, policyPath)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("parliament community auditors lint failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Parliament lint with private auditors tool
@@ -152,18 +224,38 @@ func AddParliamentTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(lintWithPrivateAuditorsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewParliamentModule(client)
+
+		// Get parameters
 		policyPath := request.GetString("policy_path", "")
+		if policyPath == "" {
+			return mcp.NewToolResultError("policy_path is required"), nil
+		}
 		privateAuditors := request.GetString("private_auditors", "")
-		args := []string{"parliament", "--file", policyPath, "--private_auditors", privateAuditors}
-		
-		if config := request.GetString("config", ""); config != "" {
-			args = append(args, "--config", config)
+		if privateAuditors == "" {
+			return mcp.NewToolResultError("private_auditors is required"), nil
 		}
-		if request.GetBool("json_output", false) {
-			args = append(args, "--json")
+
+		// Note: Dagger module doesn't support config and json_output options for private auditors
+		if request.GetString("config", "") != "" || request.GetBool("json_output", false) {
+			return mcp.NewToolResultError("config and json_output options not supported in Dagger module for private auditors"), nil
 		}
-		
-		return executeShipCommand(args)
+
+		// Lint with private auditors
+		output, err := module.LintWithPrivateAuditors(ctx, policyPath, privateAuditors)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("parliament private auditors lint failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Parliament lint AWS managed policies tool
@@ -177,16 +269,27 @@ func AddParliamentTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(lintAwsManagedPolicesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"parliament", "--aws-managed-policies"}
-		
-		if config := request.GetString("config", ""); config != "" {
-			args = append(args, "--config", config)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		if request.GetBool("json_output", false) {
-			args = append(args, "--json")
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewParliamentModule(client)
+
+		// Get parameters
+		config := request.GetString("config", "")
+		jsonOutput := request.GetBool("json_output", false)
+
+		// Lint AWS managed policies
+		output, err := module.LintAWSManagedPolicies(ctx, config, jsonOutput)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("parliament AWS managed policies lint failed: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Parliament lint auth details file tool
@@ -204,17 +307,31 @@ func AddParliamentTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(lintAuthDetailsFileTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewParliamentModule(client)
+
+		// Get parameters
 		authDetailsFile := request.GetString("auth_details_file", "")
-		args := []string{"parliament", "--auth-details-file", authDetailsFile}
-		
-		if config := request.GetString("config", ""); config != "" {
-			args = append(args, "--config", config)
+		if authDetailsFile == "" {
+			return mcp.NewToolResultError("auth_details_file is required"), nil
 		}
-		if request.GetBool("json_output", false) {
-			args = append(args, "--json")
+		config := request.GetString("config", "")
+		jsonOutput := request.GetBool("json_output", false)
+
+		// Lint auth details file
+		output, err := module.LintAuthDetailsFile(ctx, authDetailsFile, config, jsonOutput)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("parliament auth details lint failed: %v", err)), nil
 		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Parliament comprehensive analysis tool
@@ -235,20 +352,32 @@ func AddParliamentTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(comprehensiveAnalysisTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewParliamentModule(client)
+
+		// Get parameters
 		policyPath := request.GetString("policy_path", "")
-		args := []string{"parliament", "--file", policyPath, "--include-community-auditors"}
-		
-		if privateAuditors := request.GetString("private_auditors", ""); privateAuditors != "" {
-			args = append(args, "--private_auditors", privateAuditors)
+		if policyPath == "" {
+			return mcp.NewToolResultError("policy_path is required"), nil
 		}
-		if config := request.GetString("config", ""); config != "" {
-			args = append(args, "--config", config)
+		privateAuditors := request.GetString("private_auditors", "")
+		config := request.GetString("config", "")
+		jsonOutput := request.GetBool("json_output", false)
+
+		// Comprehensive analysis
+		output, err := module.ComprehensiveAnalysis(ctx, policyPath, privateAuditors, config, jsonOutput)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("parliament comprehensive analysis failed: %v", err)), nil
 		}
-		if request.GetBool("json_output", false) {
-			args = append(args, "--json")
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Parliament batch directory analysis tool
@@ -275,25 +404,33 @@ func AddParliamentTools(s *server.MCPServer, executeShipCommand ExecuteShipComma
 		),
 	)
 	s.AddTool(batchDirectoryAnalysisTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewParliamentModule(client)
+
+		// Get parameters
 		baseDirectory := request.GetString("base_directory", "")
-		args := []string{"parliament", "--directory", baseDirectory, "--include-community-auditors"}
-		
-		if privateAuditors := request.GetString("private_auditors", ""); privateAuditors != "" {
-			args = append(args, "--private_auditors", privateAuditors)
+		if baseDirectory == "" {
+			return mcp.NewToolResultError("base_directory is required"), nil
 		}
-		if config := request.GetString("config", ""); config != "" {
-			args = append(args, "--config", config)
+		privateAuditors := request.GetString("private_auditors", "")
+		config := request.GetString("config", "")
+		jsonOutput := request.GetBool("json_output", false)
+		includeExtension := request.GetString("include_policy_extension", "")
+		excludePattern := request.GetString("exclude_pattern", "")
+
+		// Batch directory analysis
+		output, err := module.BatchDirectoryAnalysis(ctx, baseDirectory, config, privateAuditors, jsonOutput, includeExtension, excludePattern)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("parliament batch directory analysis failed: %v", err)), nil
 		}
-		if request.GetBool("json_output", false) {
-			args = append(args, "--json")
-		}
-		if extension := request.GetString("include_policy_extension", ""); extension != "" {
-			args = append(args, "--include_policy_extension", extension)
-		}
-		if pattern := request.GetString("exclude_pattern", ""); pattern != "" {
-			args = append(args, "--exclude_pattern", pattern)
-		}
-		
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 }

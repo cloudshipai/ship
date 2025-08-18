@@ -13,6 +13,8 @@ type CustodianModule struct {
 	name   string
 }
 
+const custodianBinary = "/src/.venv/bin/custodian"
+
 // NewCustodianModule creates a new Cloud Custodian module
 func NewCustodianModule(client *dagger.Client) *CustodianModule {
 	return &CustodianModule{
@@ -27,8 +29,8 @@ func (m *CustodianModule) RunPolicy(ctx context.Context, policyPath string, outp
 		From("cloudcustodian/c7n:latest").
 		WithFile("/policy.yml", m.client.Host().File(policyPath)).
 		WithExec([]string{
-			"custodian", "run",
-			"--output-dir", "/output",
+			custodianBinary, "run",
+			"-s", "/output",
 			"/policy.yml",
 		})
 
@@ -46,7 +48,7 @@ func (m *CustodianModule) ValidatePolicy(ctx context.Context, policyPath string)
 		From("cloudcustodian/c7n:latest").
 		WithFile("/policy.yml", m.client.Host().File(policyPath)).
 		WithExec([]string{
-			"custodian", "validate",
+			custodianBinary, "validate",
 			"/policy.yml",
 		})
 
@@ -64,8 +66,9 @@ func (m *CustodianModule) DryRun(ctx context.Context, policyPath string) (string
 		From("cloudcustodian/c7n:latest").
 		WithFile("/policy.yml", m.client.Host().File(policyPath)).
 		WithExec([]string{
-			"custodian", "run",
+			custodianBinary, "run",
 			"--dryrun",
+			"-s", "/output",
 			"/policy.yml",
 		})
 
@@ -79,7 +82,7 @@ func (m *CustodianModule) DryRun(ctx context.Context, policyPath string) (string
 
 // Schema shows schema for a particular resource type
 func (m *CustodianModule) Schema(ctx context.Context, resourceType string) (string, error) {
-	args := []string{"custodian", "schema"}
+	args := []string{custodianBinary, "schema"}
 	if resourceType != "" {
 		args = append(args, resourceType)
 	}
@@ -98,9 +101,12 @@ func (m *CustodianModule) Schema(ctx context.Context, resourceType string) (stri
 
 // GetVersion returns the version of Cloud Custodian
 func (m *CustodianModule) GetVersion(ctx context.Context) (string, error) {
+	// The container has custodian as the entrypoint, so we need to use WithEntrypoint
 	container := m.client.Container().
-		From("cloudcustodian/c7n:latest").
-		WithExec([]string{"custodian", "version"})
+		From("cloudcustodian/c7n:latest")
+	
+	// Execute the version command
+	container = container.WithExec([]string{custodianBinary, "version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

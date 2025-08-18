@@ -14,11 +14,13 @@ type TFLintModule struct {
 	name   string
 }
 
+const tflintBinary = "/usr/local/bin/tflint"
+
 // NewTFLintModule creates a new TFLint module
 func NewTFLintModule(client *dagger.Client) *TFLintModule {
 	return &TFLintModule{
 		client: client,
-		name:   "tflint",
+		name:   tflintBinary,
 	}
 }
 
@@ -29,7 +31,7 @@ func (m *TFLintModule) LintDirectory(ctx context.Context, dir string) (string, e
 		From("ghcr.io/terraform-linters/tflint:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"tflint", "--init"})
+		WithExec([]string{tflintBinary, "--init"})
 
 	// Sync to ensure init completes
 	_, err := initContainer.Sync(ctx)
@@ -60,7 +62,7 @@ func (m *TFLintModule) LintFile(ctx context.Context, filePath string) (string, e
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			"tflint",
+			tflintBinary,
 			"--format", "json",
 			filename,
 		})
@@ -83,14 +85,14 @@ func (m *TFLintModule) LintWithConfig(ctx context.Context, dir string, configFil
 	if configFile != "" {
 		container = container.WithFile("/.tflint.hcl", m.client.Host().File(configFile))
 		container = container.WithExec([]string{
-			"tflint",
+			tflintBinary,
 			"--format", "json",
 			"--config", "/.tflint.hcl",
 			"/workspace",
 		})
 	} else {
 		container = container.WithExec([]string{
-			"tflint",
+			tflintBinary,
 			"--format", "json",
 			"/workspace",
 		})
@@ -106,7 +108,7 @@ func (m *TFLintModule) LintWithConfig(ctx context.Context, dir string, configFil
 
 // LintWithRules runs TFLint with specific rule sets enabled
 func (m *TFLintModule) LintWithRules(ctx context.Context, dir string, enableRules []string, disableRules []string) (string, error) {
-	args := []string{"tflint", "--format", "json"}
+	args := []string{tflintBinary, "--format", "json"}
 
 	// Add enabled rules
 	for _, rule := range enableRules {
@@ -139,7 +141,7 @@ func (m *TFLintModule) InitPlugins(ctx context.Context, dir string) error {
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			"tflint",
+			tflintBinary,
 			"--init",
 		})
 
@@ -155,7 +157,7 @@ func (m *TFLintModule) InitPlugins(ctx context.Context, dir string) error {
 func (m *TFLintModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("ghcr.io/terraform-linters/tflint:latest").
-		WithExec([]string{"tflint", "--version"})
+		WithExec([]string{tflintBinary, "--version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

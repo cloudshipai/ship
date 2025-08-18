@@ -2,13 +2,22 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddSigstorePolicyControllerTools adds Sigstore Policy Controller MCP tool implementations using real CLI tools
+// AddSigstorePolicyControllerTools adds Sigstore Policy Controller MCP tool implementations using direct Dagger calls
 func AddSigstorePolicyControllerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addSigstorePolicyControllerToolsDirect(s)
+}
+
+// addSigstorePolicyControllerToolsDirect adds Sigstore Policy Controller tools using direct Dagger module calls
+func addSigstorePolicyControllerToolsDirect(s *server.MCPServer) {
 	// Test policy against image using policy-controller-tester
 	testPolicyTool := mcp.NewTool("sigstore_test_policy",
 		mcp.WithDescription("Test Sigstore policy against container image using real policy-controller-tester"),
@@ -21,30 +30,44 @@ func AddSigstorePolicyControllerTools(s *server.MCPServer, executeShipCommand Ex
 			mcp.Required(),
 		),
 		mcp.WithString("resource",
-			mcp.Description("Path to Kubernetes resource file"),
+			mcp.Description("Path to Kubernetes resource file - NOTE: not supported in current Dagger module"),
 		),
 		mcp.WithString("trustroot",
-			mcp.Description("Path to Kubernetes TrustRoot resource"),
+			mcp.Description("Path to Kubernetes TrustRoot resource - NOTE: not supported in current Dagger module"),
 		),
 		mcp.WithString("log_level",
-			mcp.Description("Log level for output"),
+			mcp.Description("Log level for output - NOTE: not supported in current Dagger module"),
 			mcp.Enum("debug", "info", "warn", "error"),
 		),
 	)
 	s.AddTool(testPolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSigstorePolicyControllerModule(client)
+
+		// Get parameters
 		policy := request.GetString("policy", "")
 		image := request.GetString("image", "")
-		args := []string{"policy-tester", "--policy", policy, "--image", image}
-		if resource := request.GetString("resource", ""); resource != "" {
-			args = append(args, "-resource", resource)
+
+		// Check for unsupported parameters
+		if request.GetString("resource", "") != "" || request.GetString("trustroot", "") != "" ||
+			request.GetString("log_level", "") != "" {
+			return mcp.NewToolResultError("resource, trustroot, and log_level options not supported in current Dagger module"), nil
 		}
-		if trustroot := request.GetString("trustroot", ""); trustroot != "" {
-			args = append(args, "-trustroot", trustroot)
+
+		// Test policy
+		output, err := module.TestPolicy(ctx, policy, image)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("sigstore test policy failed: %v", err)), nil
 		}
-		if logLevel := request.GetString("log_level", ""); logLevel != "" {
-			args = append(args, "-log-level", logLevel)
-		}
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Get tester version
@@ -52,8 +75,23 @@ func AddSigstorePolicyControllerTools(s *server.MCPServer, executeShipCommand Ex
 		mcp.WithDescription("Get policy-controller-tester version"),
 	)
 	s.AddTool(versionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"policy-tester", "--version"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSigstorePolicyControllerModule(client)
+
+		// Get version
+		output, err := module.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("sigstore get version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Create ClusterImagePolicy using kubectl
@@ -68,12 +106,27 @@ func AddSigstorePolicyControllerTools(s *server.MCPServer, executeShipCommand Ex
 		),
 	)
 	s.AddTool(createPolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		policyFile := request.GetString("policy_file", "")
-		args := []string{"kubectl", "apply", "-f", policyFile}
-		if namespace := request.GetString("namespace", ""); namespace != "" {
-			args = append(args, "-n", namespace)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSigstorePolicyControllerModule(client)
+
+		// Get parameters
+		policyFile := request.GetString("policy_file", "")
+		namespace := request.GetString("namespace", "")
+
+		// Create policy
+		output, err := module.CreatePolicy(ctx, policyFile, namespace)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("sigstore create policy failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// List ClusterImagePolicies using kubectl
@@ -85,11 +138,26 @@ func AddSigstorePolicyControllerTools(s *server.MCPServer, executeShipCommand Ex
 		),
 	)
 	s.AddTool(listPolicesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"kubectl", "get", "clusterimagepolicy"}
-		if output := request.GetString("output", ""); output != "" {
-			args = append(args, "-o", output)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSigstorePolicyControllerModule(client)
+
+		// Get parameters
+		output := request.GetString("output", "")
+
+		// List policies
+		result, err := module.ListClusterImagePolicies(ctx, output)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("sigstore list policies failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Delete ClusterImagePolicy using kubectl
@@ -101,9 +169,26 @@ func AddSigstorePolicyControllerTools(s *server.MCPServer, executeShipCommand Ex
 		),
 	)
 	s.AddTool(deletePolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSigstorePolicyControllerModule(client)
+
+		// Get parameters
 		policyName := request.GetString("policy_name", "")
-		args := []string{"kubectl", "delete", "clusterimagepolicy", policyName}
-		return executeShipCommand(args)
+
+		// Delete policy
+		output, err := module.DeletePolicy(ctx, policyName)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("sigstore delete policy failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Enable policy enforcement for namespace using kubectl
@@ -115,9 +200,26 @@ func AddSigstorePolicyControllerTools(s *server.MCPServer, executeShipCommand Ex
 		),
 	)
 	s.AddTool(enableNamespaceTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSigstorePolicyControllerModule(client)
+
+		// Get parameters
 		namespace := request.GetString("namespace", "")
-		args := []string{"kubectl", "label", "namespace", namespace, "policy.sigstore.dev/include=true"}
-		return executeShipCommand(args)
+
+		// Enable namespace
+		output, err := module.EnableNamespace(ctx, namespace)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("sigstore enable namespace failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Disable policy enforcement for namespace using kubectl
@@ -129,9 +231,26 @@ func AddSigstorePolicyControllerTools(s *server.MCPServer, executeShipCommand Ex
 		),
 	)
 	s.AddTool(disableNamespaceTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSigstorePolicyControllerModule(client)
+
+		// Get parameters
 		namespace := request.GetString("namespace", "")
-		args := []string{"kubectl", "label", "namespace", namespace, "policy.sigstore.dev/exclude=true"}
-		return executeShipCommand(args)
+
+		// Disable namespace
+		output, err := module.DisableNamespace(ctx, namespace)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("sigstore disable namespace failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Get policy enforcement status for namespace using kubectl
@@ -143,9 +262,26 @@ func AddSigstorePolicyControllerTools(s *server.MCPServer, executeShipCommand Ex
 		),
 	)
 	s.AddTool(getNamespaceStatusTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSigstorePolicyControllerModule(client)
+
+		// Get parameters
 		namespace := request.GetString("namespace", "")
-		args := []string{"kubectl", "get", "namespace", namespace, "--show-labels"}
-		return executeShipCommand(args)
+
+		// Get namespace status
+		output, err := module.GetNamespaceStatus(ctx, namespace)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("sigstore get namespace status failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Describe ClusterImagePolicy using kubectl
@@ -157,8 +293,25 @@ func AddSigstorePolicyControllerTools(s *server.MCPServer, executeShipCommand Ex
 		),
 	)
 	s.AddTool(describePolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSigstorePolicyControllerModule(client)
+
+		// Get parameters
 		policyName := request.GetString("policy_name", "")
-		args := []string{"kubectl", "describe", "clusterimagepolicy", policyName}
-		return executeShipCommand(args)
+
+		// Describe policy
+		output, err := module.DescribePolicy(ctx, policyName)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("sigstore describe policy failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 }

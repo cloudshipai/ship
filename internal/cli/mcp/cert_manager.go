@@ -4,12 +4,20 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
+	"dagger.io/dagger"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 // AddCertManagerTools adds cert-manager MCP tool implementations
 func AddCertManagerTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addCertManagerToolsDirect(s)
+}
+
+// addCertManagerToolsDirect implements direct Dagger calls for cert-manager tools
+func addCertManagerToolsDirect(s *server.MCPServer) {
 	// Cert-manager install tool (using kubectl)
 	installTool := mcp.NewTool("cert_manager_install",
 		mcp.WithDescription("Install cert-manager using kubectl apply"),
@@ -21,13 +29,25 @@ func AddCertManagerTools(s *server.MCPServer, executeShipCommand ExecuteShipComm
 		),
 	)
 	s.AddTool(installTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		version := request.GetString("version", "v1.18.2")
-		manifestUrl := fmt.Sprintf("https://github.com/cert-manager/cert-manager/releases/download/%s/cert-manager.yaml", version)
-		args := []string{"kubectl", "apply", "-f", manifestUrl}
-		if request.GetBool("dry_run", false) {
-			args = append(args, "--dry-run=client")
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		version := request.GetString("version", "v1.18.2")
+		dryRun := request.GetBool("dry_run", false)
+
+		// Create cert-manager module and install
+		certManagerModule := modules.NewCertManagerModule(client)
+		result, err := certManagerModule.Install(ctx, version, dryRun)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cert-manager install failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cert-manager check installation tool
@@ -38,9 +58,24 @@ func AddCertManagerTools(s *server.MCPServer, executeShipCommand ExecuteShipComm
 		),
 	)
 	s.AddTool(checkInstallTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		namespace := request.GetString("namespace", "cert-manager")
-		args := []string{"kubectl", "get", "pods", "-n", namespace}
-		return executeShipCommand(args)
+
+		// Create cert-manager module and check installation
+		certManagerModule := modules.NewCertManagerModule(client)
+		result, err := certManagerModule.CheckInstallation(ctx, namespace, "")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("check installation failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cert-manager create certificate request tool
@@ -61,18 +96,27 @@ func AddCertManagerTools(s *server.MCPServer, executeShipCommand ExecuteShipComm
 		),
 	)
 	s.AddTool(createCertRequestTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
 		name := request.GetString("name", "")
-		args := []string{"cmctl", "create", "certificaterequest", name}
-		if fromCertFile := request.GetString("from_certificate_file", ""); fromCertFile != "" {
-			args = append(args, "--from-certificate-file", fromCertFile)
+		fromCertFile := request.GetString("from_certificate_file", "")
+		fetchCertificate := request.GetBool("fetch_certificate", false)
+		timeout := request.GetString("timeout", "")
+
+		// Create cert-manager module and create certificate request
+		certManagerModule := modules.NewCertManagerModule(client)
+		result, err := certManagerModule.CreateCertificateRequest(ctx, name, fromCertFile, fetchCertificate, timeout, "")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("create certificate request failed: %v", err)), nil
 		}
-		if request.GetBool("fetch_certificate", false) {
-			args = append(args, "--fetch-certificate")
-		}
-		if timeout := request.GetString("timeout", ""); timeout != "" {
-			args = append(args, "--timeout", timeout)
-		}
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cert-manager list certificates tool
@@ -86,13 +130,25 @@ func AddCertManagerTools(s *server.MCPServer, executeShipCommand ExecuteShipComm
 		),
 	)
 	s.AddTool(listCertificatesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"kubectl", "get", "certificates"}
-		if request.GetBool("all_namespaces", false) {
-			args = append(args, "--all-namespaces")
-		} else if namespace := request.GetString("namespace", ""); namespace != "" {
-			args = append(args, "-n", namespace)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		namespace := request.GetString("namespace", "")
+		allNamespaces := request.GetBool("all_namespaces", false)
+
+		// Create cert-manager module and list certificates
+		certManagerModule := modules.NewCertManagerModule(client)
+		result, err := certManagerModule.ListCertificates(ctx, namespace, allNamespaces, "")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("list certificates failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cert-manager renew certificate tool
@@ -110,17 +166,32 @@ func AddCertManagerTools(s *server.MCPServer, executeShipCommand ExecuteShipComm
 		),
 	)
 	s.AddTool(renewCertificateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"cmctl", "renew"}
-		if request.GetBool("all", false) {
-			args = append(args, "--all")
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Get parameters
+		certName := request.GetString("cert_name", "")
+		namespace := request.GetString("namespace", "")
+		all := request.GetBool("all", false)
+
+		// Create cert-manager module and renew certificate(s)
+		certManagerModule := modules.NewCertManagerModule(client)
+		var result string
+		var renewErr error
+		if all {
+			result, renewErr = certManagerModule.RenewAllCertificates(ctx, namespace, "")
 		} else {
-			certName := request.GetString("cert_name", "")
-			args = append(args, certName)
+			result, renewErr = certManagerModule.RenewCertificate(ctx, certName, namespace, "")
 		}
-		if namespace := request.GetString("namespace", ""); namespace != "" {
-			args = append(args, "-n", namespace)
+		if renewErr != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("renew certificate failed: %v", renewErr)), nil
 		}
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cert-manager status tool
@@ -135,12 +206,25 @@ func AddCertManagerTools(s *server.MCPServer, executeShipCommand ExecuteShipComm
 		),
 	)
 	s.AddTool(statusTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		certName := request.GetString("certificate_name", "")
-		args := []string{"cmctl", "status", "certificate", certName}
-		if namespace := request.GetString("namespace", ""); namespace != "" {
-			args = append(args, "-n", namespace)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Get parameters
+		certName := request.GetString("certificate_name", "")
+		namespace := request.GetString("namespace", "")
+
+		// Create cert-manager module and check certificate status
+		certManagerModule := modules.NewCertManagerModule(client)
+		result, err := certManagerModule.CheckCertificate(ctx, certName, namespace, "")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("check certificate status failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 
 	// Cert-manager get version tool
@@ -148,7 +232,20 @@ func AddCertManagerTools(s *server.MCPServer, executeShipCommand ExecuteShipComm
 		mcp.WithDescription("Get cmctl version information"),
 	)
 	s.AddTool(getVersionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := []string{"cmctl", "version"}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create cert-manager module and get version
+		certManagerModule := modules.NewCertManagerModule(client)
+		result, err := certManagerModule.GetVersion(ctx)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("get cert-manager version failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
 	})
 }

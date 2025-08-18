@@ -7,7 +7,9 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/cloudshipai/ship/internal/cli/mcp"
 	"github.com/cloudshipai/ship/internal/modules"
+	"github.com/cloudshipai/ship/pkg/ship"
 	"github.com/spf13/cobra"
 )
 
@@ -169,6 +171,9 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 		{"memory", "Memory/knowledge storage MCP server", "mcp-external"},
 		{"brave-search", "Brave search MCP server", "mcp-external"},
 		{"steampipe", "Cloud infrastructure queries MCP server", "mcp-external"},
+		{"slack", "Slack workspace operations MCP server", "mcp-external"},
+		{"github", "GitHub operations MCP server", "mcp-external"},
+		{"desktop-commander", "Desktop operations MCP server", "mcp-external"},
 
 		// AWS Labs Official MCP Servers
 		{"aws-core", "AWS core operations and general services", "aws-mcp"},
@@ -485,7 +490,7 @@ spec:
 	// Generate additional files based on type
 	if moduleType == "docker" {
 		// Generate Dockerfile
-		dockerfile := fmt.Sprintf(`FROM alpine:latest
+		dockerfile := `FROM alpine:latest
 
 # Install dependencies
 RUN apk add --no-cache bash curl
@@ -498,7 +503,7 @@ RUN chmod +x /entrypoint.sh
 WORKDIR /workspace
 
 ENTRYPOINT ["/entrypoint.sh"]
-`)
+`
 		if err := os.WriteFile(fmt.Sprintf("%s/Dockerfile", outputDir), []byte(dockerfile), 0644); err != nil {
 			return err
 		}
@@ -552,16 +557,7 @@ echo "%s completed successfully"
 
 // isExternalMCPServerModule checks if the given name is an external MCP server
 func isExternalMCPServerModule(serverName string) bool {
-	externalServers := []string{
-		"filesystem", "memory", "brave-search", "steampipe",
-		"aws-core", "aws-iam", "aws-pricing", "aws-eks", "aws-ec2", "aws-s3",
-	}
-	for _, server := range externalServers {
-		if server == serverName {
-			return true
-		}
-	}
-	return false
+	return mcp.IsExternalMCPServer(serverName)
 }
 
 // isBuiltinMCPTool checks if the given name is a built-in MCP tool
@@ -577,11 +573,8 @@ func isBuiltinMCPTool(toolName string) bool {
 
 // showMCPServerInfo displays information about an external MCP server
 func showMCPServerInfo(serverName string) error {
-	// Get the actual hardcoded server configuration from the mcp_cmd.go file
-	// We need to access the hardcodedMCPServers map from mcp_cmd.go
-	serverConfigs := getHardcodedMCPServerConfigs()
-
-	config, exists := serverConfigs[serverName]
+	// Get the external server configuration from the proper mcp package
+	config, exists := mcp.GetExternalMCPServer(serverName)
 	if !exists {
 		return fmt.Errorf("external MCP server '%s' not found", serverName)
 	}
@@ -733,163 +726,17 @@ func showBuiltinToolInfo(toolName string) error {
 	return nil
 }
 
-// getHardcodedMCPServerConfigs returns the hardcoded MCP server configurations
-// This is a reference to the same data structure in mcp_cmd.go
-func getHardcodedMCPServerConfigs() map[string]struct {
-	Name        string
-	Description string
-	Command     string
-	Args        []string
-	Transport   string
-	Variables   []struct {
-		Name        string
-		Description string
-		Required    bool
-		Default     string
-		Secret      bool
-	}
-} {
-	return map[string]struct {
-		Name        string
-		Description string
-		Command     string
-		Args        []string
-		Transport   string
-		Variables   []struct {
-			Name        string
-			Description string
-			Required    bool
-			Default     string
-			Secret      bool
-		}
-	}{
-		"filesystem": {
-			Name:        "filesystem",
-			Description: "Filesystem operations MCP server with tools for file and directory management",
-			Command:     "npx",
-			Args:        []string{"-y", "@modelcontextprotocol/server-filesystem", "/tmp"},
-			Transport:   "stdio",
-			Variables: []struct {
-				Name        string
-				Description string
-				Required    bool
-				Default     string
-				Secret      bool
-			}{
-				{
-					Name:        "FILESYSTEM_ROOT",
-					Description: "Root directory for filesystem operations (overrides /tmp default)",
-					Required:    false,
-					Default:     "/tmp",
-					Secret:      false,
-				},
-			},
-		},
-		"memory": {
-			Name:        "memory",
-			Description: "Memory/knowledge storage MCP server for persistent data storage",
-			Command:     "npx",
-			Args:        []string{"-y", "@modelcontextprotocol/server-memory"},
-			Transport:   "stdio",
-			Variables: []struct {
-				Name        string
-				Description string
-				Required    bool
-				Default     string
-				Secret      bool
-			}{
-				{
-					Name:        "MEMORY_STORAGE_PATH",
-					Description: "Path for persistent memory storage",
-					Required:    false,
-					Default:     "/tmp/mcp-memory",
-					Secret:      false,
-				},
-				{
-					Name:        "MEMORY_MAX_SIZE",
-					Description: "Maximum memory storage size (e.g., 100MB)",
-					Required:    false,
-					Default:     "50MB",
-					Secret:      false,
-				},
-			},
-		},
-		"brave-search": {
-			Name:        "brave-search",
-			Description: "Brave search MCP server for web search capabilities",
-			Command:     "npx",
-			Args:        []string{"-y", "@modelcontextprotocol/server-brave-search"},
-			Transport:   "stdio",
-			Variables: []struct {
-				Name        string
-				Description string
-				Required    bool
-				Default     string
-				Secret      bool
-			}{
-				{
-					Name:        "BRAVE_API_KEY",
-					Description: "Brave Search API key for search functionality",
-					Required:    true,
-					Default:     "",
-					Secret:      true,
-				},
-				{
-					Name:        "BRAVE_SEARCH_COUNT",
-					Description: "Number of search results to return (default: 10)",
-					Required:    false,
-					Default:     "10",
-					Secret:      false,
-				},
-			},
-		},
-		"steampipe": {
-			Name:        "steampipe",
-			Description: "Cloud infrastructure queries MCP server with SQL-based tools for cloud resources",
-			Command:     "npx",
-			Args:        []string{"-y", "@turbot/steampipe-mcp"},
-			Transport:   "stdio",
-			Variables: []struct {
-				Name        string
-				Description string
-				Required    bool
-				Default     string
-				Secret      bool
-			}{
-				{
-					Name:        "STEAMPIPE_DATABASE_CONNECTIONS",
-					Description: "Database connections configuration for Steampipe",
-					Required:    false,
-					Default:     "postgres://steampipe@localhost:9193/steampipe",
-					Secret:      false,
-				},
-			},
-		},
-	}
-}
-
 // getServerDescription returns a user-friendly description for the server
 func getServerDescription(serverName string) string {
-	descriptions := map[string]string{
-		"filesystem":   "Filesystem operations MCP server with tools for file and directory management",
-		"memory":       "Memory/knowledge storage MCP server for persistent data storage",
-		"brave-search": "Brave search MCP server for web search capabilities",
-		"steampipe":    "Cloud infrastructure queries MCP server with SQL-based tools for cloud resources",
-	}
-	if desc, exists := descriptions[serverName]; exists {
-		return desc
+	// Check if this is an external MCP server
+	if mcp.IsExternalMCPServer(serverName) {
+		return fmt.Sprintf("External MCP server: %s", serverName)
 	}
 	return "External MCP server"
 }
 
 // hasOptionalVariables checks if any variables are optional
-func hasOptionalVariables(variables []struct {
-	Name        string
-	Description string
-	Required    bool
-	Default     string
-	Secret      bool
-}) bool {
+func hasOptionalVariables(variables []ship.Variable) bool {
 	for _, variable := range variables {
 		if !variable.Required {
 			return true
@@ -899,13 +746,7 @@ func hasOptionalVariables(variables []struct {
 }
 
 // getOptionalVariableExample generates an example with optional variables
-func getOptionalVariableExample(serverName string, _ []struct {
-	Name        string
-	Description string
-	Required    bool
-	Default     string
-	Secret      bool
-}) string {
+func getOptionalVariableExample(serverName string, _ []ship.Variable) string {
 	examples := map[string]string{
 		"filesystem":   "--var FILESYSTEM_ROOT=/custom/path",
 		"memory":       "--var MEMORY_STORAGE_PATH=/data --var MEMORY_MAX_SIZE=100MB",

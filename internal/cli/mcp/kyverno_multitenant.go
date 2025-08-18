@@ -4,15 +4,23 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"dagger.io/dagger"
 )
 
-// AddKyvernoMultitenantTools adds Kyverno multi-tenant policy MCP tool implementations using real CLI commands
+// AddKyvernoMultitenantTools adds Kyverno multi-tenant policy MCP tool implementations using direct Dagger calls
 func AddKyvernoMultitenantTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addKyvernoMultitenantToolsDirect(s)
+}
+
+// addKyvernoMultitenantToolsDirect adds Kyverno multitenant tools using direct Dagger module calls
+func addKyvernoMultitenantToolsDirect(s *server.MCPServer) {
 	// Create tenant namespace with labels
 	createTenantNamespaceTool := mcp.NewTool("kyverno_multitenant_create_namespace",
-		mcp.WithDescription("Create namespace for tenant with appropriate labels using kubectl"),
+		mcp.WithDescription("Create namespace for tenant with appropriate labels"),
 		mcp.WithString("tenant_name",
 			mcp.Description("Name of the tenant"),
 			mcp.Required(),
@@ -21,136 +29,224 @@ func AddKyvernoMultitenantTools(s *server.MCPServer, executeShipCommand ExecuteS
 			mcp.Description("Namespace name for the tenant"),
 			mcp.Required(),
 		),
+		mcp.WithString("kubeconfig",
+			mcp.Description("Path to kubeconfig file"),
+		),
 	)
 	s.AddTool(createTenantNamespaceTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		tenantName := request.GetString("tenant_name", "")
-		namespace := request.GetString("namespace", "")
-		
-		// Create namespace with tenant label
-		args := []string{"kubectl", "create", "namespace", namespace}
-		result, err := executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
 		if err != nil {
-			return result, err
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		// Label the namespace with tenant information
-		labelArgs := []string{"kubectl", "label", "namespace", namespace, 
-			fmt.Sprintf("tenant=%s", tenantName),
-			fmt.Sprintf("kyverno.io/tenant=%s", tenantName)}
-		return executeShipCommand(labelArgs)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKyvernoMultitenantModule(client)
+
+		// Get parameters
+		namespace := request.GetString("namespace", "")
+		if namespace == "" {
+			return mcp.NewToolResultError("namespace is required"), nil
+		}
+		kubeconfig := request.GetString("kubeconfig", "")
+
+		// Create tenant namespace
+		output, err := module.CreateTenantNamespace(ctx, namespace, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("create tenant namespace failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Apply namespace isolation policy
 	applyNamespaceIsolationTool := mcp.NewTool("kyverno_multitenant_namespace_isolation",
-		mcp.WithDescription("Apply Kyverno policy for namespace isolation using kubectl"),
-		mcp.WithString("policy_file",
-			mcp.Description("Path to namespace isolation policy YAML file"),
+		mcp.WithDescription("Apply Kyverno policy for namespace isolation"),
+		mcp.WithString("tenant_name",
+			mcp.Description("Name of the tenant for policy generation"),
 			mcp.Required(),
+		),
+		mcp.WithString("kubeconfig",
+			mcp.Description("Path to kubeconfig file"),
 		),
 	)
 	s.AddTool(applyNamespaceIsolationTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		policyFile := request.GetString("policy_file", "")
-		args := []string{"kubectl", "apply", "-f", policyFile}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKyvernoMultitenantModule(client)
+
+		// Get parameters
+		tenantName := request.GetString("tenant_name", "")
+		if tenantName == "" {
+			return mcp.NewToolResultError("tenant_name is required"), nil
+		}
+		kubeconfig := request.GetString("kubeconfig", "")
+
+		// Create tenant policies (includes isolation)
+		output, err := module.CreateTenantPolicies(ctx, tenantName, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("create tenant policies failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Create ResourceQuota for tenant
+	// Create resource quota for tenant
 	createResourceQuotaTool := mcp.NewTool("kyverno_multitenant_create_quota",
-		mcp.WithDescription("Create ResourceQuota for tenant namespace using kubectl"),
+		mcp.WithDescription("Create resource quota for tenant namespace"),
 		mcp.WithString("namespace",
-			mcp.Description("Tenant namespace"),
+			mcp.Description("Namespace to create quota for"),
 			mcp.Required(),
 		),
 		mcp.WithString("cpu_limit",
-			mcp.Description("CPU limit (e.g., '4')"),
+			mcp.Description("CPU limit (e.g., '2' or '1000m')"),
 		),
 		mcp.WithString("memory_limit",
-			mcp.Description("Memory limit (e.g., '8Gi')"),
+			mcp.Description("Memory limit (e.g., '4Gi' or '2048Mi')"),
 		),
-		mcp.WithString("pods_limit",
-			mcp.Description("Maximum number of pods"),
+		mcp.WithString("kubeconfig",
+			mcp.Description("Path to kubeconfig file"),
 		),
 	)
 	s.AddTool(createResourceQuotaTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKyvernoMultitenantModule(client)
+
+		// Get parameters
 		namespace := request.GetString("namespace", "")
-		
-		// Build ResourceQuota YAML
-		quotaYAML := fmt.Sprintf(`
-apiVersion: v1
-kind: ResourceQuota
-metadata:
-  name: tenant-quota
-  namespace: %s
-spec:
-  hard:`, namespace)
-		
-		if cpu := request.GetString("cpu_limit", ""); cpu != "" {
-			quotaYAML += fmt.Sprintf("\n    requests.cpu: '%s'", cpu)
-			quotaYAML += fmt.Sprintf("\n    limits.cpu: '%s'", cpu)
+		if namespace == "" {
+			return mcp.NewToolResultError("namespace is required"), nil
 		}
-		if memory := request.GetString("memory_limit", ""); memory != "" {
-			quotaYAML += fmt.Sprintf("\n    requests.memory: %s", memory)
-			quotaYAML += fmt.Sprintf("\n    limits.memory: %s", memory)
+		cpuLimit := request.GetString("cpu_limit", "1")
+		memoryLimit := request.GetString("memory_limit", "2Gi")
+		kubeconfig := request.GetString("kubeconfig", "")
+
+		// Create resource quota
+		output, err := module.CreateResourceQuota(ctx, namespace, cpuLimit, memoryLimit, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("create resource quota failed: %v", err)), nil
 		}
-		if pods := request.GetString("pods_limit", ""); pods != "" {
-			quotaYAML += fmt.Sprintf("\n    pods: '%s'", pods)
-		}
-		
-		// Apply using kubectl with inline YAML
-		args := []string{"sh", "-c", fmt.Sprintf("echo '%s' | kubectl apply -f -", quotaYAML)}
-		return executeShipCommand(args)
+
+		return mcp.NewToolResultText(output), nil
 	})
 
-	// Apply Kyverno generate policy for automatic resource creation
+	// Generate and apply multitenant policies
 	applyGeneratePolicyTool := mcp.NewTool("kyverno_multitenant_generate_policy",
-		mcp.WithDescription("Apply Kyverno generate policy for automatic resource creation in tenant namespaces"),
-		mcp.WithString("policy_file",
-			mcp.Description("Path to Kyverno generate policy file"),
+		mcp.WithDescription("Generate and apply comprehensive multitenant policies"),
+		mcp.WithString("tenants_config",
+			mcp.Description("Path to tenants configuration file"),
 			mcp.Required(),
+		),
+		mcp.WithString("kubeconfig",
+			mcp.Description("Path to kubeconfig file"),
 		),
 	)
 	s.AddTool(applyGeneratePolicyTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		policyFile := request.GetString("policy_file", "")
-		
-		// First validate the policy
-		validateArgs := []string{"kyverno", "apply", policyFile, "--dry-run"}
-		_, err := executeShipCommand(validateArgs)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
 		if err != nil {
-			return nil, fmt.Errorf("policy validation failed: %v", err)
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
 		}
-		
-		// Apply the policy to cluster
-		args := []string{"kubectl", "apply", "-f", policyFile}
-		return executeShipCommand(args)
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKyvernoMultitenantModule(client)
+
+		// Get parameters
+		tenantsConfig := request.GetString("tenants_config", "")
+		if tenantsConfig == "" {
+			return mcp.NewToolResultError("tenants_config is required"), nil
+		}
+		kubeconfig := request.GetString("kubeconfig", "")
+
+		// Validate multitenant setup
+		output, err := module.ValidateMultitenantSetup(ctx, tenantsConfig, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("validate multitenant setup failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// List tenant namespaces
 	listTenantNamespacesTool := mcp.NewTool("kyverno_multitenant_list_namespaces",
-		mcp.WithDescription("List namespaces for a specific tenant using kubectl"),
-		mcp.WithString("tenant_name",
-			mcp.Description("Name of the tenant"),
-			mcp.Required(),
+		mcp.WithDescription("List all tenant namespaces"),
+		mcp.WithString("kubeconfig",
+			mcp.Description("Path to kubeconfig file"),
 		),
 	)
 	s.AddTool(listTenantNamespacesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		tenantName := request.GetString("tenant_name", "")
-		args := []string{"kubectl", "get", "namespaces", "-l", fmt.Sprintf("tenant=%s", tenantName)}
-		return executeShipCommand(args)
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKyvernoMultitenantModule(client)
+
+		// Get parameters
+		kubeconfig := request.GetString("kubeconfig", "")
+
+		// List tenant namespaces
+		output, err := module.ListTenantNamespaces(ctx, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("list tenant namespaces failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 
 	// Get tenant policies
 	getTenantPoliciesTool := mcp.NewTool("kyverno_multitenant_get_policies",
-		mcp.WithDescription("Get Kyverno policies affecting a tenant's namespaces"),
+		mcp.WithDescription("Get Kyverno policies for a specific tenant namespace"),
 		mcp.WithString("namespace",
-			mcp.Description("Tenant namespace"),
+			mcp.Description("Tenant namespace to get policies for"),
 			mcp.Required(),
+		),
+		mcp.WithString("kubeconfig",
+			mcp.Description("Path to kubeconfig file"),
 		),
 	)
 	s.AddTool(getTenantPoliciesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewKyvernoMultitenantModule(client)
+
+		// Get parameters
 		namespace := request.GetString("namespace", "")
-		
-		// Get policies in the namespace
-		args := []string{"kubectl", "get", "policy", "-n", namespace}
-		return executeShipCommand(args)
+		if namespace == "" {
+			return mcp.NewToolResultError("namespace is required"), nil
+		}
+		kubeconfig := request.GetString("kubeconfig", "")
+
+		// Get tenant policies
+		output, err := module.GetTenantPolicies(ctx, namespace, kubeconfig)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("get tenant policies failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(output), nil
 	})
 }

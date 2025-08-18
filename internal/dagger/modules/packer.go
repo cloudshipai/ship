@@ -13,11 +13,13 @@ type PackerModule struct {
 	name   string
 }
 
+const packerBinary = "/usr/local/bin/packer"
+
 // NewPackerModule creates a new Packer module
 func NewPackerModule(client *dagger.Client) *PackerModule {
 	return &PackerModule{
 		client: client,
-		name:   "packer",
+		name:   packerBinary,
 	}
 }
 
@@ -31,7 +33,7 @@ func (m *PackerModule) BuildImage(ctx context.Context, templatePath string, vars
 		container = container.WithFile("/vars.pkrvars.hcl", m.client.Host().File(varsFile))
 	}
 
-	args := []string{"packer", "build"}
+	args := []string{packerBinary, "build"}
 	if varsFile != "" {
 		args = append(args, "-var-file=/vars.pkrvars.hcl")
 	}
@@ -53,7 +55,7 @@ func (m *PackerModule) ValidateTemplate(ctx context.Context, templatePath string
 		From("hashicorp/packer:latest").
 		WithFile("/template.pkr.hcl", m.client.Host().File(templatePath)).
 		WithExec([]string{
-			"packer", "validate",
+			packerBinary, "validate",
 			"/template.pkr.hcl",
 		})
 
@@ -71,7 +73,7 @@ func (m *PackerModule) FormatTemplate(ctx context.Context, templatePath string) 
 		From("hashicorp/packer:latest").
 		WithFile("/template.pkr.hcl", m.client.Host().File(templatePath)).
 		WithExec([]string{
-			"packer", "fmt",
+			packerBinary, "fmt",
 			"/template.pkr.hcl",
 		})
 
@@ -87,7 +89,7 @@ func (m *PackerModule) FormatTemplate(ctx context.Context, templatePath string) 
 func (m *PackerModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("hashicorp/packer:latest").
-		WithExec([]string{"packer", "version"})
+		WithExec([]string{packerBinary, "version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -103,7 +105,7 @@ func (m *PackerModule) InspectTemplate(ctx context.Context, templatePath string,
 		From("hashicorp/packer:latest").
 		WithFile("/template.pkr.hcl", m.client.Host().File(templatePath))
 
-	args := []string{"packer", "inspect"}
+	args := []string{packerBinary, "inspect"}
 	if machineReadable {
 		args = append(args, "-machine-readable")
 	}
@@ -125,7 +127,7 @@ func (m *PackerModule) FixTemplate(ctx context.Context, templatePath string, val
 		From("hashicorp/packer:latest").
 		WithFile("/template.pkr.hcl", m.client.Host().File(templatePath))
 
-	args := []string{"packer", "fix"}
+	args := []string{packerBinary, "fix"}
 	if validate {
 		args = append(args, "-validate")
 	}
@@ -147,7 +149,7 @@ func (m *PackerModule) InitConfiguration(ctx context.Context, configFile string,
 		From("hashicorp/packer:latest").
 		WithFile("/config.pkr.hcl", m.client.Host().File(configFile))
 
-	args := []string{"packer", "init"}
+	args := []string{packerBinary, "init"}
 	if upgrade {
 		args = append(args, "-upgrade")
 	}
@@ -172,7 +174,7 @@ func (m *PackerModule) ManagePlugins(ctx context.Context, subcommand string, plu
 		container = container.WithFile("/config.pkr.hcl", m.client.Host().File(configFile))
 	}
 
-	args := []string{"packer", "plugins", subcommand}
+	args := []string{packerBinary, "plugins", subcommand}
 	switch subcommand {
 	case "install", "remove":
 		if pluginName != "" {
@@ -203,7 +205,7 @@ func (m *PackerModule) HCL2Upgrade(ctx context.Context, templateFile string, out
 		From("hashicorp/packer:latest").
 		WithFile("/template.json", m.client.Host().File(templateFile))
 
-	args := []string{"packer", "hcl2_upgrade"}
+	args := []string{packerBinary, "hcl2_upgrade"}
 	if outputFile != "" {
 		args = append(args, "-output-file", "/output.pkr.hcl")
 	}
@@ -232,7 +234,7 @@ func (m *PackerModule) Console(ctx context.Context, templateFile string, vars st
 		container = container.WithFile("/vars.pkrvars.hcl", m.client.Host().File(varFile))
 	}
 
-	args := []string{"packer", "console"}
+	args := []string{packerBinary, "console"}
 	if vars != "" {
 		args = append(args, "-var", vars)
 	}

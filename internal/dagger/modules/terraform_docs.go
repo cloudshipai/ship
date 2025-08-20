@@ -33,6 +33,8 @@ func (m *TerraformDocsModule) GenerateMarkdown(ctx context.Context, dir string) 
 			terraformDocsBinary,
 			"markdown",
 			".",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -53,6 +55,8 @@ func (m *TerraformDocsModule) GenerateJSON(ctx context.Context, dir string) (str
 			terraformDocsBinary,
 			"json",
 			".",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -77,12 +81,16 @@ func (m *TerraformDocsModule) GenerateWithConfig(ctx context.Context, dir string
 			"--config", "/.terraform-docs.yml",
 			"markdown",
 			"/workspace",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 	} else {
 		container = container.WithExec([]string{
 			terraformDocsBinary,
 			"markdown",
 			"/workspace",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 	}
 
@@ -104,6 +112,8 @@ func (m *TerraformDocsModule) GenerateTable(ctx context.Context, dir string) (st
 			terraformDocsBinary,
 			"markdown", "table",
 			".",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -118,7 +128,9 @@ func (m *TerraformDocsModule) GenerateTable(ctx context.Context, dir string) (st
 func (m *TerraformDocsModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("quay.io/terraform-docs/terraform-docs:latest").
-		WithExec([]string{terraformDocsBinary, "--version"})
+		WithExec([]string{terraformDocsBinary, "--version"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

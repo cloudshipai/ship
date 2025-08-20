@@ -31,7 +31,9 @@ func (m *TFLintModule) LintDirectory(ctx context.Context, dir string) (string, e
 		From("ghcr.io/terraform-linters/tflint:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{tflintBinary, "--init"})
+		WithExec([]string{tflintBinary, "--init"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	// Sync to ensure init completes
 	_, err := initContainer.Sync(ctx)
@@ -42,6 +44,8 @@ func (m *TFLintModule) LintDirectory(ctx context.Context, dir string) (string, e
 	// Run TFLint - use a bash wrapper to capture output regardless of exit code
 	lintContainer := initContainer.WithExec([]string{
 		"sh", "-c", "tflint --format json || true",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := lintContainer.Stdout(ctx)
@@ -65,6 +69,8 @@ func (m *TFLintModule) LintFile(ctx context.Context, filePath string) (string, e
 			tflintBinary,
 			"--format", "json",
 			filename,
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -89,12 +95,16 @@ func (m *TFLintModule) LintWithConfig(ctx context.Context, dir string, configFil
 			"--format", "json",
 			"--config", "/.tflint.hcl",
 			"/workspace",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 	} else {
 		container = container.WithExec([]string{
 			tflintBinary,
 			"--format", "json",
 			"/workspace",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 	}
 
@@ -124,7 +134,9 @@ func (m *TFLintModule) LintWithRules(ctx context.Context, dir string, enableRule
 		From("ghcr.io/terraform-linters/tflint:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec(args)
+		WithExec(args, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -157,7 +169,9 @@ func (m *TFLintModule) InitPlugins(ctx context.Context, dir string) error {
 func (m *TFLintModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("ghcr.io/terraform-linters/tflint:latest").
-		WithExec([]string{tflintBinary, "--version"})
+		WithExec([]string{tflintBinary, "--version"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -182,7 +196,9 @@ func (m *TFLintModule) LintWithVarFile(ctx context.Context, dir string, varFile 
 		args = append(args, "--format", "json")
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -206,7 +222,9 @@ func (m *TFLintModule) LintWithVar(ctx context.Context, dir string, variable str
 		args = append(args, "--format", "json")
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

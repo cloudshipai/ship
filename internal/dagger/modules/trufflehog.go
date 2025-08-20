@@ -14,13 +14,12 @@ type TruffleHogModule struct {
 	name   string
 }
 
-const trufflehogBinary = "/usr/local/bin/trufflehog"
 
 // NewTruffleHogModule creates a new TruffleHog module
 func NewTruffleHogModule(client *dagger.Client) *TruffleHogModule {
 	return &TruffleHogModule{
 		client: client,
-		name:   trufflehogBinary,
+		name:   "trufflehog",
 	}
 }
 
@@ -30,7 +29,9 @@ func (m *TruffleHogModule) ScanDirectory(ctx context.Context, dir string) (strin
 		From("trufflesecurity/trufflehog:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{trufflehogBinary, "filesystem", ".", "--json"})
+		WithExec([]string{"trufflehog", "filesystem", ".", "--json"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -49,7 +50,9 @@ func (m *TruffleHogModule) ScanDirectory(ctx context.Context, dir string) (strin
 func (m *TruffleHogModule) ScanGitRepo(ctx context.Context, repoURL string) (string, error) {
 	container := m.client.Container().
 		From("trufflesecurity/trufflehog:latest").
-		WithExec([]string{trufflehogBinary, "git", repoURL, "--json"})
+		WithExec([]string{"trufflehog", "git", repoURL, "--json"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -74,7 +77,9 @@ func (m *TruffleHogModule) ScanGitHub(ctx context.Context, repo string, token st
 		container = container.WithEnvVariable("GITHUB_TOKEN", os.Getenv("GITHUB_TOKEN"))
 	}
 
-	container = container.WithExec([]string{trufflehogBinary, "github", "--repo", repo, "--json"})
+	container = container.WithExec([]string{"trufflehog", "github", "--repo", repo, "--json"}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -99,7 +104,9 @@ func (m *TruffleHogModule) ScanGitHubOrg(ctx context.Context, org string, token 
 		container = container.WithEnvVariable("GITHUB_TOKEN", os.Getenv("GITHUB_TOKEN"))
 	}
 
-	container = container.WithExec([]string{trufflehogBinary, "github", "--org", org, "--json"})
+	container = container.WithExec([]string{"trufflehog", "github", "--org", org, "--json"}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -117,7 +124,9 @@ func (m *TruffleHogModule) ScanGitHubOrg(ctx context.Context, org string, token 
 func (m *TruffleHogModule) ScanDockerImage(ctx context.Context, imageName string) (string, error) {
 	container := m.client.Container().
 		From("trufflesecurity/trufflehog:latest").
-		WithExec([]string{trufflehogBinary, "docker", "--image", imageName, "--json"})
+		WithExec([]string{"trufflehog", "docker", "--image", imageName, "--json"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -138,7 +147,9 @@ func (m *TruffleHogModule) ScanS3(ctx context.Context, bucket string) (string, e
 		WithEnvVariable("AWS_ACCESS_KEY_ID", os.Getenv("AWS_ACCESS_KEY_ID")).
 		WithEnvVariable("AWS_SECRET_ACCESS_KEY", os.Getenv("AWS_SECRET_ACCESS_KEY")).
 		WithEnvVariable("AWS_REGION", os.Getenv("AWS_REGION")).
-		WithExec([]string{trufflehogBinary, "s3", "--bucket", bucket, "--json"})
+		WithExec([]string{"trufflehog", "s3", "--bucket", bucket, "--json"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -158,13 +169,13 @@ func (m *TruffleHogModule) ScanWithVerification(ctx context.Context, target stri
 
 	switch targetType {
 	case "filesystem":
-		args = []string{trufflehogBinary, "filesystem", target, "--json", "--verify"}
+		args = []string{"trufflehog", "filesystem", target, "--json", "--verify"}
 	case "git":
-		args = []string{trufflehogBinary, "git", target, "--json", "--verify"}
+		args = []string{"trufflehog", "git", target, "--json", "--verify"}
 	case "github":
-		args = []string{trufflehogBinary, "github", "--repo", target, "--json", "--verify"}
+		args = []string{"trufflehog", "github", "--repo", target, "--json", "--verify"}
 	default:
-		args = []string{trufflehogBinary, "filesystem", target, "--json", "--verify"}
+		args = []string{"trufflehog", "filesystem", target, "--json", "--verify"}
 	}
 
 	container := m.client.Container().From("trufflesecurity/trufflehog:latest")
@@ -180,7 +191,9 @@ func (m *TruffleHogModule) ScanWithVerification(ctx context.Context, target stri
 		container = container.WithEnvVariable("GITHUB_TOKEN", os.Getenv("GITHUB_TOKEN"))
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -199,7 +212,7 @@ func (m *TruffleHogModule) ScanGitAdvanced(ctx context.Context, repoURL string, 
 	container := m.client.Container().
 		From("trufflesecurity/trufflehog:latest")
 
-	args := []string{trufflehogBinary, "git", repoURL}
+	args := []string{"trufflehog", "git", repoURL}
 	if branch != "" {
 		args = append(args, "--branch", branch)
 	}
@@ -219,7 +232,9 @@ func (m *TruffleHogModule) ScanGitAdvanced(ctx context.Context, repoURL string, 
 		args = append(args, "--exclude", path)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -240,7 +255,7 @@ func (m *TruffleHogModule) ScanFilesystemAdvanced(ctx context.Context, path stri
 		WithDirectory("/workspace", m.client.Host().Directory(path)).
 		WithWorkdir("/workspace")
 
-	args := []string{trufflehogBinary, "filesystem", "."}
+	args := []string{"trufflehog", "filesystem", "."}
 	if onlyVerified {
 		args = append(args, "--only-verified")
 	}
@@ -254,7 +269,9 @@ func (m *TruffleHogModule) ScanFilesystemAdvanced(ctx context.Context, path stri
 		args = append(args, "--exclude", excludePath)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -273,7 +290,7 @@ func (m *TruffleHogModule) ScanDockerAdvanced(ctx context.Context, image string,
 	container := m.client.Container().
 		From("trufflesecurity/trufflehog:latest")
 
-	args := []string{trufflehogBinary, "docker", image}
+	args := []string{"trufflehog", "docker", image}
 	if onlyVerified {
 		args = append(args, "--only-verified")
 	}
@@ -284,7 +301,9 @@ func (m *TruffleHogModule) ScanDockerAdvanced(ctx context.Context, image string,
 		args = append(args, "--layers", layers)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -309,7 +328,7 @@ func (m *TruffleHogModule) ComprehensiveSecretDetection(ctx context.Context, tar
 		target = "."
 	}
 
-	args := []string{trufflehogBinary, sourceType, target}
+	args := []string{"trufflehog", sourceType, target}
 	if onlyVerified {
 		args = append(args, "--only-verified")
 	}
@@ -332,7 +351,9 @@ func (m *TruffleHogModule) ComprehensiveSecretDetection(ctx context.Context, tar
 		args = append(args, "--include", path)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -354,13 +375,13 @@ func (m *TruffleHogModule) CloudStorageScanning(ctx context.Context, cloudProvid
 	var args []string
 	switch cloudProvider {
 	case "s3":
-		args = []string{trufflehogBinary, "s3", "--bucket", resourceIdentifier}
+		args = []string{"trufflehog", "s3", "--bucket", resourceIdentifier}
 	case "gcs":
-		args = []string{trufflehogBinary, "gcs", "--bucket", resourceIdentifier}
+		args = []string{"trufflehog", "gcs", "--bucket", resourceIdentifier}
 	case "azure-storage":
-		args = []string{trufflehogBinary, "azure", "--container", resourceIdentifier}
+		args = []string{"trufflehog", "azure", "--container", resourceIdentifier}
 	default:
-		args = []string{trufflehogBinary, cloudProvider, resourceIdentifier}
+		args = []string{"trufflehog", cloudProvider, resourceIdentifier}
 	}
 
 	if credentialsProfile != "" {
@@ -391,7 +412,9 @@ func (m *TruffleHogModule) CloudStorageScanning(ctx context.Context, cloudProvid
 		container = container.WithEnvVariable("AWS_REGION", os.Getenv("AWS_REGION"))
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -413,25 +436,27 @@ func (m *TruffleHogModule) CustomDetectorManagement(ctx context.Context, action 
 	var args []string
 	switch action {
 	case "list":
-		args = []string{trufflehogBinary, "--list-detectors"}
+		args = []string{"trufflehog", "--list-detectors"}
 	case "validate":
 		container = container.WithFile("/config.yaml", m.client.Host().File(detectorConfig))
-		args = []string{trufflehogBinary, "--validate-config", "/config.yaml"}
+		args = []string{"trufflehog", "--validate-config", "/config.yaml"}
 	case "scan-with-custom":
 		container = container.WithFile("/config.yaml", m.client.Host().File(detectorConfig)).
 			WithDirectory("/workspace", m.client.Host().Directory(target)).
 			WithWorkdir("/workspace")
-		args = []string{trufflehogBinary, "filesystem", ".", "--config", "/config.yaml"}
+		args = []string{"trufflehog", "filesystem", ".", "--config", "/config.yaml"}
 		if includeBuiltin {
 			args = append(args, "--include-builtin")
 		}
 	case "test-detector":
-		args = []string{trufflehogBinary, "--test-detector", detectorPattern}
+		args = []string{"trufflehog", "--test-detector", detectorPattern}
 	default:
-		args = []string{trufflehogBinary, "--help"}
+		args = []string{"trufflehog", "--help"}
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -453,13 +478,13 @@ func (m *TruffleHogModule) EnterpriseGitScanning(ctx context.Context, gitSource 
 	var args []string
 	switch gitSource {
 	case "github":
-		args = []string{trufflehogBinary, "github", "--repo", repository}
+		args = []string{"trufflehog", "github", "--repo", repository}
 	case "gitlab":
-		args = []string{trufflehogBinary, "gitlab", "--repo", repository}
+		args = []string{"trufflehog", "gitlab", "--repo", repository}
 	case "bitbucket":
-		args = []string{trufflehogBinary, "bitbucket", "--repo", repository}
+		args = []string{"trufflehog", "bitbucket", "--repo", repository}
 	default:
-		args = []string{trufflehogBinary, "git", repository}
+		args = []string{"trufflehog", "git", repository}
 	}
 
 	if authentication != "" {
@@ -485,7 +510,9 @@ func (m *TruffleHogModule) EnterpriseGitScanning(ctx context.Context, gitSource 
 		args = append(args, "--format", outputFormat)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -506,7 +533,7 @@ func (m *TruffleHogModule) CICDPipelineIntegration(ctx context.Context, scanTarg
 		WithDirectory("/workspace", m.client.Host().Directory(scanTarget)).
 		WithWorkdir("/workspace")
 
-	args := []string{trufflehogBinary, "filesystem", "."}
+	args := []string{"trufflehog", "filesystem", "."}
 
 	// Configure based on scan type
 	switch scanType {
@@ -539,7 +566,9 @@ func (m *TruffleHogModule) CICDPipelineIntegration(ctx context.Context, scanTarg
 		args = append(args, "--timeout", timeout+"s")
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -564,7 +593,7 @@ func (m *TruffleHogModule) PerformanceOptimization(ctx context.Context, target s
 		target = "."
 	}
 
-	args := []string{trufflehogBinary, sourceType, target}
+	args := []string{"trufflehog", sourceType, target}
 	if concurrency != "" {
 		args = append(args, "--concurrency", concurrency)
 	}
@@ -587,7 +616,9 @@ func (m *TruffleHogModule) PerformanceOptimization(ctx context.Context, target s
 		args = append(args, "--metrics")
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -612,7 +643,7 @@ func (m *TruffleHogModule) ComprehensiveReporting(ctx context.Context, target st
 		target = "."
 	}
 
-	args := []string{trufflehogBinary, sourceType, target}
+	args := []string{"trufflehog", sourceType, target}
 
 	// Configure report-specific settings
 	switch reportType {
@@ -640,7 +671,9 @@ func (m *TruffleHogModule) ComprehensiveReporting(ctx context.Context, target st
 		args = append(args, "--baseline", "/baseline.json")
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -658,7 +691,9 @@ func (m *TruffleHogModule) ComprehensiveReporting(ctx context.Context, target st
 func (m *TruffleHogModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("trufflesecurity/trufflehog:latest").
-		WithExec([]string{trufflehogBinary, "--version"})
+		WithExec([]string{"trufflehog", "--version"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

@@ -13,13 +13,11 @@ type KubeBenchModule struct {
 	name   string
 }
 
-const kubeBenchBinary = "/usr/local/bin/kube-bench"
-
 // NewKubeBenchModule creates a new kube-bench module
 func NewKubeBenchModule(client *dagger.Client) *KubeBenchModule {
 	return &KubeBenchModule{
 		client: client,
-		name:   kubeBenchBinary,
+		name:   "kube-bench",
 	}
 }
 
@@ -33,8 +31,10 @@ func (m *KubeBenchModule) RunBenchmark(ctx context.Context, kubeconfig string) (
 	}
 
 	container = container.WithExec([]string{
-		kubeBenchBinary,
+		"kube-bench",
 		"--json",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -55,9 +55,11 @@ func (m *KubeBenchModule) RunMasterBenchmark(ctx context.Context, kubeconfig str
 	}
 
 	container = container.WithExec([]string{
-		kubeBenchBinary,
+		"kube-bench",
 		"master",
 		"--json",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -78,9 +80,11 @@ func (m *KubeBenchModule) RunNodeBenchmark(ctx context.Context, kubeconfig strin
 	}
 
 	container = container.WithExec([]string{
-		kubeBenchBinary,
+		"kube-bench",
 		"node",
 		"--json",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -95,14 +99,21 @@ func (m *KubeBenchModule) RunNodeBenchmark(ctx context.Context, kubeconfig strin
 func (m *KubeBenchModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("aquasec/kube-bench:latest").
-		WithExec([]string{kubeBenchBinary, "--version"})
+		WithExec([]string{"kube-bench", "version"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get kube-bench version: %w", err)
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
 	}
-
-	return output, nil
+	
+	stderr, _ := container.Stderr(ctx)
+	if stderr != "" {
+		return stderr, nil
+	}
+	
+	return "", fmt.Errorf("failed to get kube-bench version: no output received")
 }
 
 // RunWithChecks runs specific checks only
@@ -114,12 +125,14 @@ func (m *KubeBenchModule) RunWithChecks(ctx context.Context, kubeconfig string, 
 		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
 	}
 
-	args := []string{kubeBenchBinary, "--json"}
+	args := []string{"kube-bench", "--json"}
 	if checks != "" {
 		args = append(args, "--check", checks)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -138,12 +151,14 @@ func (m *KubeBenchModule) RunWithSkip(ctx context.Context, kubeconfig string, sk
 		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
 	}
 
-	args := []string{kubeBenchBinary, "--json"}
+	args := []string{"kube-bench", "--json"}
 	if skip != "" {
 		args = append(args, "--skip", skip)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -172,7 +187,9 @@ func (m *KubeBenchModule) RunWithCustomOutput(ctx context.Context, kubeconfig st
 		args = append(args, "--outputfile", outputFile)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -192,8 +209,10 @@ func (m *KubeBenchModule) RunASFF(ctx context.Context, kubeconfig string) (strin
 	}
 
 	container = container.WithExec([]string{
-		kubeBenchBinary,
+		"kube-bench",
 		"--asff",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)

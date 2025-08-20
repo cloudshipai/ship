@@ -13,13 +13,12 @@ type TrivyModule struct {
 	name   string
 }
 
-const trivyBinaryMain = "/usr/local/bin/trivy"
 
 // NewTrivyModule creates a new Trivy module
 func NewTrivyModule(client *dagger.Client) *TrivyModule {
 	return &TrivyModule{
 		client: client,
-		name:   trivyBinaryMain,
+		name:   "trivy",
 	}
 }
 
@@ -28,19 +27,17 @@ func (m *TrivyModule) ScanImage(ctx context.Context, imageName string) (string, 
 	container := m.client.Container().
 		From("aquasec/trivy:latest").
 		WithExec([]string{
-			trivyBinaryMain,
-			"image",
-			"--format", "json",
-			"--severity", "HIGH,CRITICAL",
-			imageName,
+			"trivy", "image", "--format", "json", "--severity", "HIGH,CRITICAL", imageName,
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to scan image: %w", err)
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
 	}
 
-	return output, nil
+	return "", fmt.Errorf("failed to scan image: no output received")
 }
 
 // ScanFilesystem scans a filesystem for vulnerabilities
@@ -50,19 +47,17 @@ func (m *TrivyModule) ScanFilesystem(ctx context.Context, dir string) (string, e
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			trivyBinaryMain,
-			"fs",
-			"--format", "json",
-			"--severity", "HIGH,CRITICAL",
-			".",
+			"trivy", "fs", "--format", "json", "--severity", "HIGH,CRITICAL", ".",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to scan filesystem: %w", err)
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
 	}
 
-	return output, nil
+	return "", fmt.Errorf("failed to scan filesystem: no output received")
 }
 
 // ScanRepository scans a git repository
@@ -70,19 +65,17 @@ func (m *TrivyModule) ScanRepository(ctx context.Context, repoURL string) (strin
 	container := m.client.Container().
 		From("aquasec/trivy:latest").
 		WithExec([]string{
-			trivyBinaryMain,
-			"repo",
-			"--format", "json",
-			"--severity", "HIGH,CRITICAL",
-			repoURL,
+			"trivy", "repo", "--format", "json", "--severity", "HIGH,CRITICAL", repoURL,
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to scan repository: %w", err)
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
 	}
 
-	return output, nil
+	return "", fmt.Errorf("failed to scan repository: no output received")
 }
 
 // ScanConfig scans configuration files for misconfigurations
@@ -92,33 +85,35 @@ func (m *TrivyModule) ScanConfig(ctx context.Context, dir string) (string, error
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			trivyBinaryMain,
-			"config",
-			"--format", "json",
-			"--severity", "HIGH,CRITICAL",
-			".",
+			"trivy", "config", "--format", "json", "--severity", "HIGH,CRITICAL", ".",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to scan config: %w", err)
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
 	}
 
-	return output, nil
+	return "", fmt.Errorf("failed to scan config: no output received")
 }
 
 // GetVersion returns the version of Trivy
 func (m *TrivyModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("aquasec/trivy:latest").
-		WithExec([]string{trivyBinaryMain, "--version"})
+		WithExec([]string{
+			"trivy", "--version",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get trivy version: %w", err)
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
 	}
 
-	return output, nil
+	return "", fmt.Errorf("failed to get trivy version: no output received")
 }
 
 // ScanSBOM scans SBOM file for vulnerabilities
@@ -127,7 +122,7 @@ func (m *TrivyModule) ScanSBOM(ctx context.Context, sbomPath string, severity st
 		From("aquasec/trivy:latest").
 		WithFile("/sbom.json", m.client.Host().File(sbomPath))
 
-	args := []string{trivyBinaryMain, "sbom", "/sbom.json"}
+	args := []string{"sbom", "/sbom.json"}
 	if severity != "" {
 		args = append(args, "--severity", severity)
 	}
@@ -141,7 +136,9 @@ func (m *TrivyModule) ScanSBOM(ctx context.Context, sbomPath string, severity st
 		args = append(args, "--ignore-unfixed")
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -160,7 +157,7 @@ func (m *TrivyModule) ScanKubernetes(ctx context.Context, target string, cluster
 		target = "cluster"
 	}
 
-	args := []string{trivyBinaryMain, "k8s", target}
+	args := []string{"k8s", target}
 	if clusterContext != "" {
 		args = append(args, "--context", clusterContext)
 	}
@@ -180,7 +177,9 @@ func (m *TrivyModule) ScanKubernetes(ctx context.Context, target string, cluster
 		args = append(args, "--include-images")
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -201,7 +200,7 @@ func (m *TrivyModule) GenerateSBOM(ctx context.Context, target string, targetTyp
 		target = "."
 	}
 
-	args := []string{trivyBinaryMain, targetType, "--format", sbomFormat, target}
+	args := []string{targetType, "--format", sbomFormat, target}
 	if outputFile != "" {
 		args = append(args, "--output", outputFile)
 	}
@@ -209,7 +208,9 @@ func (m *TrivyModule) GenerateSBOM(ctx context.Context, target string, targetTyp
 		args = append(args, "--include-dev-deps")
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -233,7 +234,7 @@ func (m *TrivyModule) ScanWithFilters(ctx context.Context, target string, target
 		container = container.WithFile("/.trivyignore", m.client.Host().File(ignoreFile))
 	}
 
-	args := []string{trivyBinaryMain, targetType, target}
+	args := []string{targetType, target}
 	if severity != "" {
 		args = append(args, "--severity", severity)
 	}
@@ -250,7 +251,9 @@ func (m *TrivyModule) ScanWithFilters(ctx context.Context, target string, target
 		args = append(args, "--exit-code", exitCode)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -268,20 +271,22 @@ func (m *TrivyModule) DatabaseUpdate(ctx context.Context, operation string, skip
 	var args []string
 	switch operation {
 	case "download", "update":
-		args = []string{trivyBinaryMain, "image", "--download-db-only", "alpine"}
+		args = []string{"image", "--download-db-only", "alpine"}
 		if cacheDir != "" {
 			args = append(args, "--cache-dir", cacheDir)
 		}
 	case "reset", "clean":
-		args = []string{trivyBinaryMain, "clean", "--all"}
+		args = []string{"clean", "--all"}
 		if cacheDir != "" {
 			args = append(args, "--cache-dir", cacheDir)
 		}
 	default:
-		args = []string{trivyBinaryMain, "--help"}
+		args = []string{"--help"}
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -296,7 +301,7 @@ func (m *TrivyModule) ServerMode(ctx context.Context, listenPort string, listenA
 	container := m.client.Container().
 		From("aquasec/trivy:latest")
 
-	args := []string{trivyBinaryMain, "server"}
+	args := []string{"server"}
 	if listenPort != "" {
 		args = append(args, "--listen", "0.0.0.0:"+listenPort)
 	}
@@ -310,7 +315,9 @@ func (m *TrivyModule) ServerMode(ctx context.Context, listenPort string, listenA
 		args = append(args, "--token", token)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -331,7 +338,7 @@ func (m *TrivyModule) ClientScan(ctx context.Context, target string, targetType 
 		target = "."
 	}
 
-	args := []string{trivyBinaryMain, targetType, "--server", serverURL, target}
+	args := []string{targetType, "--server", serverURL, target}
 	if token != "" {
 		args = append(args, "--token", token)
 	}
@@ -339,7 +346,9 @@ func (m *TrivyModule) ClientScan(ctx context.Context, target string, targetType 
 		args = append(args, "--format", outputFormat)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -354,12 +363,14 @@ func (m *TrivyModule) PluginManagement(ctx context.Context, action string, plugi
 	container := m.client.Container().
 		From("aquasec/trivy:latest")
 
-	args := []string{trivyBinaryMain, "plugin", action}
+	args := []string{"plugin", action}
 	if pluginName != "" && action != "list" {
 		args = append(args, pluginName)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -375,12 +386,14 @@ func (m *TrivyModule) ConvertSBOM(ctx context.Context, inputSBOM string, outputF
 		From("aquasec/trivy:latest").
 		WithFile("/input.sbom", m.client.Host().File(inputSBOM))
 
-	args := []string{trivyBinaryMain, "convert", "--format", outputFormat, "/input.sbom"}
+	args := []string{"convert", "--format", outputFormat, "/input.sbom"}
 	if outputFile != "" {
 		args = append(args, "--output", outputFile)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

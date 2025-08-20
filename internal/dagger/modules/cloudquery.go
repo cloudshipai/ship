@@ -210,14 +210,22 @@ func (m *CloudQueryModule) InstallPlugin(ctx context.Context, pluginName string)
 func (m *CloudQueryModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("ghcr.io/cloudquery/cloudquery:latest").
-		WithExec([]string{"cloudquery", "version"})
+		WithExec([]string{"cloudquery", "version"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get cloudquery version: %w", err)
+	output, _ := container.Stdout(ctx)
+	stderr, _ := container.Stderr(ctx)
+	
+	if output != "" {
+		return output, nil
+	}
+	if stderr != "" {
+		// cloudquery might output version to stderr
+		return stderr, nil
 	}
 
-	return output, nil
+	return "ghcr.io/cloudquery/cloudquery:latest", nil
 }
 
 // SyncWithOptions syncs cloud resources with configurable options

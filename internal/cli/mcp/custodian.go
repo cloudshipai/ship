@@ -175,4 +175,116 @@ func addCustodianToolsDirect(s *server.MCPServer) {
 
 		return mcp.NewToolResultText(result), nil
 	})
+
+	// Custodian report tool
+	reportTool := mcp.NewTool("custodian_report",
+		mcp.WithDescription("Generate tabular report on policy matched resources"),
+		mcp.WithString("policy_file",
+			mcp.Description("Path to custodian policy YAML file"),
+			mcp.Required(),
+		),
+		mcp.WithString("output_dir",
+			mcp.Description("Output directory containing policy run results"),
+			mcp.Required(),
+		),
+		mcp.WithString("format",
+			mcp.Description("Output format"),
+			mcp.Enum("grid", "simple", "json", "csv"),
+		),
+	)
+	s.AddTool(reportTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		policyFile := request.GetString("policy_file", "")
+		outputDir := request.GetString("output_dir", "")
+		format := request.GetString("format", "")
+		
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create custodian module and generate report
+		custodianModule := modules.NewCustodianModule(client)
+		result, err := custodianModule.Report(ctx, policyFile, outputDir, format)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("custodian report failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
+	})
+
+	// Custodian logs tool
+	logsTool := mcp.NewTool("custodian_logs",
+		mcp.WithDescription("Retrieve logs for custodian policy execution"),
+		mcp.WithString("policy_file",
+			mcp.Description("Path to custodian policy YAML file"),
+			mcp.Required(),
+		),
+		mcp.WithString("output_dir",
+			mcp.Description("Output directory containing policy run results"),
+			mcp.Required(),
+		),
+	)
+	s.AddTool(logsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		policyFile := request.GetString("policy_file", "")
+		outputDir := request.GetString("output_dir", "")
+		
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create custodian module and get logs
+		custodianModule := modules.NewCustodianModule(client)
+		result, err := custodianModule.Logs(ctx, policyFile, outputDir)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("custodian logs failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
+	})
+
+	// Custodian metrics tool
+	metricsTool := mcp.NewTool("custodian_metrics",
+		mcp.WithDescription("Retrieve metrics for custodian policy execution"),
+		mcp.WithString("policy_file",
+			mcp.Description("Path to custodian policy YAML file"),
+			mcp.Required(),
+		),
+		mcp.WithString("output_dir",
+			mcp.Description("Output directory containing policy run results"),
+			mcp.Required(),
+		),
+		mcp.WithString("start",
+			mcp.Description("Start time for metrics (e.g., 2024-01-01)"),
+		),
+		mcp.WithString("end",
+			mcp.Description("End time for metrics (e.g., 2024-01-31)"),
+		),
+	)
+	s.AddTool(metricsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		policyFile := request.GetString("policy_file", "")
+		outputDir := request.GetString("output_dir", "")
+		start := request.GetString("start", "")
+		end := request.GetString("end", "")
+		
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create custodian module and get metrics
+		custodianModule := modules.NewCustodianModule(client)
+		result, err := custodianModule.Metrics(ctx, policyFile, outputDir, start, end)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("custodian metrics failed: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(result), nil
+	})
 }

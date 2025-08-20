@@ -13,13 +13,11 @@ type SyftModule struct {
 	name   string
 }
 
-const syftBinary = "/usr/local/bin/syft"
-
 // NewSyftModule creates a new Syft module
 func NewSyftModule(client *dagger.Client) *SyftModule {
 	return &SyftModule{
 		client: client,
-		name:   syftBinary,
+		name:   "syft",
 	}
 }
 
@@ -33,14 +31,18 @@ func (m *SyftModule) GenerateSBOMFromDirectory(ctx context.Context, dir string, 
 		From("anchore/syft:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{syftBinary, "dir:.", "-o", format})
+		WithExec([]string{
+			"/syft", ".", "-o", format,
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate SBOM: %w", err)
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
 	}
 
-	return output, nil
+	return "", fmt.Errorf("failed to generate SBOM: no output received")
 }
 
 // GenerateSBOMFromImage generates SBOM from a container image
@@ -51,14 +53,18 @@ func (m *SyftModule) GenerateSBOMFromImage(ctx context.Context, imageName string
 
 	container := m.client.Container().
 		From("anchore/syft:latest").
-		WithExec([]string{syftBinary, imageName, "-o", format})
+		WithExec([]string{
+			"/syft", imageName, "-o", format,
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate SBOM from image: %w", err)
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
 	}
 
-	return output, nil
+	return "", fmt.Errorf("failed to generate SBOM from image: no output received")
 }
 
 // GenerateSBOMFromPackage generates SBOM from a specific package manager
@@ -67,25 +73,18 @@ func (m *SyftModule) GenerateSBOMFromPackage(ctx context.Context, dir string, pa
 		format = "json"
 	}
 
-	var source string
-	switch packageType {
-	case "npm", "yarn":
-		source = "dir:."
-	case "pip", "python":
-		source = "dir:."
-	case "go":
-		source = "dir:."
-	case "maven", "gradle":
-		source = "dir:."
-	default:
-		source = "dir:."
-	}
+	// packageType can be used for future enhancements to filter by package manager
+	_ = packageType
 
 	container := m.client.Container().
 		From("anchore/syft:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{syftBinary, source, "-o", format})
+		WithExec([]string{
+			"/syft", ".", "-o", format,
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -103,15 +102,23 @@ func (m *SyftModule) GenerateAttestations(ctx context.Context, target string, fo
 
 	container := m.client.Container().From("anchore/syft:latest")
 	
-	if target[:6] != "image:" {
+	if len(target) > 6 && target[:6] == "image:" {
+		// It's an image
+		container = container.WithExec([]string{
+			"/syft", target, "-o", format,
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
+	} else {
 		// Assume it's a directory
 		container = container.
 			WithDirectory("/workspace", m.client.Host().Directory(target)).
 			WithWorkdir("/workspace").
-			WithExec([]string{syftBinary, "dir:.", "-o", format, "--source-name", target})
-	} else {
-		// It's an image
-		container = container.WithExec([]string{syftBinary, target, "-o", format})
+			WithExec([]string{
+				"/syft", ".", "-o", format,
+			}, dagger.ContainerWithExecOpts{
+				Expect: "ANY",
+			})
 	}
 
 	output, err := container.Stdout(ctx)
@@ -154,15 +161,18 @@ func (m *SyftModule) LanguageSpecificCataloging(ctx context.Context, target stri
 		}
 	}
 
-	args := []string{syftBinary, "dir:.", "-o", outputFormat}
+	cmd := "/usr/local/bin/syft dir:. -o " + outputFormat
 	if len(catalogers) > 0 {
-		args = append(args, "--catalogers", fmt.Sprintf("%s", catalogers[0]))
+		cmd += " --catalogers " + catalogers[0]
 	}
 	if packageManagers != "" {
-		args = append(args, "--catalogers", packageManagers)
+		cmd += " --catalogers " + packageManagers
 	}
+	cmd += " 2>&1"
 
-	container = container.WithExec(args)
+	container = container.WithExec([]string{"sh", "-c", cmd}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -179,32 +189,35 @@ func (m *SyftModule) SupplyChainAnalysis(ctx context.Context, target string, ana
 		WithDirectory("/workspace", m.client.Host().Directory(target)).
 		WithWorkdir("/workspace")
 
-	args := []string{syftBinary, "dir:."}
+	cmd := "/usr/local/bin/syft dir:."
 
 	// Configure analysis depth
 	switch analysisDepth {
 	case "shallow":
-		args = append(args, "--scope", "Squashed")
+		cmd += " --scope Squashed"
 	case "deep":
-		args = append(args, "--scope", "AllLayers")
+		cmd += " --scope AllLayers"
 	case "comprehensive":
-		args = append(args, "--scope", "AllLayers", "--catalogers", "all")
+		cmd += " --scope AllLayers --catalogers all"
 	default:
-		args = append(args, "--scope", "AllLayers")
+		cmd += " --scope AllLayers"
 	}
 
 	// Configure output formats
 	if len(outputFormats) > 0 {
-		args = append(args, "-o", outputFormats[0])
+		cmd += " -o " + outputFormats[0]
 	} else {
-		args = append(args, "-o", "cyclonedx-json,spdx-json")
+		cmd += " -o cyclonedx-json,spdx-json"
 	}
 
 	if includeLicenseAnalysis {
-		args = append(args, "-o", "spdx-json")
+		cmd += " -o spdx-json"
 	}
+	cmd += " 2>&1"
 
-	container = container.WithExec(args)
+	container = container.WithExec([]string{"sh", "-c", cmd}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -227,12 +240,15 @@ func (m *SyftModule) SBOMComparison(ctx context.Context, baselineTarget string, 
 		container = container.WithDirectory("/comparison", m.client.Host().Directory(comparisonTarget))
 	}
 
-	args := []string{syftBinary, "/baseline", "-o", "syft-json", "--file", "/tmp/baseline-sbom.json"}
+	cmd := "/usr/local/bin/syft /baseline -o syft-json --file /tmp/baseline-sbom.json"
 	if outputFormat != "" {
-		args = append(args, "-o", outputFormat)
+		cmd += " -o " + outputFormat
 	}
+	cmd += " 2>&1"
 
-	container = container.WithExec(args)
+	container = container.WithExec([]string{"sh", "-c", cmd}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -249,31 +265,33 @@ func (m *SyftModule) ComplianceAttestation(ctx context.Context, target string, c
 		WithDirectory("/workspace", m.client.Host().Directory(target)).
 		WithWorkdir("/workspace")
 
-	args := []string{syftBinary, "dir:."}
+	cmd := "/usr/local/bin/syft dir:."
 
 	// Configure output format based on compliance framework
 	switch complianceFramework {
 	case "ntia-minimum":
-		args = append(args, "-o", "spdx-json")
+		cmd += " -o spdx-json"
 	case "spdx-2.3":
-		args = append(args, "-o", "spdx-json")
+		cmd += " -o spdx-json"
 	case "cyclonedx-1.4":
-		args = append(args, "-o", "cyclonedx-json")
+		cmd += " -o cyclonedx-json"
 	case "sbom-quality":
-		args = append(args, "-o", "syft-json")
+		cmd += " -o syft-json"
 	}
 
 	if outputFormat != "" {
-		args = append(args, "-o", outputFormat)
+		cmd += " -o " + outputFormat
 	}
 	if outputFile != "" {
-		args = append(args, "--file", outputFile)
+		cmd += " --file " + outputFile
 	}
 
 	// Add compliance-specific catalogers
-	args = append(args, "--catalogers", "all", "--scope", "AllLayers")
+	cmd += " --catalogers all --scope AllLayers 2>&1"
 
-	container = container.WithExec(args)
+	container = container.WithExec([]string{"sh", "-c", cmd}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -289,21 +307,24 @@ func (m *SyftModule) ArchiveAnalysis(ctx context.Context, archivePath string, ar
 		From("anchore/syft:latest").
 		WithFile("/archive", m.client.Host().File(archivePath))
 
-	args := []string{syftBinary, "/archive"}
+	cmd := "/usr/local/bin/syft /archive"
 	if outputFormat != "" {
-		args = append(args, "-o", outputFormat)
+		cmd += " -o " + outputFormat
 	}
 	if archiveType != "auto" && archiveType != "" {
-		args = append(args, "--from", archiveType)
+		cmd += " --from " + archiveType
 	}
 	if extractNested {
-		args = append(args, "--scope", "AllLayers")
+		cmd += " --scope AllLayers"
 	}
 	if extractionDepth != "" {
-		args = append(args, "--max-depth", extractionDepth)
+		cmd += " --max-depth " + extractionDepth
 	}
+	cmd += " 2>&1"
 
-	container = container.WithExec(args)
+	container = container.WithExec([]string{"sh", "-c", cmd}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -320,39 +341,42 @@ func (m *SyftModule) CICDPipelineIntegration(ctx context.Context, target string,
 		WithDirectory("/workspace", m.client.Host().Directory(target)).
 		WithWorkdir("/workspace")
 
-	args := []string{syftBinary, "dir:."}
+	cmd := "/usr/local/bin/syft dir:."
 
 	// Configure based on pipeline stage
 	switch pipelineStage {
 	case "build":
-		args = append(args, "-o", "syft-json,cyclonedx-json")
+		cmd += " -o syft-json,cyclonedx-json"
 	case "test":
-		args = append(args, "-o", "syft-json")
+		cmd += " -o syft-json"
 	case "staging", "production":
-		args = append(args, "-o", "spdx-json,cyclonedx-json")
+		cmd += " -o spdx-json,cyclonedx-json"
 	case "release":
-		args = append(args, "-o", "spdx-json,cyclonedx-json,syft-json")
+		cmd += " -o spdx-json,cyclonedx-json,syft-json"
 	default:
-		args = append(args, "-o", "syft-json,cyclonedx-json")
+		cmd += " -o syft-json,cyclonedx-json"
 	}
 
 	if len(outputFormats) > 0 {
-		args = append(args, "-o", outputFormats[0])
+		cmd += " -o " + outputFormats[0]
 	}
 	if outputDirectory != "" {
 		if artifactName == "" {
 			artifactName = "sbom"
 		}
-		args = append(args, "--file", outputDirectory+"/"+artifactName)
+		cmd += " --file " + outputDirectory + "/" + artifactName
 	}
 	if quietMode {
-		args = append(args, "--quiet")
+		cmd += " --quiet"
 	}
 	if timeout != "" {
-		args = append(args, "--timeout", timeout+"s")
+		cmd += " --timeout " + timeout + "s"
 	}
+	cmd += " 2>&1"
 
-	container = container.WithExec(args)
+	container = container.WithExec([]string{"sh", "-c", cmd}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -374,17 +398,20 @@ func (m *SyftModule) MetadataExtraction(ctx context.Context, target string, meta
 		outputFormat = "syft-json"
 	}
 
-	args := []string{syftBinary, "dir:.", "-o", outputFormat}
+	cmd := "/usr/local/bin/syft dir:. -o " + outputFormat
 
 	// Enable all catalogers for comprehensive metadata
-	args = append(args, "--catalogers", "all", "--scope", "AllLayers")
+	cmd += " --catalogers all --scope AllLayers"
 
 	if includeFileMetadata {
 		// Enable file cataloger for file-level metadata
-		args = append(args, "--catalogers", "file-metadata")
+		cmd += " --catalogers file-metadata"
 	}
+	cmd += " 2>&1"
 
-	container = container.WithExec(args)
+	container = container.WithExec([]string{"sh", "-c", cmd}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

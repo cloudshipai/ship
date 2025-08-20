@@ -13,8 +13,6 @@ type InfraMapModule struct {
 	client *dagger.Client
 }
 
-const inframapBinary = "/usr/local/bin/inframap"
-
 // NewInfraMapModule creates a new InfraMap module instance
 func NewInfraMapModule(client *dagger.Client) *InfraMapModule {
 	return &InfraMapModule{
@@ -29,11 +27,9 @@ func (m *InfraMapModule) GenerateFromState(ctx context.Context, stateFile string
 
 	// Create container with InfraMap
 	container := m.client.Container().
-		From("alpine:latest").
-		WithExec([]string{"apk", "add", "--no-cache", "curl", "tar"}).
-		WithExec([]string{"sh", "-c", "mkdir -p /usr/local/bin && curl -sSL https://github.com/cycloidio/inframap/releases/download/v0.7.0/inframap-linux-amd64.tar.gz | tar xz -C /usr/local/bin/ && mv /usr/local/bin/inframap-linux-amd64 /usr/local/bin/inframap && chmod +x /usr/local/bin/inframap"}).
-		WithDirectory("/workspace", workDir).
-		WithWorkdir("/workspace")
+		From("cycloid/inframap:latest").
+		WithDirectory("/opt", workDir).
+		WithWorkdir("/opt")
 
 	// Generate the diagram based on format
 	var output string
@@ -43,7 +39,9 @@ func (m *InfraMapModule) GenerateFromState(ctx context.Context, stateFile string
 	case "png", "svg", "pdf":
 		// Generate dot format first, then convert
 		result := container.
-			WithExec([]string{inframapBinary, "generate", stateFile})
+			WithExec([]string{"/home/inframap/inframap", "generate", stateFile}, dagger.ContainerWithExecOpts{
+				Expect: "ANY",
+			})
 
 		output, err = result.Stdout(ctx)
 		if err != nil {
@@ -54,7 +52,9 @@ func (m *InfraMapModule) GenerateFromState(ctx context.Context, stateFile string
 	case "dot":
 		// Generate raw dot format
 		result := container.
-			WithExec([]string{inframapBinary, "generate", stateFile})
+			WithExec([]string{"/home/inframap/inframap", "generate", stateFile}, dagger.ContainerWithExecOpts{
+				Expect: "ANY",
+			})
 
 		output, err = result.Stdout(ctx)
 		if err != nil {
@@ -76,11 +76,9 @@ func (m *InfraMapModule) GenerateFromHCL(ctx context.Context, directory string, 
 
 	// Create container with InfraMap
 	container := m.client.Container().
-		From("alpine:latest").
-		WithExec([]string{"apk", "add", "--no-cache", "curl", "tar"}).
-		WithExec([]string{"sh", "-c", "mkdir -p /usr/local/bin && curl -sSL https://github.com/cycloidio/inframap/releases/download/v0.7.0/inframap-linux-amd64.tar.gz | tar xz -C /usr/local/bin/ && mv /usr/local/bin/inframap-linux-amd64 /usr/local/bin/inframap && chmod +x /usr/local/bin/inframap"}).
-		WithDirectory("/workspace", workDir).
-		WithWorkdir("/workspace")
+		From("cycloid/inframap:latest").
+		WithDirectory("/opt", workDir).
+		WithWorkdir("/opt")
 
 	// Generate the diagram
 	var output string
@@ -90,7 +88,9 @@ func (m *InfraMapModule) GenerateFromHCL(ctx context.Context, directory string, 
 	case "png", "svg", "pdf":
 		// For HCL, we need to specify all .tf files
 		result := container.
-			WithExec([]string{inframapBinary, "generate", "--hcl", "."})
+			WithExec([]string{"/home/inframap/inframap", "generate", "--hcl", "."}, dagger.ContainerWithExecOpts{
+				Expect: "ANY",
+			})
 
 		output, err = result.Stdout(ctx)
 		if err != nil {
@@ -100,7 +100,9 @@ func (m *InfraMapModule) GenerateFromHCL(ctx context.Context, directory string, 
 
 	case "dot":
 		result := container.
-			WithExec([]string{inframapBinary, "generate", "--hcl", "."})
+			WithExec([]string{"/home/inframap/inframap", "generate", "--hcl", "."}, dagger.ContainerWithExecOpts{
+				Expect: "ANY",
+			})
 
 		output, err = result.Stdout(ctx)
 		if err != nil {
@@ -121,12 +123,11 @@ func (m *InfraMapModule) GenerateWithOptions(ctx context.Context, input string, 
 
 	container := m.client.Container().
 		From("cycloid/inframap:latest").
-		WithExec([]string{"sh", "-c", "apk add --no-cache graphviz font-noto"}).
-		WithDirectory("/workspace", workDir).
-		WithWorkdir("/workspace")
+		WithDirectory("/opt", workDir).
+		WithWorkdir("/opt")
 
 	// Build command with options
-	args := []string{inframapBinary, "generate"}
+	args := []string{"/home/inframap/inframap", "generate"}
 
 	if options.Raw {
 		args = append(args, "--raw")
@@ -148,7 +149,9 @@ func (m *InfraMapModule) GenerateWithOptions(ctx context.Context, input string, 
 		cmd = fmt.Sprintf("%s | dot -T%s", cmd, options.Format)
 	}
 
-	result := container.WithExec([]string{"sh", "-c", cmd})
+	result := container.WithExec([]string{"sh", "-c", cmd}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := result.Stdout(ctx)
 	if err != nil {
@@ -164,14 +167,14 @@ func (m *InfraMapModule) PruneState(ctx context.Context, stateFile string) (stri
 	workDir := m.client.Host().Directory(".")
 
 	container := m.client.Container().
-		From("alpine:latest").
-		WithExec([]string{"apk", "add", "--no-cache", "curl", "tar"}).
-		WithExec([]string{"sh", "-c", "mkdir -p /usr/local/bin && curl -sSL https://github.com/cycloidio/inframap/releases/latest/download/inframap-linux-amd64.tar.gz | tar xz -C /usr/local/bin/ && chmod +x /usr/local/bin/inframap"}).
-		WithDirectory("/workspace", workDir).
-		WithWorkdir("/workspace")
+		From("cycloid/inframap:latest").
+		WithDirectory("/opt", workDir).
+		WithWorkdir("/opt")
 
 	result := container.
-		WithExec([]string{inframapBinary, "prune", stateFile})
+		WithExec([]string{"/home/inframap/inframap", "prune", stateFile}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := result.Stdout(ctx)
 	if err != nil {
@@ -180,6 +183,28 @@ func (m *InfraMapModule) PruneState(ctx context.Context, stateFile string) (stri
 	}
 
 	return output, nil
+}
+
+// GetVersion returns the version of InfraMap
+func (m *InfraMapModule) GetVersion(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("cycloid/inframap:latest").
+		WithExec([]string{"/home/inframap/inframap", "version"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
+
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
+	}
+	
+	// InfraMap might output to stderr
+	stderr, _ := container.Stderr(ctx)
+	if stderr != "" {
+		return stderr, nil
+	}
+	
+	return "", fmt.Errorf("failed to get inframap version: no output received")
 }
 
 // InfraMapOptions contains options for diagram generation

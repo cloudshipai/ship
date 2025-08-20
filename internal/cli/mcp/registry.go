@@ -37,6 +37,7 @@ var ToolRegistry = map[string][]ToolInfo{
 		{Name: "dockle", Description: "Container image linter", AddFunc: AddDockleTools, HasVariables: false},
 		{Name: "sops", Description: "Secrets management", AddFunc: AddSOPSTools, HasVariables: true},
 		{Name: "ossf-scorecard", Description: "OSSF security scorecard", AddFunc: AddOSSFScorecardTools, HasVariables: false},
+		{Name: "scancode", Description: "License and copyright detection", AddFunc: AddScanCodeTools, HasVariables: false},
 		{Name: "steampipe", Description: "Cloud asset querying with SQL", AddFunc: AddSteampipeTools, HasVariables: true},
 		{Name: "allstar", Description: "Kubernetes security policy enforcement", AddFunc: AddAllstarTools, HasVariables: false},
 		{Name: "cfn-nag", Description: "CloudFormation security linter", AddFunc: AddCfnNagTools, HasVariables: false},

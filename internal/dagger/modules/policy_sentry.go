@@ -32,9 +32,14 @@ func (m *PolicySentryModule) CreateTemplate(ctx context.Context, templateType st
 	}
 
 	container := m.client.Container().
-		From("cloudshipai/policy-sentry:latest").
+		From("python:3.11-slim").
+		WithExec([]string{"pip", "install", "--no-cache-dir", "policy-sentry"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
 		WithWorkdir("/workspace").
-		WithExec(args)
+		WithExec(args, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -51,10 +56,15 @@ func (m *PolicySentryModule) CreateTemplate(ctx context.Context, templateType st
 // WritePolicy writes an IAM policy from a YAML template
 func (m *PolicySentryModule) WritePolicy(ctx context.Context, inputFile string) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/policy-sentry:latest").
+		From("python:3.11-slim").
+		WithExec([]string{"pip", "install", "--no-cache-dir", "policy-sentry"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
 		WithFile("/workspace/input.yml", m.client.Host().File(inputFile)).
 		WithWorkdir("/workspace").
-		WithExec([]string{policySentryBinary, "write-policy", "--input-file", "input.yml"})
+		WithExec([]string{policySentryBinary, "write-policy", "--input-file", "input.yml"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -71,10 +81,15 @@ func (m *PolicySentryModule) WritePolicy(ctx context.Context, inputFile string) 
 // WritePolicyFromTemplate writes a policy from an inline template
 func (m *PolicySentryModule) WritePolicyFromTemplate(ctx context.Context, templateYAML string) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/policy-sentry:latest").
+		From("python:3.11-slim").
+		WithExec([]string{"pip", "install", "--no-cache-dir", "policy-sentry"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
 		WithNewFile("/workspace/template.yml", templateYAML).
 		WithWorkdir("/workspace").
-		WithExec([]string{policySentryBinary, "write-policy", "--input-file", "template.yml"})
+		WithExec([]string{policySentryBinary, "write-policy", "--input-file", "template.yml"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -107,10 +122,15 @@ actions:
 	}
 
 	container := m.client.Container().
-		From("cloudshipai/policy-sentry:latest").
+		From("python:3.11-slim").
+		WithExec([]string{"pip", "install", "--no-cache-dir", "policy-sentry"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
 		WithNewFile("/workspace/actions.yml", template).
 		WithWorkdir("/workspace").
-		WithExec([]string{policySentryBinary, "write-policy", "--input-file", "actions.yml"})
+		WithExec([]string{policySentryBinary, "write-policy", "--input-file", "actions.yml"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -139,10 +159,15 @@ crud:
 	}
 
 	container := m.client.Container().
-		From("cloudshipai/policy-sentry:latest").
+		From("python:3.11-slim").
+		WithExec([]string{"pip", "install", "--no-cache-dir", "policy-sentry"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
 		WithNewFile("/workspace/crud.yml", template).
 		WithWorkdir("/workspace").
-		WithExec([]string{policySentryBinary, "write-policy", "--input-file", "crud.yml"})
+		WithExec([]string{policySentryBinary, "write-policy", "--input-file", "crud.yml"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -159,8 +184,13 @@ crud:
 // QueryActionTable queries the action table for service information
 func (m *PolicySentryModule) QueryActionTable(ctx context.Context, service string) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/policy-sentry:latest").
-		WithExec([]string{policySentryBinary, "query", "action-table", "--service", service})
+		From("python:3.11-slim").
+		WithExec([]string{"pip", "install", "--no-cache-dir", "policy-sentry"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
+		WithExec([]string{policySentryBinary, "query", "action-table", "--service", service}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -177,8 +207,13 @@ func (m *PolicySentryModule) QueryActionTable(ctx context.Context, service strin
 // QueryConditionTable queries the condition table for service information
 func (m *PolicySentryModule) QueryConditionTable(ctx context.Context, service string) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/policy-sentry:latest").
-		WithExec([]string{policySentryBinary, "query", "condition-table", "--service", service})
+		From("python:3.11-slim").
+		WithExec([]string{"pip", "install", "--no-cache-dir", "policy-sentry"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
+		WithExec([]string{policySentryBinary, "query", "condition-table", "--service", service}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

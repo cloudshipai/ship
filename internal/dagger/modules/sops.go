@@ -160,7 +160,8 @@ func (m *SOPSModule) PublishKeys(ctx context.Context, keyType string, keyPath st
 
 	if keyType == "pgp" && keyPath != "" {
 		// For PGP, show key information using gpg
-		container = container.From("alpine/gpg:latest")
+		container = container.From("alpine:latest").
+			WithExec([]string{"apk", "add", "--no-cache", "gnupg"})
 		args = []string{"gpg", "--import", "/workspace/keyfile", "&&", "gpg", "--list-keys"}
 	}
 

@@ -31,7 +31,9 @@ func (m *ProwlerModule) ScanAWS(ctx context.Context, provider string, region str
 		WithEnvVariable("AWS_ACCESS_KEY_ID", os.Getenv("AWS_ACCESS_KEY_ID")).
 		WithEnvVariable("AWS_SECRET_ACCESS_KEY", os.Getenv("AWS_SECRET_ACCESS_KEY")).
 		WithEnvVariable("AWS_REGION", region).
-		WithExec([]string{prowlerBinary, "aws", "--output-format", "json"})
+		WithExec([]string{prowlerBinary, "aws", "--output-format", "json"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -49,7 +51,9 @@ func (m *ProwlerModule) ScanAzure(ctx context.Context) (string, error) {
 		WithEnvVariable("AZURE_TENANT_ID", os.Getenv("AZURE_TENANT_ID")).
 		WithEnvVariable("AZURE_CLIENT_ID", os.Getenv("AZURE_CLIENT_ID")).
 		WithEnvVariable("AZURE_CLIENT_SECRET", os.Getenv("AZURE_CLIENT_SECRET")).
-		WithExec([]string{prowlerBinary, "azure", "--output-format", "json"})
+		WithExec([]string{prowlerBinary, "azure", "--output-format", "json"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -64,7 +68,9 @@ func (m *ProwlerModule) ScanGCP(ctx context.Context, projectId string) (string, 
 	container := m.client.Container().
 		From("toniblyx/prowler:latest").
 		WithEnvVariable("GOOGLE_APPLICATION_CREDENTIALS", os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")).
-		WithExec([]string{prowlerBinary, "gcp", "--project-id", projectId, "--output-format", "json"})
+		WithExec([]string{prowlerBinary, "gcp", "--project-id", projectId, "--output-format", "json"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -80,7 +86,9 @@ func (m *ProwlerModule) ScanKubernetes(ctx context.Context, kubeconfigPath strin
 		From("toniblyx/prowler:latest").
 		WithFile("/tmp/kubeconfig", m.client.Host().File(kubeconfigPath)).
 		WithEnvVariable("KUBECONFIG", "/tmp/kubeconfig").
-		WithExec([]string{prowlerBinary, "kubernetes", "--output-format", "json"})
+		WithExec([]string{prowlerBinary, "kubernetes", "--output-format", "json"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -97,7 +105,9 @@ func (m *ProwlerModule) ScanWithCompliance(ctx context.Context, provider string,
 		WithEnvVariable("AWS_ACCESS_KEY_ID", os.Getenv("AWS_ACCESS_KEY_ID")).
 		WithEnvVariable("AWS_SECRET_ACCESS_KEY", os.Getenv("AWS_SECRET_ACCESS_KEY")).
 		WithEnvVariable("AWS_REGION", region).
-		WithExec([]string{prowlerBinary, provider, "--compliance", compliance, "--output-format", "json"})
+		WithExec([]string{prowlerBinary, provider, "--compliance", compliance, "--output-format", "json"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -114,7 +124,9 @@ func (m *ProwlerModule) ScanSpecificServices(ctx context.Context, provider strin
 		WithEnvVariable("AWS_ACCESS_KEY_ID", os.Getenv("AWS_ACCESS_KEY_ID")).
 		WithEnvVariable("AWS_SECRET_ACCESS_KEY", os.Getenv("AWS_SECRET_ACCESS_KEY")).
 		WithEnvVariable("AWS_REGION", region).
-		WithExec([]string{prowlerBinary, provider, "--services", services, "--output-format", "json"})
+		WithExec([]string{prowlerBinary, provider, "--services", services, "--output-format", "json"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -133,7 +145,9 @@ func (m *ProwlerModule) ListChecks(ctx context.Context, provider string) (string
 
 	container := m.client.Container().
 		From("toniblyx/prowler:latest").
-		WithExec(args)
+		WithExec(args, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -152,7 +166,9 @@ func (m *ProwlerModule) ListServices(ctx context.Context, provider string) (stri
 
 	container := m.client.Container().
 		From("toniblyx/prowler:latest").
-		WithExec(args)
+		WithExec(args, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -171,7 +187,9 @@ func (m *ProwlerModule) ListCompliance(ctx context.Context, provider string) (st
 
 	container := m.client.Container().
 		From("toniblyx/prowler:latest").
-		WithExec(args)
+		WithExec(args, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -187,7 +205,9 @@ func (m *ProwlerModule) GenerateDashboard(ctx context.Context, inputFile string,
 		From("toniblyx/prowler:latest").
 		WithFile("/workspace/input.json", m.client.Host().File(inputFile)).
 		WithWorkdir("/workspace").
-		WithExec([]string{prowlerBinary, "dashboard", "--input", "input.json", "--output-dir", outputDir})
+		WithExec([]string{prowlerBinary, "dashboard", "--input", "input.json", "--output-dir", outputDir}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

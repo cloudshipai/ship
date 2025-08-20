@@ -8,7 +8,7 @@ import (
 )
 
 // niktoBinary is the path to the nikto binary in the container
-const niktoBinary = "/usr/bin/nikto.pl"
+const niktoBinary = "nikto"
 
 // NiktoModule runs Nikto for web vulnerability scanning
 type NiktoModule struct {
@@ -27,11 +27,13 @@ func NewNiktoModule(client *dagger.Client) *NiktoModule {
 // ScanHost scans a web host for vulnerabilities
 func (m *NiktoModule) ScanHost(ctx context.Context, host string) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/nikto:latest").
+		From("wolff2023/nikto:latest").
 		WithExec([]string{
 			niktoBinary,
 			"-h", host,
 			"-Format", "json",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -45,13 +47,15 @@ func (m *NiktoModule) ScanHost(ctx context.Context, host string) (string, error)
 // ScanWithSSL scans a host with SSL/TLS analysis
 func (m *NiktoModule) ScanWithSSL(ctx context.Context, host string, port int) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/nikto:latest").
+		From("wolff2023/nikto:latest").
 		WithExec([]string{
 			niktoBinary,
 			"-h", host,
 			"-p", fmt.Sprintf("%d", port),
 			"-ssl",
 			"-Format", "json",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -65,12 +69,14 @@ func (m *NiktoModule) ScanWithSSL(ctx context.Context, host string, port int) (s
 // ScanWithTuning scans with specific tuning options
 func (m *NiktoModule) ScanWithTuning(ctx context.Context, host string, tuning string) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/nikto:latest").
+		From("wolff2023/nikto:latest").
 		WithExec([]string{
 			niktoBinary,
 			"-h", host,
 			"-Tuning", tuning,
 			"-Format", "json",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -84,8 +90,10 @@ func (m *NiktoModule) ScanWithTuning(ctx context.Context, host string, tuning st
 // GetVersion returns the version of Nikto
 func (m *NiktoModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/nikto:latest").
-		WithExec([]string{niktoBinary, "-Version"})
+		From("wolff2023/nikto:latest").
+		WithExec([]string{niktoBinary, "-Version"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -99,9 +107,11 @@ func (m *NiktoModule) GetVersion(ctx context.Context) (string, error) {
 // ScanHostsFile scans multiple hosts from a file
 func (m *NiktoModule) ScanHostsFile(ctx context.Context, hostsFile string) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/nikto:latest").
+		From("wolff2023/nikto:latest").
 		WithFile("/workspace/hosts.txt", m.client.Host().File(hostsFile)).
-		WithExec([]string{niktoBinary, "-h", "/workspace/hosts.txt"})
+		WithExec([]string{niktoBinary, "-h", "/workspace/hosts.txt"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -119,8 +129,10 @@ func (m *NiktoModule) ScanWithAuth(ctx context.Context, host string, authMethod 
 	}
 
 	container := m.client.Container().
-		From("cloudshipai/nikto:latest").
-		WithExec(args)
+		From("wolff2023/nikto:latest").
+		WithExec(args, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -138,8 +150,10 @@ func (m *NiktoModule) ScanWithProxy(ctx context.Context, host string, proxyHost 
 	}
 
 	container := m.client.Container().
-		From("cloudshipai/nikto:latest").
-		WithExec(args)
+		From("wolff2023/nikto:latest").
+		WithExec(args, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -157,8 +171,10 @@ func (m *NiktoModule) ScanWithEvasion(ctx context.Context, host string, evasionL
 	}
 
 	container := m.client.Container().
-		From("cloudshipai/nikto:latest").
-		WithExec(args)
+		From("wolff2023/nikto:latest").
+		WithExec(args, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -171,8 +187,10 @@ func (m *NiktoModule) ScanWithEvasion(ctx context.Context, host string, evasionL
 // UpdateDatabase updates Nikto's vulnerability database
 func (m *NiktoModule) UpdateDatabase(ctx context.Context) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/nikto:latest").
-		WithExec([]string{niktoBinary, "-update"})
+		From("wolff2023/nikto:latest").
+		WithExec([]string{niktoBinary, "-update"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -185,8 +203,10 @@ func (m *NiktoModule) UpdateDatabase(ctx context.Context) (string, error) {
 // DatabaseCheck checks Nikto database integrity
 func (m *NiktoModule) DatabaseCheck(ctx context.Context) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/nikto:latest").
-		WithExec([]string{niktoBinary, "-dbcheck"})
+		From("wolff2023/nikto:latest").
+		WithExec([]string{niktoBinary, "-dbcheck"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -199,8 +219,10 @@ func (m *NiktoModule) DatabaseCheck(ctx context.Context) (string, error) {
 // FindOnly performs discovery-only scan without vulnerability checks
 func (m *NiktoModule) FindOnly(ctx context.Context, host string) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/nikto:latest").
-		WithExec([]string{niktoBinary, "-h", host, "-findonly"})
+		From("wolff2023/nikto:latest").
+		WithExec([]string{niktoBinary, "-h", host, "-findonly"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

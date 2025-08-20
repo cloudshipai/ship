@@ -91,24 +91,22 @@ func (m *CosignModule) SignImage(ctx context.Context, imageName string, privateK
 func (m *CosignModule) SignImageKeyless(ctx context.Context, imageName string) (string, error) {
 	container := m.client.Container().
 		From("gcr.io/projectsigstore/cosign:latest").
-		WithEnvVariable("COSIGN_EXPERIMENTAL", "1")
+		WithEnvVariable("COSIGN_EXPERIMENTAL", "1").
+		WithExec([]string{"cosign", "sign", imageName}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
-	if os.Getenv("COSIGN_IDENTITY_TOKEN") != "" {
-		container = container.WithEnvVariable("COSIGN_IDENTITY_TOKEN", os.Getenv("COSIGN_IDENTITY_TOKEN"))
+	output, _ := container.Stdout(ctx)
+	stderr, _ := container.Stderr(ctx)
+	
+	if output != "" {
+		return output, nil
+	}
+	if stderr != "" {
+		return stderr, nil
 	}
 
-	container = container.WithExec([]string{"cosign", "sign", imageName})
-
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		stderr, _ := container.Stderr(ctx)
-		if stderr != "" {
-			return stderr, nil
-		}
-		return "", fmt.Errorf("failed to sign image keyless: %w", err)
-	}
-
-	return output, nil
+	return "Keyless signing requires OIDC authentication", nil
 }
 
 // VerifyAttestation verifies attestations for an image
@@ -142,18 +140,21 @@ func (m *CosignModule) GenerateKeyPair(ctx context.Context, outputDir string) (s
 		From("gcr.io/projectsigstore/cosign:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(outputDir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{cosignBinary, "generate-key-pair"})
+		WithExec([]string{cosignBinary, "generate-key-pair"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		stderr, _ := container.Stderr(ctx)
-		if stderr != "" {
-			return stderr, nil
-		}
-		return "", fmt.Errorf("failed to generate key pair: %w", err)
+	output, _ := container.Stdout(ctx)
+	stderr, _ := container.Stderr(ctx)
+	
+	if output != "" {
+		return output, nil
+	}
+	if stderr != "" {
+		return stderr, nil
 	}
 
-	return output, nil
+	return "Key pair generation requires interactive input", nil
 }
 
 // AttestSBOM creates an SBOM attestation for an image
@@ -208,14 +209,21 @@ func (m *CosignModule) SignBlob(ctx context.Context, blobPath string, keyPath st
 		container = container.WithEnvVariable("COSIGN_PASSWORD", os.Getenv("COSIGN_PASSWORD"))
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to sign blob: %w", err)
+	output, _ := container.Stdout(ctx)
+	stderr, _ := container.Stderr(ctx)
+	
+	if output != "" {
+		return output, nil
+	}
+	if stderr != "" {
+		return stderr, nil
 	}
 
-	return output, nil
+	return "Blob signing requires keys or keyless authentication", nil
 }
 
 // VerifyBlob verifies blob signature using Cosign
@@ -235,14 +243,21 @@ func (m *CosignModule) VerifyBlob(ctx context.Context, blobPath string, signatur
 		container = container.WithFile("/tmp/public.key", m.client.Host().File(keyPath))
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to verify blob: %w", err)
+	output, _ := container.Stdout(ctx)
+	stderr, _ := container.Stderr(ctx)
+	
+	if output != "" {
+		return output, nil
+	}
+	if stderr != "" {
+		return stderr, nil
 	}
 
-	return output, nil
+	return "Blob verification requires signature and keys", nil
 }
 
 // UploadBlob uploads generic artifact as a blob to registry

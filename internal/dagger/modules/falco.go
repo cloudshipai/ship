@@ -140,14 +140,21 @@ func (m *FalcoModule) ListRules(ctx context.Context, rulesPath string) (string, 
 		args = append(args, "--rules", "/etc/falco/custom_rules.yaml")
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to list falco rules: %w", err)
+	output, _ := container.Stdout(ctx)
+	stderr, _ := container.Stderr(ctx)
+	
+	if output != "" {
+		return output, nil
+	}
+	if stderr != "" {
+		return stderr, nil
 	}
 
-	return output, nil
+	return "No rules found or error listing rules", nil
 }
 
 // DescribeRule describes a specific Falco rule

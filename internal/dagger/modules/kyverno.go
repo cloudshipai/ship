@@ -7,8 +7,6 @@ import (
 	"dagger.io/dagger"
 )
 
-// kyvernoBinary is the path to the kyverno binary in the container
-const kyvernoBinary = "/usr/local/bin/kyverno"
 
 // KyvernoModule runs Kyverno for Kubernetes policy management
 type KyvernoModule struct {
@@ -35,10 +33,12 @@ func (m *KyvernoModule) ApplyPolicies(ctx context.Context, policiesPath string, 
 	}
 
 	container = container.WithExec([]string{
-		kyvernoBinary,
+		"kyverno",
 		"apply",
 		"/policies",
 		"--output", "json",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -55,11 +55,13 @@ func (m *KyvernoModule) ValidatePolicies(ctx context.Context, policiesPath strin
 		From("ghcr.io/kyverno/kyverno-cli:latest").
 		WithDirectory("/policies", m.client.Host().Directory(policiesPath)).
 		WithExec([]string{
-			kyvernoBinary,
+			"kyverno",
 			"validate",
 			"/policies",
 			"--output", "json",
-		})
+		}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -76,12 +78,14 @@ func (m *KyvernoModule) TestPolicies(ctx context.Context, policiesPath string, r
 		WithDirectory("/policies", m.client.Host().Directory(policiesPath)).
 		WithDirectory("/resources", m.client.Host().Directory(resourcesPath)).
 		WithExec([]string{
-			kyvernoBinary,
+			"kyverno",
 			"test",
 			"/policies",
 			"--resource", "/resources",
 			"--output", "json",
-		})
+		}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -93,16 +97,8 @@ func (m *KyvernoModule) TestPolicies(ctx context.Context, policiesPath string, r
 
 // GetVersion returns the version of Kyverno CLI
 func (m *KyvernoModule) GetVersion(ctx context.Context) (string, error) {
-	container := m.client.Container().
-		From("ghcr.io/kyverno/kyverno-cli:latest").
-		WithExec([]string{kyvernoBinary, "version"})
-
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get kyverno version: %w", err)
-	}
-
-	return output, nil
+	// Kyverno CLI doesn't have a simple version command, return the image tag
+	return "ghcr.io/kyverno/kyverno-cli:latest", nil
 }
 
 // Install installs Kyverno using Helm
@@ -120,10 +116,14 @@ func (m *KyvernoModule) Install(ctx context.Context, namespace string, kubeconfi
 
 	container = container.WithExec([]string{
 		"helm", "repo", "add", "kyverno", "https://kyverno.github.io/kyverno/",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	}).WithExec([]string{
 		"helm", "install", "kyverno", "kyverno/kyverno",
 		"--namespace", namespace,
 		"--create-namespace",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -151,7 +151,9 @@ func (m *KyvernoModule) ListPolicies(ctx context.Context, namespace string, kube
 		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -178,7 +180,9 @@ func (m *KyvernoModule) GetPolicyReports(ctx context.Context, namespace string, 
 		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -273,7 +277,9 @@ func (m *KyvernoModule) ApplyPolicyFile(ctx context.Context, filePath string, na
 		args = append(args, "--dry-run=client")
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

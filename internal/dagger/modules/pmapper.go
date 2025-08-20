@@ -27,7 +27,10 @@ func NewPMapperModule(client *dagger.Client) *PMapperModule {
 // CreateGraph creates a privilege graph for an AWS account
 func (m *PMapperModule) CreateGraph(ctx context.Context, profile string) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/pmapper:latest").
+		From("python:3.11-slim").
+		WithExec([]string{"pip", "install", "--no-cache-dir", "principalmapper"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
 		WithEnvVariable("AWS_PROFILE", profile)
 
 	if os.Getenv("AWS_ACCESS_KEY_ID") != "" {
@@ -37,7 +40,9 @@ func (m *PMapperModule) CreateGraph(ctx context.Context, profile string) (string
 			WithEnvVariable("AWS_REGION", os.Getenv("AWS_REGION"))
 	}
 
-	container = container.WithExec([]string{pmapperBinary, "graph", "create"})
+	container = container.WithExec([]string{pmapperBinary, "graph", "create"}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -54,7 +59,10 @@ func (m *PMapperModule) CreateGraph(ctx context.Context, profile string) (string
 // QueryAccess queries if a principal can access a specific action/resource
 func (m *PMapperModule) QueryAccess(ctx context.Context, profile string, principal string, action string, resource string) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/pmapper:latest").
+		From("python:3.11-slim").
+		WithExec([]string{"pip", "install", "--no-cache-dir", "principalmapper"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
 		WithEnvVariable("AWS_PROFILE", profile)
 
 	if os.Getenv("AWS_ACCESS_KEY_ID") != "" {
@@ -69,7 +77,9 @@ func (m *PMapperModule) QueryAccess(ctx context.Context, profile string, princip
 		args = append(args, resource)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -86,7 +96,10 @@ func (m *PMapperModule) QueryAccess(ctx context.Context, profile string, princip
 // FindPrivilegeEscalation finds privilege escalation paths
 func (m *PMapperModule) FindPrivilegeEscalation(ctx context.Context, profile string, principal string) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/pmapper:latest").
+		From("python:3.11-slim").
+		WithExec([]string{"pip", "install", "--no-cache-dir", "principalmapper"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
 		WithEnvVariable("AWS_PROFILE", profile)
 
 	if os.Getenv("AWS_ACCESS_KEY_ID") != "" {
@@ -96,7 +109,9 @@ func (m *PMapperModule) FindPrivilegeEscalation(ctx context.Context, profile str
 			WithEnvVariable("AWS_REGION", os.Getenv("AWS_REGION"))
 	}
 
-	container = container.WithExec([]string{pmapperBinary, "query", "preset", "privesc", principal})
+	container = container.WithExec([]string{pmapperBinary, "query", "preset", "privesc", principal}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -113,7 +128,10 @@ func (m *PMapperModule) FindPrivilegeEscalation(ctx context.Context, profile str
 // VisualizeGraph creates a visual representation of the privilege graph
 func (m *PMapperModule) VisualizeGraph(ctx context.Context, profile string, outputFormat string) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/pmapper:latest").
+		From("python:3.11-slim").
+		WithExec([]string{"pip", "install", "--no-cache-dir", "principalmapper"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
 		WithEnvVariable("AWS_PROFILE", profile)
 
 	if os.Getenv("AWS_ACCESS_KEY_ID") != "" {
@@ -128,7 +146,9 @@ func (m *PMapperModule) VisualizeGraph(ctx context.Context, profile string, outp
 		args = append(args, "--format", outputFormat)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -145,7 +165,10 @@ func (m *PMapperModule) VisualizeGraph(ctx context.Context, profile string, outp
 // ListPrincipals lists all principals in the AWS account
 func (m *PMapperModule) ListPrincipals(ctx context.Context, profile string) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/pmapper:latest").
+		From("python:3.11-slim").
+		WithExec([]string{"pip", "install", "--no-cache-dir", "principalmapper"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
 		WithEnvVariable("AWS_PROFILE", profile)
 
 	if os.Getenv("AWS_ACCESS_KEY_ID") != "" {
@@ -155,7 +178,9 @@ func (m *PMapperModule) ListPrincipals(ctx context.Context, profile string) (str
 			WithEnvVariable("AWS_REGION", os.Getenv("AWS_REGION"))
 	}
 
-	container = container.WithExec([]string{pmapperBinary, "query", "list", "principals"})
+	container = container.WithExec([]string{pmapperBinary, "query", "list", "principals"}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -172,7 +197,10 @@ func (m *PMapperModule) ListPrincipals(ctx context.Context, profile string) (str
 // CheckAdminAccess checks if a principal has admin access
 func (m *PMapperModule) CheckAdminAccess(ctx context.Context, profile string, principal string) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/pmapper:latest").
+		From("python:3.11-slim").
+		WithExec([]string{"pip", "install", "--no-cache-dir", "principalmapper"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
 		WithEnvVariable("AWS_PROFILE", profile)
 
 	if os.Getenv("AWS_ACCESS_KEY_ID") != "" {
@@ -182,7 +210,9 @@ func (m *PMapperModule) CheckAdminAccess(ctx context.Context, profile string, pr
 			WithEnvVariable("AWS_REGION", os.Getenv("AWS_REGION"))
 	}
 
-	container = container.WithExec([]string{pmapperBinary, "query", "preset", "admin", principal})
+	container = container.WithExec([]string{pmapperBinary, "query", "preset", "admin", principal}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

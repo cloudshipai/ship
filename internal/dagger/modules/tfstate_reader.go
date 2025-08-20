@@ -27,12 +27,16 @@ func NewTfstateReaderModule(client *dagger.Client) *TfstateReaderModule {
 func (m *TfstateReaderModule) AnalyzeState(ctx context.Context, statePath string) (string, error) {
 	container := m.client.Container().
 		From("alpine:latest").
-		WithExec([]string{"apk", "add", "--no-cache", "jq"}).
+		WithExec([]string{"apk", "add", "--no-cache", "jq"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
 		WithFile("/terraform.tfstate", m.client.Host().File(statePath)).
 		WithExec([]string{
 			"jq",
 			"{ version: .version, terraform_version: .terraform_version, serial: .serial, lineage: .lineage, resources: [.resources[] | {type: .type, name: .name, provider: .provider, instances: (.instances | length)}] }",
 			"/terraform.tfstate",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -47,12 +51,16 @@ func (m *TfstateReaderModule) AnalyzeState(ctx context.Context, statePath string
 func (m *TfstateReaderModule) ListResources(ctx context.Context, statePath string) (string, error) {
 	container := m.client.Container().
 		From("alpine:latest").
-		WithExec([]string{"apk", "add", "--no-cache", "jq"}).
+		WithExec([]string{"apk", "add", "--no-cache", "jq"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
 		WithFile("/terraform.tfstate", m.client.Host().File(statePath)).
 		WithExec([]string{
 			"jq",
 			"[.resources[] | {type: .type, name: .name, mode: .mode, provider: .provider}]",
 			"/terraform.tfstate",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -67,12 +75,16 @@ func (m *TfstateReaderModule) ListResources(ctx context.Context, statePath strin
 func (m *TfstateReaderModule) GetResourceByType(ctx context.Context, statePath string, resourceType string) (string, error) {
 	container := m.client.Container().
 		From("alpine:latest").
-		WithExec([]string{"apk", "add", "--no-cache", "jq"}).
+		WithExec([]string{"apk", "add", "--no-cache", "jq"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
 		WithFile("/terraform.tfstate", m.client.Host().File(statePath)).
 		WithExec([]string{
 			"jq",
 			fmt.Sprintf(`[.resources[] | select(.type == "%s")]`, resourceType),
 			"/terraform.tfstate",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -87,12 +99,16 @@ func (m *TfstateReaderModule) GetResourceByType(ctx context.Context, statePath s
 func (m *TfstateReaderModule) ExtractOutputs(ctx context.Context, statePath string) (string, error) {
 	container := m.client.Container().
 		From("alpine:latest").
-		WithExec([]string{"apk", "add", "--no-cache", "jq"}).
+		WithExec([]string{"apk", "add", "--no-cache", "jq"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
 		WithFile("/terraform.tfstate", m.client.Host().File(statePath)).
 		WithExec([]string{
 			"jq",
 			".outputs",
 			"/terraform.tfstate",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -110,6 +126,8 @@ func (m *TfstateReaderModule) ShowState(ctx context.Context, statePath string) (
 		WithFile("/terraform.tfstate", m.client.Host().File(statePath)).
 		WithExec([]string{
 			"terraform", "show", "-json", "/terraform.tfstate",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -126,9 +144,13 @@ func (m *TfstateReaderModule) PullRemoteState(ctx context.Context, workdir strin
 		From("hashicorp/terraform:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(workdir)).
 		WithWorkdir("/workspace").
-		WithExec([]string{"terraform", "init"}).
+		WithExec([]string{"terraform", "init"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
 		WithExec([]string{
 			"terraform", "state", "pull",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -143,10 +165,14 @@ func (m *TfstateReaderModule) PullRemoteState(ctx context.Context, workdir strin
 func (m *TfstateReaderModule) InteractiveExplorer(ctx context.Context, statePath string) (string, error) {
 	container := m.client.Container().
 		From("alpine:latest").
-		WithExec([]string{"apk", "add", "--no-cache", "jq"}).
+		WithExec([]string{"apk", "add", "--no-cache", "jq"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
 		WithFile("/terraform.tfstate", m.client.Host().File(statePath)).
 		WithExec([]string{
 			"sh", "-c", "echo 'Interactive exploration:' && jq '.' /terraform.tfstate | head -50",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -168,7 +194,9 @@ func (m *TfstateReaderModule) StateListResources(ctx context.Context, statePath 
 		args = append(args, resourceId)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -185,6 +213,8 @@ func (m *TfstateReaderModule) StateShowResource(ctx context.Context, statePath s
 		WithFile("/terraform.tfstate", m.client.Host().File(statePath)).
 		WithExec([]string{
 			"terraform", "state", "show", "-state=/terraform.tfstate", resourceAddress,
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -200,12 +230,16 @@ func (m *TfstateReaderModule) LookupResource(ctx context.Context, statePath stri
 	// Since we don't have tfstate-lookup in container, simulate with jq
 	container := m.client.Container().
 		From("alpine:latest").
-		WithExec([]string{"apk", "add", "--no-cache", "jq"}).
+		WithExec([]string{"apk", "add", "--no-cache", "jq"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
 		WithFile("/terraform.tfstate", m.client.Host().File(statePath)).
 		WithExec([]string{
 			"jq",
 			fmt.Sprintf(`[.resources[] | select(.type + "." + .name == "%s") | .instances[]]`, resourceAddress),
 			"/terraform.tfstate",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -220,7 +254,9 @@ func (m *TfstateReaderModule) LookupResource(ctx context.Context, statePath stri
 func (m *TfstateReaderModule) DumpAllResources(ctx context.Context, statePath string) (string, error) {
 	container := m.client.Container().
 		From("alpine:latest").
-		WithExec([]string{"apk", "add", "--no-cache", "jq"}).
+		WithExec([]string{"apk", "add", "--no-cache", "jq"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
 		WithFile("/terraform.tfstate", m.client.Host().File(statePath)).
 		WithExec([]string{
 			"jq",
@@ -241,6 +277,8 @@ func (m *TfstateReaderModule) DumpAllResources(ctx context.Context, statePath st
 				}]
 			}`,
 			"/terraform.tfstate",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)

@@ -15,7 +15,6 @@ type InfracostModule struct {
 	name   string
 }
 
-const infracostBinary = "/usr/bin/infracost"
 
 // NewInfracostModule creates a new Infracost module
 func NewInfracostModule(client *dagger.Client) *InfracostModule {
@@ -30,10 +29,12 @@ func (m *InfracostModule) BreakdownDirectory(ctx context.Context, dir string) (s
 	container := m.prepareContainer(dir)
 
 	container = container.WithExec([]string{
-		infracostBinary,
+		"infracost",
 		"breakdown",
 		"--path", ".",
 		"--format", "json",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -54,10 +55,12 @@ func (m *InfracostModule) BreakdownPlan(ctx context.Context, planFile string) (s
 	container = container.
 		WithFile("/tmp/plan.json", m.client.Host().File(planFile)).
 		WithExec([]string{
-			infracostBinary,
+			"infracost",
 			"breakdown",
 			"--path", "/tmp/" + filename,
 			"--format", "json",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -73,10 +76,12 @@ func (m *InfracostModule) Diff(ctx context.Context, dir string) (string, error) 
 	container := m.prepareContainer(dir)
 
 	container = container.WithExec([]string{
-		infracostBinary,
+		"infracost",
 		"diff",
 		"--path", ".",
 		"--format", "json",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -96,10 +101,12 @@ func (m *InfracostModule) BreakdownWithConfig(ctx context.Context, configFile st
 	container = container.
 		WithFile("/tmp/infracost.yml", m.client.Host().File(configFile)).
 		WithExec([]string{
-			infracostBinary,
+			"infracost",
 			"breakdown",
 			"--config-file", "/tmp/infracost.yml",
 			"--format", "json",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -115,10 +122,12 @@ func (m *InfracostModule) GenerateHTMLReport(ctx context.Context, dir string) (s
 	container := m.prepareContainer(dir)
 
 	container = container.WithExec([]string{
-		infracostBinary,
+		"infracost",
 		"breakdown",
 		"--path", ".",
 		"--format", "html",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -134,10 +143,12 @@ func (m *InfracostModule) GenerateTableReport(ctx context.Context, dir string) (
 	container := m.prepareContainer(dir)
 
 	container = container.WithExec([]string{
-		infracostBinary,
+		"infracost",
 		"breakdown",
 		"--path", ".",
 		"--format", "table",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -152,7 +163,9 @@ func (m *InfracostModule) GenerateTableReport(ctx context.Context, dir string) (
 func (m *InfracostModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("infracost/infracost:latest").
-		WithExec([]string{"infracost", "--version"})
+		WithExec([]string{"infracost", "--version"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

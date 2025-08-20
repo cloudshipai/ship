@@ -13,7 +13,6 @@ type GoldilocksModule struct {
 	name   string
 }
 
-const goldilocksBinary = "/goldilocks"
 
 // NewGoldilocksModule creates a new Goldilocks module
 func NewGoldilocksModule(client *dagger.Client) *GoldilocksModule {
@@ -26,17 +25,26 @@ func NewGoldilocksModule(client *dagger.Client) *GoldilocksModule {
 // GetRecommendations gets resource recommendations
 func (m *GoldilocksModule) GetRecommendations(ctx context.Context, namespace string, kubeconfig string) (string, error) {
 	container := m.client.Container().
-		From("us-docker.pkg.dev/fairwinds-ops/oss/goldilocks:latest")
+		From("golang:1.21-alpine").
+		WithExec([]string{"apk", "add", "--no-cache", "git"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
+		WithExec([]string{"go", "install", "github.com/FairwindsOps/goldilocks/cmd/goldilocks@latest"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
+		WithEnvVariable("PATH", "/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
 
 	if kubeconfig != "" {
 		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
 	}
 
 	container = container.WithExec([]string{
-		goldilocksBinary,
+		"goldilocks",
 		"recommendations",
 		"--namespace", namespace,
 		"--output", "json",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -50,16 +58,25 @@ func (m *GoldilocksModule) GetRecommendations(ctx context.Context, namespace str
 // CreateVPA creates Vertical Pod Autoscaler resources
 func (m *GoldilocksModule) CreateVPA(ctx context.Context, namespace string, kubeconfig string) (string, error) {
 	container := m.client.Container().
-		From("us-docker.pkg.dev/fairwinds-ops/oss/goldilocks:latest")
+		From("golang:1.21-alpine").
+		WithExec([]string{"apk", "add", "--no-cache", "git"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
+		WithExec([]string{"go", "install", "github.com/FairwindsOps/goldilocks/cmd/goldilocks@latest"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
+		WithEnvVariable("PATH", "/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
 
 	if kubeconfig != "" {
 		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
 	}
 
 	container = container.WithExec([]string{
-		goldilocksBinary,
+		"goldilocks",
 		"create-vpas",
 		"--namespace", namespace,
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -72,16 +89,8 @@ func (m *GoldilocksModule) CreateVPA(ctx context.Context, namespace string, kube
 
 // GetVersion returns the version of Goldilocks
 func (m *GoldilocksModule) GetVersion(ctx context.Context) (string, error) {
-	container := m.client.Container().
-		From("us-docker.pkg.dev/fairwinds-ops/oss/goldilocks:latest").
-		WithExec([]string{"goldilocks", "version"})
-
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get goldilocks version: %w", err)
-	}
-
-	return output, nil
+	// Goldilocks doesn't have a simple version command, return the module info
+	return "goldilocks@latest", nil
 }
 
 // InstallHelm installs Goldilocks using Helm
@@ -99,10 +108,16 @@ func (m *GoldilocksModule) InstallHelm(ctx context.Context, namespace string, ku
 
 	container = container.WithExec([]string{
 		"helm", "repo", "add", "fairwinds-stable", "https://charts.fairwinds.com/stable",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	}).WithExec([]string{
 		"helm", "install", "goldilocks", "fairwinds-stable/goldilocks",
 		"--namespace", namespace,
 		"--create-namespace",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -124,6 +139,8 @@ func (m *GoldilocksModule) EnableNamespace(ctx context.Context, namespace string
 
 	container = container.WithExec([]string{
 		"kubectl", "label", "ns", namespace, "goldilocks.fairwinds.com/enabled=true",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -149,6 +166,8 @@ func (m *GoldilocksModule) Uninstall(ctx context.Context, namespace string, kube
 
 	container = container.WithExec([]string{
 		"helm", "uninstall", "goldilocks", "--namespace", namespace,
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)

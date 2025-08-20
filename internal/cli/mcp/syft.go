@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -13,8 +14,109 @@ import (
 
 // AddSyftTools adds Syft (SBOM generation from container images and filesystems) MCP tool implementations using direct Dagger calls
 func AddSyftTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// Ignore executeShipCommand - we use direct Dagger calls
+	// Add the new unified syft_sbom tool first
+	addNewSyftSBOMTool(s)
+	
+	// Keep existing tools for backward compatibility
 	addSyftToolsDirect(s)
+}
+
+// addNewSyftSBOMTool adds the new unified SBOM generation tool
+func addNewSyftSBOMTool(s *server.MCPServer) {
+	// Syft SBOM generation tool - unified interface
+	sbomTool := mcp.NewTool("syft_sbom",
+		mcp.WithDescription("Generate CycloneDX or SPDX SBOM from a directory, image, or archive"),
+		mcp.WithString("target",
+			mcp.Description("Target to scan (e.g., dir:., docker:alpine:3.19, oci-archive:/path/image.tar)"),
+			mcp.Required(),
+		),
+		mcp.WithString("format",
+			mcp.Description("Output format: cyclonedx-json or spdx-json (default: cyclonedx-json)"),
+		),
+		mcp.WithString("output_path",
+			mcp.Description("Where to write SBOM (default: ./sbom.cdx.json or ./sbom.spdx.json based on format)"),
+		),
+	)
+	s.AddTool(sbomTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewSyftModule(client)
+
+		// Get parameters
+		target := request.GetString("target", "")
+		if target == "" {
+			return mcp.NewToolResultError("target is required"), nil
+		}
+		
+		format := request.GetString("format", "cyclonedx-json")
+		outputPath := request.GetString("output_path", "")
+		
+		// Set default output path based on format
+		if outputPath == "" {
+			if format == "spdx-json" {
+				outputPath = "./sbom.spdx.json"
+			} else {
+				outputPath = "./sbom.cdx.json"
+			}
+		}
+
+		// Generate SBOM
+		var stdout string
+		var stderr string
+		
+		// Determine target type and call appropriate method
+		if strings.HasPrefix(target, "dir:") {
+			dirPath := strings.TrimPrefix(target, "dir:")
+			stdout, err = module.GenerateSBOMFromDirectory(ctx, dirPath, format)
+		} else if strings.HasPrefix(target, "docker:") || strings.HasPrefix(target, "registry:") {
+			stdout, err = module.GenerateSBOMFromImage(ctx, target, format)
+		} else if strings.HasPrefix(target, "oci-archive:") {
+			// For archives, we'll use the archive analysis method if it exists
+			archivePath := strings.TrimPrefix(target, "oci-archive:")
+			// Try to use archive analysis, fall back to treating as directory
+			stdout, err = module.ArchiveAnalysis(ctx, archivePath, "oci", format, false, true, "")
+			if err != nil {
+				// Fallback: treat as directory scan
+				stdout, err = module.GenerateSBOMFromDirectory(ctx, archivePath, format)
+			}
+		} else {
+			// Default: treat as directory
+			stdout, err = module.GenerateSBOMFromDirectory(ctx, target, format)
+		}
+		
+		// Build result in the expected format
+		result := map[string]interface{}{
+			"status": "ok",
+			"stdout": stdout,
+			"stderr": stderr,
+			"artifacts": map[string]string{},
+			"summary": map[string]interface{}{},
+			"diagnostics": []string{},
+		}
+		
+		// Add artifact path
+		if format == "spdx-json" {
+			result["artifacts"].(map[string]string)["sbom_spdx"] = outputPath
+		} else {
+			result["artifacts"].(map[string]string)["sbom_cyclonedx"] = outputPath
+		}
+		
+		if err != nil {
+			result["status"] = "error"
+			result["stderr"] = err.Error()
+			result["diagnostics"] = []string{fmt.Sprintf("Syft SBOM generation failed: %v", err)}
+		}
+
+		// Return as JSON
+		resultJSON, _ := json.Marshal(result)
+		return mcp.NewToolResultText(string(resultJSON)), nil
+	})
 }
 
 // addSyftToolsDirect adds Syft tools using direct Dagger module calls
@@ -46,12 +148,34 @@ func addSyftToolsDirect(s *server.MCPServer) {
 		format := request.GetString("format", "json")
 
 		// Generate SBOM from directory
-		output, err := module.GenerateSBOMFromDirectory(ctx, directory, format)
+		stdout, err := module.GenerateSBOMFromDirectory(ctx, directory, format)
+		
+		// Build result in the expected format
+		result := map[string]interface{}{
+			"status": "ok",
+			"stdout": stdout,
+			"stderr": "",
+			"artifacts": map[string]string{},
+			"summary": map[string]interface{}{},
+			"diagnostics": []string{},
+		}
+		
+		// Add artifact path based on format
+		if format == "spdx-json" {
+			result["artifacts"].(map[string]string)["sbom_spdx"] = "./sbom.spdx.json"
+		} else {
+			result["artifacts"].(map[string]string)["sbom_cyclonedx"] = "./sbom.cdx.json"
+		}
+		
 		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Syft generate SBOM from directory failed: %v", err)), nil
+			result["status"] = "error"
+			result["stderr"] = err.Error()
+			result["diagnostics"] = []string{fmt.Sprintf("Syft generate SBOM from directory failed: %v", err)}
 		}
 
-		return mcp.NewToolResultText(output), nil
+		// Return as JSON
+		resultJSON, _ := json.Marshal(result)
+		return mcp.NewToolResultText(string(resultJSON)), nil
 	})
 
 	// Syft generate SBOM from image tool

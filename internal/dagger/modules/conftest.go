@@ -13,8 +13,6 @@ type ConftestModule struct {
 	name   string
 }
 
-const conftestBinary = "/conftest"
-
 // NewConftestModule creates a new Conftest module
 func NewConftestModule(client *dagger.Client) *ConftestModule {
 	return &ConftestModule{
@@ -31,8 +29,7 @@ func (m *ConftestModule) TestWithPolicy(ctx context.Context, dir string, policyP
 		WithDirectory("/policies", m.client.Host().Directory(policyPath)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			conftestBinary,
-			"test",
+			"/conftest", "test",
 			"--policy", "/policies",
 			"--output", "json",
 			".",
@@ -56,8 +53,7 @@ func (m *ConftestModule) TestFile(ctx context.Context, filePath string, policyPa
 		WithDirectory("/policies", m.client.Host().Directory(policyPath)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			conftestBinary,
-			"test",
+			"/conftest", "test",
 			"--policy", "/policies",
 			"--output", "json",
 			"target.yaml",
@@ -79,8 +75,7 @@ func (m *ConftestModule) VerifyPolicies(ctx context.Context, policyPath string) 
 		From("openpolicyagent/conftest:latest").
 		WithDirectory("/policies", m.client.Host().Directory(policyPath)).
 		WithExec([]string{
-			conftestBinary,
-			"verify",
+			"/conftest", "verify",
 			"--policy", "/policies",
 		}, dagger.ContainerWithExecOpts{
 			Expect: "ANY",
@@ -96,7 +91,7 @@ func (m *ConftestModule) VerifyPolicies(ctx context.Context, policyPath string) 
 
 // ParseFile parses and prints structured data from input files
 func (m *ConftestModule) ParseFile(ctx context.Context, filePath string, parser string) (string, error) {
-	args := []string{"conftest", "parse", "/workspace/target.yaml"}
+	args := []string{"/conftest", "parse", "/workspace/target.yaml"}
 	if parser != "" {
 		args = append(args, "--parser", parser)
 	}
@@ -117,7 +112,7 @@ func (m *ConftestModule) ParseFile(ctx context.Context, filePath string, parser 
 
 // PushPolicies pushes OPA policy bundles to OCI registry
 func (m *ConftestModule) PushPolicies(ctx context.Context, registryURL string, policyPath string) (string, error) {
-	args := []string{"conftest", "push", registryURL}
+	args := []string{"/conftest", "push", registryURL}
 	if policyPath != "" {
 		args = append(args, "/policies")
 	}
@@ -143,7 +138,7 @@ func (m *ConftestModule) PushPolicies(ctx context.Context, registryURL string, p
 func (m *ConftestModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("openpolicyagent/conftest:latest").
-		WithExec([]string{"conftest", "--version"})
+		WithExec([]string{"/conftest", "--version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -155,7 +150,7 @@ func (m *ConftestModule) GetVersion(ctx context.Context) (string, error) {
 
 // TestWithOptions tests configuration files with comprehensive options
 func (m *ConftestModule) TestWithOptions(ctx context.Context, inputFile string, policy string, namespace string, allNamespaces bool, output string, parser string) (string, error) {
-	args := []string{"conftest", "test", "/workspace/input"}
+	args := []string{"/conftest", "test", "/workspace/input"}
 	
 	if policy != "" {
 		args = append(args, "--policy", "/policies")
@@ -196,7 +191,7 @@ func (m *ConftestModule) TestWithOptions(ctx context.Context, inputFile string, 
 
 // VerifyWithOptions runs policy unit tests with options
 func (m *ConftestModule) VerifyWithOptions(ctx context.Context, policy string, showBuiltinErrors bool) (string, error) {
-	args := []string{"conftest", "verify"}
+	args := []string{"/conftest", "verify"}
 	
 	if policy != "" {
 		args = append(args, "--policy", "/policies")

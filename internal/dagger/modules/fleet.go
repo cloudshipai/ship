@@ -26,7 +26,7 @@ func NewFleetModule(client *dagger.Client) *FleetModule {
 // GetClusters lists Fleet clusters
 func (m *FleetModule) GetClusters(ctx context.Context, kubeconfig string) (string, error) {
 	container := m.client.Container().
-		From("rancher/fleet:latest")
+		From("rancher/fleet:v0.10.4")
 
 	if kubeconfig != "" {
 		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
@@ -48,7 +48,7 @@ func (m *FleetModule) GetClusters(ctx context.Context, kubeconfig string) (strin
 // GetGitRepos lists Git repositories managed by Fleet
 func (m *FleetModule) GetGitRepos(ctx context.Context, kubeconfig string) (string, error) {
 	container := m.client.Container().
-		From("rancher/fleet:latest")
+		From("rancher/fleet:v0.10.4")
 
 	if kubeconfig != "" {
 		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
@@ -82,7 +82,7 @@ spec:
 `, name, repoURL, branch, path)
 
 	container := m.client.Container().
-		From("rancher/fleet:latest").
+		From("rancher/fleet:v0.10.4").
 		WithNewFile("/gitrepo.yaml", gitRepoYAML)
 
 	if kubeconfig != "" {

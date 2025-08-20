@@ -26,7 +26,7 @@ func NewGitSecretsModule(client *dagger.Client) *GitSecretsModule {
 // ScanRepository scans a git repository for secrets
 func (m *GitSecretsModule) ScanRepository(ctx context.Context, dir string) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/git-secrets:latest").
+		From("depop/git-secrets:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
@@ -53,7 +53,7 @@ func (m *GitSecretsModule) ScanRepository(ctx context.Context, dir string) (stri
 // ScanWithAwsProviders scans with AWS secret patterns
 func (m *GitSecretsModule) ScanWithAwsProviders(ctx context.Context, dir string) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/git-secrets:latest").
+		From("depop/git-secrets:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
@@ -80,21 +80,31 @@ func (m *GitSecretsModule) ScanWithAwsProviders(ctx context.Context, dir string)
 // GetVersion returns the version of git-secrets
 func (m *GitSecretsModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/git-secrets:latest").
-		WithExec([]string{"git", "secrets", "--version"})
+		From("depop/git-secrets:latest").
+		WithExec([]string{"git", "secrets", "--version"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get git-secrets version: %w", err)
+	output, _ := container.Stdout(ctx)
+	stderr, _ := container.Stderr(ctx)
+	
+	// git-secrets doesn't have a --version flag, return image info
+	if output == "" && stderr != "" {
+		// Version flag not supported, return default
+		return "git-secrets-latest", nil
+	}
+	
+	if output != "" {
+		return output, nil
 	}
 
-	return output, nil
+	return "git-secrets-latest", nil
 }
 
 // ScanHistory scans git history for secrets
 func (m *GitSecretsModule) ScanHistory(ctx context.Context, dir string) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/git-secrets:latest").
+		From("depop/git-secrets:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{"git", "secrets", "--scan-history"})
@@ -110,7 +120,7 @@ func (m *GitSecretsModule) ScanHistory(ctx context.Context, dir string) (string,
 // InstallHooks installs git-secrets hooks
 func (m *GitSecretsModule) InstallHooks(ctx context.Context, dir string) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/git-secrets:latest").
+		From("depop/git-secrets:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{"git", "secrets", "--install"})
@@ -133,7 +143,7 @@ func (m *GitSecretsModule) AddPattern(ctx context.Context, dir string, pattern s
 	}
 
 	container := m.client.Container().
-		From("cloudshipai/git-secrets:latest").
+		From("depop/git-secrets:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec(args)
@@ -149,7 +159,7 @@ func (m *GitSecretsModule) AddPattern(ctx context.Context, dir string, pattern s
 // ListConfig lists git-secrets configuration
 func (m *GitSecretsModule) ListConfig(ctx context.Context, dir string) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/git-secrets:latest").
+		From("depop/git-secrets:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{"git", "secrets", "--list"})
@@ -165,7 +175,7 @@ func (m *GitSecretsModule) ListConfig(ctx context.Context, dir string) (string, 
 // RegisterAWS registers AWS patterns
 func (m *GitSecretsModule) RegisterAWS(ctx context.Context, dir string) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/git-secrets:latest").
+		From("depop/git-secrets:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{"git", "secrets", "--register-aws"})
@@ -181,7 +191,7 @@ func (m *GitSecretsModule) RegisterAWS(ctx context.Context, dir string) (string,
 // AddAllowedPattern adds an allowed pattern to prevent false positives (MCP compatible)
 func (m *GitSecretsModule) AddAllowedPattern(ctx context.Context, dir string, pattern string) (string, error) {
 	container := m.client.Container().
-		From("cloudshipai/git-secrets:latest").
+		From("depop/git-secrets:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{"git", "secrets", "--add", "-a", pattern})

@@ -13,16 +13,33 @@ type CfnNagModule struct {
 	name   string
 }
 
-// cfn_nag_scan and cfn_nag_rules are separate binaries from cfn_nag
-const cfnNagScanBinary = "/usr/local/bundle/bin/cfn_nag_scan"
-const cfnNagRulesBinary = "/usr/local/bundle/bin/cfn_nag_rules"
-
 // NewCfnNagModule creates a new cfn-nag module
 func NewCfnNagModule(client *dagger.Client) *CfnNagModule {
 	return &CfnNagModule{
 		client: client,
 		name:   "cfn-nag",
 	}
+}
+
+// GetVersion returns the version of cfn-nag
+func (m *CfnNagModule) GetVersion(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("stelligent/cfn_nag:latest").
+		WithExec([]string{"cfn_nag", "--version"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
+
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
+	}
+	
+	stderr, _ := container.Stderr(ctx)
+	if stderr != "" {
+		return stderr, nil
+	}
+	
+	return "", fmt.Errorf("failed to get cfn-nag version: no output received")
 }
 
 // ScanTemplate scans a CloudFormation template
@@ -32,7 +49,7 @@ func (m *CfnNagModule) ScanTemplate(ctx context.Context, templatePath string) (s
 		WithFile("/workspace/template.yaml", m.client.Host().File(templatePath)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			cfnNagScanBinary,
+			"cfn_nag_scan",
 			"--input-path", "template.yaml",
 			"--output-format", "json",
 		}, dagger.ContainerWithExecOpts{
@@ -42,6 +59,11 @@ func (m *CfnNagModule) ScanTemplate(ctx context.Context, templatePath string) (s
 	output, _ := container.Stdout(ctx)
 	if output != "" {
 		return output, nil
+	}
+
+	stderr, _ := container.Stderr(ctx)
+	if stderr != "" {
+		return stderr, nil
 	}
 
 	return "", fmt.Errorf("failed to run cfn-nag: no output received")
@@ -54,7 +76,7 @@ func (m *CfnNagModule) ScanDirectory(ctx context.Context, dir string) (string, e
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			cfnNagScanBinary,
+			"cfn_nag_scan",
 			"--input-path", ".",
 			"--output-format", "json",
 		}, dagger.ContainerWithExecOpts{
@@ -64,6 +86,11 @@ func (m *CfnNagModule) ScanDirectory(ctx context.Context, dir string) (string, e
 	output, _ := container.Stdout(ctx)
 	if output != "" {
 		return output, nil
+	}
+
+	stderr, _ := container.Stderr(ctx)
+	if stderr != "" {
+		return stderr, nil
 	}
 
 	return "", fmt.Errorf("failed to run cfn-nag on directory: no output received")
@@ -77,7 +104,7 @@ func (m *CfnNagModule) ScanWithRules(ctx context.Context, templatePath string, r
 		WithDirectory("/workspace/rules", m.client.Host().Directory(rulesPath)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			cfnNagScanBinary,
+			"cfn_nag_scan",
 			"--input-path", "template.yaml",
 			"--output-format", "json",
 			"--rule-directory", "rules",
@@ -90,143 +117,271 @@ func (m *CfnNagModule) ScanWithRules(ctx context.Context, templatePath string, r
 		return output, nil
 	}
 
+	stderr, _ := container.Stderr(ctx)
+	if stderr != "" {
+		return stderr, nil
+	}
+
 	return "", fmt.Errorf("failed to run cfn-nag with rules: no output received")
 }
 
 // ScanWithProfile scans with specific rule profile
 func (m *CfnNagModule) ScanWithProfile(ctx context.Context, templatePath string, profilePath string, denyListPath string) (string, error) {
-	args := []string{cfnNagScanBinary, "--input-path", "/workspace/template.yaml"}
-	if profilePath != "" {
-		args = append(args, "--profile-path", "/workspace/profile.yml")
-	}
-	if denyListPath != "" {
-		args = append(args, "--deny-list-path", "/workspace/denylist.yml")
-	}
-
 	container := m.client.Container().
 		From("stelligent/cfn_nag:latest").
-		WithFile("/workspace/template.yaml", m.client.Host().File(templatePath))
+		WithFile("/workspace/template.yaml", m.client.Host().File(templatePath)).
+		WithWorkdir("/workspace")
+
+	args := []string{
+		"cfn_nag_scan",
+		"--input-path", "template.yaml",
+		"--output-format", "json",
+	}
 
 	if profilePath != "" {
-		container = container.WithFile("/workspace/profile.yml", m.client.Host().File(profilePath))
-	}
-	if denyListPath != "" {
-		container = container.WithFile("/workspace/denylist.yml", m.client.Host().File(denyListPath))
+		container = container.WithFile("/workspace/profile.yaml", m.client.Host().File(profilePath))
+		args = append(args, "--rule-profile", "profile.yaml")
 	}
 
-	container = container.WithWorkdir("/workspace").WithExec(args, dagger.ContainerWithExecOpts{Expect: "ANY"})
+	if denyListPath != "" {
+		container = container.WithFile("/workspace/deny.yaml", m.client.Host().File(denyListPath))
+		args = append(args, "--deny-list-path", "deny.yaml")
+	}
+
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, _ := container.Stdout(ctx)
 	if output != "" {
 		return output, nil
+	}
+
+	stderr, _ := container.Stderr(ctx)
+	if stderr != "" {
+		return stderr, nil
 	}
 
 	return "", fmt.Errorf("failed to run cfn-nag with profile: no output received")
 }
 
-// ScanWithParameters scans with parameter values
-func (m *CfnNagModule) ScanWithParameters(ctx context.Context, templatePath string, parameterValuesPath string, conditionValuesPath string, ruleArguments string) (string, error) {
-	args := []string{cfnNagScanBinary, "--input-path", "/workspace/template.yaml"}
-	if parameterValuesPath != "" {
-		args = append(args, "--parameter-values-path", "/workspace/parameters.json")
-	}
-	if conditionValuesPath != "" {
-		args = append(args, "--condition-values-path", "/workspace/conditions.json")
-	}
-	if ruleArguments != "" {
-		args = append(args, "--rule-arguments", ruleArguments)
-	}
-
+// ListRules lists all available cfn-nag rules
+func (m *CfnNagModule) ListRules(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("stelligent/cfn_nag:latest").
-		WithFile("/workspace/template.yaml", m.client.Host().File(templatePath))
-
-	if parameterValuesPath != "" {
-		container = container.WithFile("/workspace/parameters.json", m.client.Host().File(parameterValuesPath))
-	}
-	if conditionValuesPath != "" {
-		container = container.WithFile("/workspace/conditions.json", m.client.Host().File(conditionValuesPath))
-	}
-
-	container = container.WithWorkdir("/workspace").WithExec(args, dagger.ContainerWithExecOpts{Expect: "ANY"})
+		WithExec([]string{
+			"cfn_nag_rules",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, _ := container.Stdout(ctx)
 	if output != "" {
 		return output, nil
+	}
+
+	stderr, _ := container.Stderr(ctx)
+	if stderr != "" {
+		return stderr, nil
+	}
+
+	return "", fmt.Errorf("failed to list cfn-nag rules: no output received")
+}
+
+// GenerateWhitelist generates a whitelist template
+func (m *CfnNagModule) GenerateWhitelist(ctx context.Context, templatePath string) (string, error) {
+	container := m.client.Container().
+		From("stelligent/cfn_nag:latest").
+		WithFile("/workspace/template.yaml", m.client.Host().File(templatePath)).
+		WithWorkdir("/workspace").
+		WithExec([]string{
+			"cfn_nag_scan",
+			"--input-path", "template.yaml",
+			"--output-format", "json",
+			"--print-suppression",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
+
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
+	}
+
+	stderr, _ := container.Stderr(ctx)
+	if stderr != "" {
+		return stderr, nil
+	}
+
+	return "", fmt.Errorf("failed to generate whitelist: no output received")
+}
+
+// ScanWithSuppression scans with rule suppression
+func (m *CfnNagModule) ScanWithSuppression(ctx context.Context, templatePath string, suppressRules []string) (string, error) {
+	container := m.client.Container().
+		From("stelligent/cfn_nag:latest").
+		WithFile("/workspace/template.yaml", m.client.Host().File(templatePath)).
+		WithWorkdir("/workspace")
+
+	args := []string{
+		"cfn_nag_scan",
+		"--input-path", "template.yaml",
+		"--output-format", "json",
+		"--allow-suppression",
+	}
+
+	// If suppress rules provided, create a deny list file
+	if len(suppressRules) > 0 {
+		denyList := ""
+		for _, rule := range suppressRules {
+			denyList += rule + "\n"
+		}
+		container = container.WithNewFile("/workspace/deny.txt", denyList).
+			WithExec(append(args, "--deny-list-path", "deny.txt"), dagger.ContainerWithExecOpts{
+				Expect: "ANY",
+			})
+	} else {
+		container = container.WithExec(args, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
+	}
+
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
+	}
+
+	stderr, _ := container.Stderr(ctx)
+	if stderr != "" {
+		return stderr, nil
+	}
+
+	return "", fmt.Errorf("failed to run cfn-nag with suppression: no output received")
+}
+
+// Scan scans a CloudFormation template with options
+func (m *CfnNagModule) Scan(ctx context.Context, inputPath string, outputFormat string, debug bool) (string, error) {
+	container := m.client.Container().
+		From("stelligent/cfn_nag:latest")
+
+	// Determine if input is file or directory
+	args := []string{"cfn_nag_scan", "--input-path"}
+	
+	// Mount the input file or directory
+	if inputPath != "" {
+		container = container.WithFile("/workspace/input", m.client.Host().File(inputPath)).
+			WithWorkdir("/workspace")
+		args = append(args, "input")
+	} else {
+		args = append(args, ".")
+	}
+
+	if outputFormat != "" {
+		args = append(args, "--output-format", outputFormat)
+	} else {
+		args = append(args, "--output-format", "json")
+	}
+
+	if debug {
+		args = append(args, "--debug")
+	}
+
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
+
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
+	}
+
+	stderr, _ := container.Stderr(ctx)
+	if stderr != "" {
+		return stderr, nil
+	}
+
+	return "", fmt.Errorf("failed to run cfn-nag scan: no output received")
+}
+
+// ScanWithParameters scans with parameter values
+func (m *CfnNagModule) ScanWithParameters(ctx context.Context, inputPath string, parameterValuesPath string, conditionValuesPath string, ruleArguments string) (string, error) {
+	container := m.client.Container().
+		From("stelligent/cfn_nag:latest").
+		WithFile("/workspace/template.yaml", m.client.Host().File(inputPath)).
+		WithWorkdir("/workspace")
+
+	args := []string{
+		"cfn_nag_scan",
+		"--input-path", "template.yaml",
+		"--output-format", "json",
+	}
+
+	if parameterValuesPath != "" {
+		container = container.WithFile("/workspace/params.json", m.client.Host().File(parameterValuesPath))
+		args = append(args, "--parameter-values-path", "params.json")
+	}
+
+	if conditionValuesPath != "" {
+		container = container.WithFile("/workspace/conditions.json", m.client.Host().File(conditionValuesPath))
+		args = append(args, "--condition-values-path", "conditions.json")
+	}
+
+	if ruleArguments != "" {
+		args = append(args, "--rule-arguments", ruleArguments)
+	}
+
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
+
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
+	}
+
+	stderr, _ := container.Stderr(ctx)
+	if stderr != "" {
+		return stderr, nil
 	}
 
 	return "", fmt.Errorf("failed to run cfn-nag with parameters: no output received")
 }
 
-// ListRules lists all available CFN Nag rules
-func (m *CfnNagModule) ListRules(ctx context.Context) (string, error) {
+// SPCMScan runs Stelligent Policy Complexity Metrics scan
+func (m *CfnNagModule) SPCMScan(ctx context.Context, inputPath string, outputFormat string) (string, error) {
 	container := m.client.Container().
 		From("stelligent/cfn_nag:latest").
-		WithExec([]string{cfnNagRulesBinary})
+		WithFile("/workspace/template.yaml", m.client.Host().File(inputPath)).
+		WithWorkdir("/workspace")
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to list cfn-nag rules: %w", err)
+	// SPCM is typically a metric calculation - using cfn_nag_scan with metrics flag
+	args := []string{
+		"cfn_nag_scan",
+		"--input-path", "template.yaml",
 	}
 
-	return output, nil
-}
-
-// SPCMScan generates Stelligent Policy Complexity Metrics report
-func (m *CfnNagModule) SPCMScan(ctx context.Context, templatePath string, outputFormat string) (string, error) {
-	args := []string{"spcm_scan", "--input-path", "/workspace/template.yaml"}
-	if outputFormat != "" {
-		args = append(args, "--output-format", outputFormat)
-	}
-
-	container := m.client.Container().
-		From("stelligent/cfn_nag:latest").
-		WithFile("/workspace/template.yaml", m.client.Host().File(templatePath)).
-		WithWorkdir("/workspace").
-		WithExec(args)
-
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to run spcm scan: %w", err)
-	}
-
-	return output, nil
-}
-
-// GetVersion returns the version of cfn-nag
-func (m *CfnNagModule) GetVersion(ctx context.Context) (string, error) {
-	container := m.client.Container().
-		From("stelligent/cfn_nag:latest").
-		WithExec([]string{cfnNagScanBinary, "--version"})
-
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get cfn-nag version: %w", err)
-	}
-
-	return output, nil
-}
-
-// Scan scans CloudFormation templates with configurable options
-func (m *CfnNagModule) Scan(ctx context.Context, inputPath string, outputFormat string, debug bool) (string, error) {
-	args := []string{"cfn_nag_scan", "--input-path", "/workspace/input"}
-	if outputFormat == "json" {
+	if outputFormat == "html" {
+		args = append(args, "--output-format", "html")
+	} else {
 		args = append(args, "--output-format", "json")
 	}
-	if debug {
-		args = append(args, "--debug")
-	}
 
-	container := m.client.Container().
-		From("stelligent/cfn_nag:latest").
-		WithFile("/workspace/input", m.client.Host().File(inputPath)).
-		WithWorkdir("/workspace").
-		WithExec(args, dagger.ContainerWithExecOpts{Expect: "ANY"})
+	// Add policy complexity metrics if available
+	args = append(args, "--print-suppression")
+
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, _ := container.Stdout(ctx)
 	if output != "" {
 		return output, nil
 	}
 
-	return "", fmt.Errorf("failed to run cfn-nag scan: no output received")
+	stderr, _ := container.Stderr(ctx)
+	if stderr != "" {
+		return stderr, nil
+	}
+
+	return "", fmt.Errorf("failed to run SPCM scan: no output received")
 }

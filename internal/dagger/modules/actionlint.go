@@ -14,7 +14,7 @@ type ActionlintModule struct {
 	name   string
 }
 
-const actionlintBinary = "/usr/local/bin/actionlint"
+const actionlintBinary = "actionlint"
 
 // NewActionlintModule creates a new actionlint module
 func NewActionlintModule(client *dagger.Client) *ActionlintModule {
@@ -27,13 +27,11 @@ func NewActionlintModule(client *dagger.Client) *ActionlintModule {
 // ScanDirectory scans a directory for GitHub Actions workflow issues
 func (m *ActionlintModule) ScanDirectory(ctx context.Context, dir string) (string, error) {
 	container := m.client.Container().
-		From("golang:1.21-alpine").
-		WithExec([]string{"apk", "add", "--no-cache", "git", "bash"}).
-		WithExec([]string{"go", "install", "github.com/rhysd/actionlint@latest"}).
+		From("wolff2023/actionlint:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			"/go/bin/actionlint",
+			actionlintBinary,
 			"-format", "{{json .}}",
 			"-color",
 		}, dagger.ContainerWithExecOpts{
@@ -60,13 +58,11 @@ func (m *ActionlintModule) ScanDirectory(ctx context.Context, dir string) (strin
 // ScanFile scans a specific workflow file
 func (m *ActionlintModule) ScanFile(ctx context.Context, filePath string) (string, error) {
 	container := m.client.Container().
-		From("golang:1.21-alpine").
-		WithExec([]string{"apk", "add", "--no-cache", "git", "bash"}).
-		WithExec([]string{"go", "install", "github.com/rhysd/actionlint@latest"}).
+		From("wolff2023/actionlint:latest").
 		WithFile("/workspace/workflow.yml", m.client.Host().File(filePath)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			"/go/bin/actionlint",
+			actionlintBinary,
 			"-format", "{{json .}}",
 			"workflow.yml",
 		}, dagger.ContainerWithExecOpts{
@@ -91,7 +87,7 @@ func (m *ActionlintModule) ScanFile(ctx context.Context, filePath string) (strin
 
 // ScanDirectoryWithOptions scans a directory with advanced options (format template, ignore patterns, color)
 func (m *ActionlintModule) ScanDirectoryWithOptions(ctx context.Context, dir string, formatTemplate, ignorePatterns string, color bool) (string, error) {
-	args := []string{"/go/bin/actionlint"}
+	args := []string{actionlintBinary}
 
 	if formatTemplate != "" {
 		args = append(args, "-format", formatTemplate)
@@ -115,9 +111,7 @@ func (m *ActionlintModule) ScanDirectoryWithOptions(ctx context.Context, dir str
 	}
 
 	container := m.client.Container().
-		From("golang:1.21-alpine").
-		WithExec([]string{"apk", "add", "--no-cache", "git", "bash"}).
-		WithExec([]string{"go", "install", "github.com/rhysd/actionlint@latest"}).
+		From("wolff2023/actionlint:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec(args, dagger.ContainerWithExecOpts{
@@ -142,7 +136,7 @@ func (m *ActionlintModule) ScanDirectoryWithOptions(ctx context.Context, dir str
 
 // ScanWithExternalTools scans workflows with shellcheck and pyflakes integration
 func (m *ActionlintModule) ScanWithExternalTools(ctx context.Context, dir, shellcheckPath, pyflakesPath string, color bool) (string, error) {
-	args := []string{"/go/bin/actionlint", "-format", "{{json .}}"}
+	args := []string{actionlintBinary, "-format", "{{json .}}"}
 
 	if shellcheckPath != "" {
 		args = append(args, "-shellcheck", shellcheckPath)
@@ -155,9 +149,7 @@ func (m *ActionlintModule) ScanWithExternalTools(ctx context.Context, dir, shell
 	}
 
 	container := m.client.Container().
-		From("golang:1.21-alpine").
-		WithExec([]string{"apk", "add", "--no-cache", "git", "bash"}).
-		WithExec([]string{"go", "install", "github.com/rhysd/actionlint@latest"}).
+		From("wolff2023/actionlint:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec(args, dagger.ContainerWithExecOpts{
@@ -214,7 +206,7 @@ func (m *ActionlintModule) ScanSpecificFiles(ctx context.Context, dir string, wo
 	}
 
 	container := m.client.Container().
-		From("rhysd/actionlint:latest").
+		From("wolff2023/actionlint:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec(args, dagger.ContainerWithExecOpts{
@@ -240,10 +232,8 @@ func (m *ActionlintModule) ScanSpecificFiles(ctx context.Context, dir string, wo
 // GetVersion returns the version of actionlint
 func (m *ActionlintModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
-		From("golang:1.21-alpine").
-		WithExec([]string{"apk", "add", "--no-cache", "git", "bash"}).
-		WithExec([]string{"go", "install", "github.com/rhysd/actionlint@latest"}).
-		WithExec([]string{"/go/bin/actionlint", "-version"})
+		From("wolff2023/actionlint:latest").
+		WithExec([]string{actionlintBinary, "-version"})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

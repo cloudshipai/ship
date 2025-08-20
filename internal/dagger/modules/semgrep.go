@@ -13,24 +13,22 @@ type SemgrepModule struct {
 	name   string
 }
 
-const semgrepBinary = "/usr/local/bin/semgrep"
-
 // NewSemgrepModule creates a new Semgrep module
 func NewSemgrepModule(client *dagger.Client) *SemgrepModule {
 	return &SemgrepModule{
 		client: client,
-		name:   semgrepBinary,
+		name:   "semgrep",
 	}
 }
 
 // ScanDirectory scans a directory with Semgrep rules
 func (m *SemgrepModule) ScanDirectory(ctx context.Context, dir string) (string, error) {
 	container := m.client.Container().
-		From("returntocorp/semgrep:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(dir)).
-		WithWorkdir("/workspace").
+		From("semgrep/semgrep:latest").
+		WithDirectory("/src", m.client.Host().Directory(dir)).
+		WithWorkdir("/src").
 		WithExec([]string{
-			semgrepBinary,
+			"semgrep",
 			"--config=auto",
 			"--json",
 			"--severity=ERROR",
@@ -50,11 +48,11 @@ func (m *SemgrepModule) ScanDirectory(ctx context.Context, dir string) (string, 
 // ScanWithRuleset scans with specific ruleset
 func (m *SemgrepModule) ScanWithRuleset(ctx context.Context, dir string, ruleset string) (string, error) {
 	container := m.client.Container().
-		From("returntocorp/semgrep:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(dir)).
-		WithWorkdir("/workspace").
+		From("semgrep/semgrep:latest").
+		WithDirectory("/src", m.client.Host().Directory(dir)).
+		WithWorkdir("/src").
 		WithExec([]string{
-			semgrepBinary,
+			"semgrep",
 			"--config", ruleset,
 			"--json",
 			".",
@@ -73,11 +71,11 @@ func (m *SemgrepModule) ScanWithRuleset(ctx context.Context, dir string, ruleset
 // ScanFile scans a specific file
 func (m *SemgrepModule) ScanFile(ctx context.Context, filePath string) (string, error) {
 	container := m.client.Container().
-		From("returntocorp/semgrep:latest").
+		From("semgrep/semgrep:latest").
 		WithFile("/workspace/target.file", m.client.Host().File(filePath)).
-		WithWorkdir("/workspace").
+		WithWorkdir("/src").
 		WithExec([]string{
-			semgrepBinary,
+			"semgrep",
 			"--config=auto",
 			"--json",
 			"target.file",
@@ -96,8 +94,10 @@ func (m *SemgrepModule) ScanFile(ctx context.Context, filePath string) (string, 
 // GetVersion returns the version of Semgrep
 func (m *SemgrepModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
-		From("returntocorp/semgrep:latest").
-		WithExec([]string{semgrepBinary, "--version"})
+		From("semgrep/semgrep:latest").
+		WithExec([]string{"semgrep", "--version"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -110,15 +110,15 @@ func (m *SemgrepModule) GetVersion(ctx context.Context) (string, error) {
 // LanguageSpecificScan performs language-specific security analysis
 func (m *SemgrepModule) LanguageSpecificScan(ctx context.Context, target string, language string, securityCategory string, outputFormat string, includeExperimental bool, confidence string) (string, error) {
 	container := m.client.Container().
-		From("returntocorp/semgrep:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(target))
+		From("semgrep/semgrep:latest").
+		WithDirectory("/src", m.client.Host().Directory(target))
 
-	args := []string{semgrepBinary, "scan", "/workspace", "--config", "p/" + language}
+	args := []string{"semgrep", "scan", "/src", "--config", "p/" + language}
 	if securityCategory != "" {
 		args = append(args, "--config", "p/" + securityCategory)
 	}
-	if outputFormat != "" {
-		args = append(args, "--output", outputFormat)
+	if outputFormat == "json" {
+		args = append(args, "--json")
 	}
 	if includeExperimental {
 		args = append(args, "--config", "p/experimental")
@@ -129,33 +129,42 @@ func (m *SemgrepModule) LanguageSpecificScan(ctx context.Context, target string,
 
 	container = container.WithExec(args, dagger.ContainerWithExecOpts{Expect: "ANY"})
 
-	output, _ := container.Stdout(ctx)
-	if output != "" {
-		return output, nil
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		// Try to get stderr for more info
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return "", fmt.Errorf("language-specific scan failed: %s", stderr)
+		}
+		return "", fmt.Errorf("language-specific scan failed: %w", err)
 	}
 
-	return "", fmt.Errorf("failed to run language-specific scan: no output received")
+	// Empty output might mean no findings, which is valid
+	if output == "" {
+		return "No security issues found", nil
+	}
+	return output, nil
 }
 
 // CICDIntegrationScan performs optimized scan for CI/CD pipelines
 func (m *SemgrepModule) CICDIntegrationScan(ctx context.Context, target string, baselineRef string, outputFormat string, outputFile string, configPolicy string, diffAware bool, failOpen bool, timeout string, quiet bool) (string, error) {
 	container := m.client.Container().
-		From("returntocorp/semgrep:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(target))
+		From("semgrep/semgrep:latest").
+		WithDirectory("/src", m.client.Host().Directory(target))
 
 	if configPolicy == "" {
 		configPolicy = "p/ci"
 	}
 
-	args := []string{semgrepBinary, "scan", "/workspace", "--config", configPolicy}
+	args := []string{"semgrep", "scan", "/src", "--config", configPolicy}
 	if baselineRef != "" {
 		args = append(args, "--baseline-ref", baselineRef)
 	}
-	if outputFormat != "" {
-		args = append(args, "--output", outputFormat)
+	if outputFormat == "json" {
+		args = append(args, "--json")
 	}
 	if outputFile != "" {
-		args = append(args, "--output-file", outputFile)
+		args = append(args, "--output", outputFile)
 	}
 	if diffAware {
 		args = append(args, "--diff-depth", "1")
@@ -183,58 +192,70 @@ func (m *SemgrepModule) CICDIntegrationScan(ctx context.Context, target string, 
 // CustomRuleManagement manages and validates custom Semgrep rules
 func (m *SemgrepModule) CustomRuleManagement(ctx context.Context, action string, rulesPath string, target string, testFiles []string, outputFormat string, strict bool) (string, error) {
 	container := m.client.Container().
-		From("returntocorp/semgrep:latest")
+		From("semgrep/semgrep:latest")
 
 	if rulesPath != "" {
 		container = container.WithFile("/rules.yaml", m.client.Host().File(rulesPath))
 	}
 	if target != "" {
-		container = container.WithDirectory("/workspace", m.client.Host().Directory(target))
+		container = container.WithDirectory("/src", m.client.Host().Directory(target))
 	}
 
 	var args []string
 	switch action {
 	case "validate":
-		args = []string{semgrepBinary, "validate", "--config", "/rules.yaml"}
+		args = []string{"semgrep", "validate", "--config", "/rules.yaml"}
 		if strict {
 			args = append(args, "--strict")
 		}
 	case "test":
-		args = []string{semgrepBinary, "test", "--config", "/rules.yaml"}
+		args = []string{"semgrep", "test", "--config", "/rules.yaml"}
 		for _, file := range testFiles {
 			container = container.WithFile("/test_"+file, m.client.Host().File(file))
 			args = append(args, "/test_"+file)
 		}
 	case "scan":
-		args = []string{semgrepBinary, "scan", "/workspace", "--config", "/rules.yaml"}
-		if outputFormat != "" {
-			args = append(args, "--output", outputFormat)
+		args = []string{"semgrep", "scan", "/src", "--config", "/rules.yaml"}
+		if outputFormat == "json" {
+			args = append(args, "--json")
 		}
 	default:
-		args = []string{semgrepBinary, "--help"}
+		args = []string{"semgrep", "--help"}
 	}
 
 	container = container.WithExec(args, dagger.ContainerWithExecOpts{Expect: "ANY"})
 
-	output, _ := container.Stdout(ctx)
-	if output != "" {
-		return output, nil
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		// Try to get stderr for more info
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return "", fmt.Errorf("custom rule management failed: %s", stderr)
+		}
+		return "", fmt.Errorf("custom rule management failed: %w", err)
 	}
 
-	return "", fmt.Errorf("failed to run custom rule management: no output received")
+	// For test/validate actions, output might be minimal
+	if output == "" && (action == "test" || action == "validate") {
+		return "Rules validated successfully", nil
+	}
+	if output == "" {
+		return "No findings", nil
+	}
+	return output, nil
 }
 
 // PerformanceOptimizedScan performs high-performance scan with optimization features
 func (m *SemgrepModule) PerformanceOptimizedScan(ctx context.Context, target string, configPolicy string, maxMemory string, maxTargetBytes string, jobs string, timeout string, enableMetrics bool, optimizations bool, excludePatterns []string) (string, error) {
 	container := m.client.Container().
-		From("returntocorp/semgrep:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(target))
+		From("semgrep/semgrep:latest").
+		WithDirectory("/src", m.client.Host().Directory(target))
 
 	if configPolicy == "" {
 		configPolicy = "auto"
 	}
 
-	args := []string{semgrepBinary, "scan", "/workspace", "--config", configPolicy}
+	args := []string{"semgrep", "scan", "/src", "--config", configPolicy}
 	if maxMemory != "" {
 		args = append(args, "--max-memory", maxMemory)
 	}
@@ -259,23 +280,32 @@ func (m *SemgrepModule) PerformanceOptimizedScan(ctx context.Context, target str
 
 	container = container.WithExec(args, dagger.ContainerWithExecOpts{Expect: "ANY"})
 
-	output, _ := container.Stdout(ctx)
-	if output != "" {
-		return output, nil
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		// Try to get stderr for more info
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return "", fmt.Errorf("performance optimized scan failed: %s", stderr)
+		}
+		return "", fmt.Errorf("performance optimized scan failed: %w", err)
 	}
 
-	return "", fmt.Errorf("failed to run performance optimized scan: no output received")
+	// Empty output might mean no findings, which is valid
+	if output == "" {
+		return "No security issues found (optimized scan)", nil
+	}
+	return output, nil
 }
 
 // ScanSecrets performs specialized secrets scanning
 func (m *SemgrepModule) ScanSecrets(ctx context.Context, directory string, outputFormat string, excludePatterns []string) (string, error) {
 	container := m.client.Container().
-		From("returntocorp/semgrep:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(directory))
+		From("semgrep/semgrep:latest").
+		WithDirectory("/src", m.client.Host().Directory(directory))
 
-	args := []string{semgrepBinary, "scan", "/workspace", "--config", "p/secrets"}
-	if outputFormat != "" {
-		args = append(args, "--output", outputFormat)
+	args := []string{"semgrep", "scan", "/src", "--config", "p/secrets"}
+	if outputFormat == "json" {
+		args = append(args, "--json")
 	}
 	for _, pattern := range excludePatterns {
 		args = append(args, "--exclude", pattern)
@@ -294,12 +324,12 @@ func (m *SemgrepModule) ScanSecrets(ctx context.Context, directory string, outpu
 // ScanOWASPTop10 scans for OWASP Top 10 vulnerabilities
 func (m *SemgrepModule) ScanOWASPTop10(ctx context.Context, directory string, outputFormat string, languageFocus string) (string, error) {
 	container := m.client.Container().
-		From("returntocorp/semgrep:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(directory))
+		From("semgrep/semgrep:latest").
+		WithDirectory("/src", m.client.Host().Directory(directory))
 
-	args := []string{semgrepBinary, "scan", "/workspace", "--config", "p/owasp-top-ten"}
-	if outputFormat != "" {
-		args = append(args, "--output", outputFormat)
+	args := []string{"semgrep", "scan", "/src", "--config", "p/owasp-top-ten"}
+	if outputFormat == "json" {
+		args = append(args, "--json")
 	}
 	if languageFocus != "" {
 		args = append(args, "--config", "p/"+languageFocus)
@@ -318,10 +348,10 @@ func (m *SemgrepModule) ScanOWASPTop10(ctx context.Context, directory string, ou
 // VulnerabilityResearch performs advanced vulnerability research and pattern discovery
 func (m *SemgrepModule) VulnerabilityResearch(ctx context.Context, target string, researchMode string, languageFocus string, vulnerabilityTypes []string, includeExperimental bool, outputFormat string) (string, error) {
 	container := m.client.Container().
-		From("returntocorp/semgrep:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(target))
+		From("semgrep/semgrep:latest").
+		WithDirectory("/src", m.client.Host().Directory(target))
 
-	args := []string{semgrepBinary, "scan", "/workspace"}
+	args := []string{"semgrep", "scan", "/src"}
 
 	// Configure research-specific rulesets
 	switch researchMode {
@@ -344,8 +374,8 @@ func (m *SemgrepModule) VulnerabilityResearch(ctx context.Context, target string
 	if includeExperimental {
 		args = append(args, "--config", "p/experimental")
 	}
-	if outputFormat != "" {
-		args = append(args, "--output", outputFormat)
+	if outputFormat == "json" {
+		args = append(args, "--json")
 	}
 
 	container = container.WithExec(args, dagger.ContainerWithExecOpts{Expect: "ANY"})
@@ -361,18 +391,18 @@ func (m *SemgrepModule) VulnerabilityResearch(ctx context.Context, target string
 // ComplianceScanning performs compliance-focused security scanning
 func (m *SemgrepModule) ComplianceScanning(ctx context.Context, target string, complianceFramework string, industryFocus string, outputFormat string, outputFile string, includeRemediation bool, severityThreshold string) (string, error) {
 	container := m.client.Container().
-		From("returntocorp/semgrep:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(target))
+		From("semgrep/semgrep:latest").
+		WithDirectory("/src", m.client.Host().Directory(target))
 
-	args := []string{semgrepBinary, "scan", "/workspace", "--config", "p/"+complianceFramework}
+	args := []string{"semgrep", "scan", "/src", "--config", "p/"+complianceFramework}
 	if industryFocus != "" {
 		args = append(args, "--config", "p/"+industryFocus)
 	}
-	if outputFormat != "" {
-		args = append(args, "--output", outputFormat)
+	if outputFormat == "json" {
+		args = append(args, "--json")
 	}
 	if outputFile != "" {
-		args = append(args, "--output-file", outputFile)
+		args = append(args, "--output", outputFile)
 	}
 	if severityThreshold != "" {
 		args = append(args, "--severity", severityThreshold)
@@ -383,21 +413,30 @@ func (m *SemgrepModule) ComplianceScanning(ctx context.Context, target string, c
 
 	container = container.WithExec(args, dagger.ContainerWithExecOpts{Expect: "ANY"})
 
-	output, _ := container.Stdout(ctx)
-	if output != "" {
-		return output, nil
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		// Try to get stderr for more info
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return "", fmt.Errorf("compliance scanning failed: %s", stderr)
+		}
+		return "", fmt.Errorf("compliance scanning failed: %w", err)
 	}
 
-	return "", fmt.Errorf("failed to run compliance scanning: no output received")
+	// Empty output might mean no compliance issues, which is valid
+	if output == "" {
+		return "No compliance issues found", nil
+	}
+	return output, nil
 }
 
 // ComprehensiveReporting generates comprehensive security analysis reports
 func (m *SemgrepModule) ComprehensiveReporting(ctx context.Context, target string, reportType string, outputFormats []string, outputDirectory string, includeMetrics bool, includeTrends bool, baselineComparison string) (string, error) {
 	container := m.client.Container().
-		From("returntocorp/semgrep:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(target))
+		From("semgrep/semgrep:latest").
+		WithDirectory("/src", m.client.Host().Directory(target))
 
-	args := []string{semgrepBinary, "scan", "/workspace"}
+	args := []string{"semgrep", "scan", "/src"}
 
 	// Configure report-specific rulesets
 	switch reportType {
@@ -411,10 +450,10 @@ func (m *SemgrepModule) ComprehensiveReporting(ctx context.Context, target strin
 		args = append(args, "--config", "p/owasp-top-ten", "--config", "p/cwe-top-25")
 	}
 
-	if len(outputFormats) > 0 {
-		args = append(args, "--output", outputFormats[0])
-	} else {
-		args = append(args, "--output", "json")
+	if len(outputFormats) > 0 && outputFormats[0] == "json" {
+		args = append(args, "--json")
+	} else if len(outputFormats) == 0 {
+		args = append(args, "--json")
 	}
 
 	if outputDirectory != "" {
@@ -440,22 +479,22 @@ func (m *SemgrepModule) ComprehensiveReporting(ctx context.Context, target strin
 // SecurityAuditScan performs comprehensive security audit scan
 func (m *SemgrepModule) SecurityAuditScan(ctx context.Context, target string, ruleset string, severity string, outputFormat string, outputFile string, excludePaths []string, verbose bool, failOnFindings bool) (string, error) {
 	container := m.client.Container().
-		From("returntocorp/semgrep:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(target))
+		From("semgrep/semgrep:latest").
+		WithDirectory("/src", m.client.Host().Directory(target))
 
 	if ruleset == "" {
 		ruleset = "p/security-audit"
 	}
 
-	args := []string{semgrepBinary, "scan", "/workspace", "--config", ruleset}
+	args := []string{"semgrep", "scan", "/src", "--config", ruleset}
 	if severity != "" {
 		args = append(args, "--severity", severity)
 	}
-	if outputFormat != "" {
-		args = append(args, "--output", outputFormat)
+	if outputFormat == "json" {
+		args = append(args, "--json")
 	}
 	if outputFile != "" {
-		args = append(args, "--output-file", outputFile)
+		args = append(args, "--output", outputFile)
 	}
 	for _, path := range excludePaths {
 		args = append(args, "--exclude", path)
@@ -469,10 +508,19 @@ func (m *SemgrepModule) SecurityAuditScan(ctx context.Context, target string, ru
 
 	container = container.WithExec(args, dagger.ContainerWithExecOpts{Expect: "ANY"})
 
-	output, _ := container.Stdout(ctx)
-	if output != "" {
-		return output, nil
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		// Try to get stderr for more info
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return "", fmt.Errorf("security audit scan failed: %s", stderr)
+		}
+		return "", fmt.Errorf("security audit scan failed: %w", err)
 	}
 
-	return "", fmt.Errorf("failed to run security audit scan: no output received")
+	// Empty output might mean no security issues, which is valid
+	if output == "" {
+		return "No security issues found in audit", nil
+	}
+	return output, nil
 }

@@ -13,8 +13,6 @@ type HadolintModule struct {
 	name   string
 }
 
-const hadolintBinary = "/bin/hadolint"
-
 // NewHadolintModule creates a new Hadolint module
 func NewHadolintModule(client *dagger.Client) *HadolintModule {
 	return &HadolintModule{
@@ -30,9 +28,7 @@ func (m *HadolintModule) ScanDockerfile(ctx context.Context, dockerfilePath stri
 		WithFile("/workspace/Dockerfile", m.client.Host().File(dockerfilePath)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			hadolintBinary,
-			"--format", "json",
-			"Dockerfile",
+			"/bin/hadolint", "--format", "json", "Dockerfile",
 		}, dagger.ContainerWithExecOpts{
 			Expect: "ANY",
 		})
@@ -45,14 +41,14 @@ func (m *HadolintModule) ScanDockerfile(ctx context.Context, dockerfilePath stri
 	return "", fmt.Errorf("failed to run hadolint: no output received")
 }
 
-// ScanDirectory scans all Dockerfiles in a directory
+// ScanDirectory scans all Dockerfiles in a directory (simplified to scan Dockerfile in root)
 func (m *HadolintModule) ScanDirectory(ctx context.Context, dir string) (string, error) {
 	container := m.client.Container().
 		From("hadolint/hadolint:latest").
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			"find", ".", "-name", "Dockerfile*", "-exec", "hadolint", "--format", "json", "{}", "+",
+			"/bin/hadolint", "--format", "json", "Dockerfile",
 		}, dagger.ContainerWithExecOpts{
 			Expect: "ANY",
 		})
@@ -69,17 +65,21 @@ func (m *HadolintModule) ScanDirectory(ctx context.Context, dir string) (string,
 func (m *HadolintModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("hadolint/hadolint:latest").
-		WithExec([]string{"hadolint", "--version"})
+		WithExec([]string{
+			"/bin/hadolint", "--version",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get hadolint version: %w", err)
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
 	}
 
-	return output, nil
+	return "", fmt.Errorf("failed to get hadolint version: no output received")
 }
 
-// ScanWithConfig scans using custom configuration
+// ScanWithConfig scans Dockerfile with custom configuration
 func (m *HadolintModule) ScanWithConfig(ctx context.Context, dockerfilePath string, configPath string) (string, error) {
 	container := m.client.Container().
 		From("hadolint/hadolint:latest").
@@ -87,39 +87,44 @@ func (m *HadolintModule) ScanWithConfig(ctx context.Context, dockerfilePath stri
 		WithFile("/workspace/.hadolint.yaml", m.client.Host().File(configPath)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
-			hadolintBinary,
-			"--config", ".hadolint.yaml",
-			"--format", "json",
-			"Dockerfile",
+			"/bin/hadolint", "--config", ".hadolint.yaml", "--format", "json", "Dockerfile",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to scan dockerfile with config: %w", err)
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
 	}
 
-	return output, nil
+	return "", fmt.Errorf("failed to run hadolint with config: no output received")
 }
 
-// ScanIgnoreRules scans while ignoring specific rules
-func (m *HadolintModule) ScanIgnoreRules(ctx context.Context, dockerfilePath string, ignoreRules []string) (string, error) {
-	args := []string{"hadolint", "--format", "json"}
-	
-	// Add ignore rules
-	for _, rule := range ignoreRules {
+// ScanIgnoreRules scans with specific rules ignored (alias for compatibility)
+func (m *HadolintModule) ScanIgnoreRules(ctx context.Context, dockerfilePath string, ignoredRules []string) (string, error) {
+	return m.ScanWithRules(ctx, dockerfilePath, ignoredRules)
+}
+
+// ScanWithRules scans with specific rules ignored
+func (m *HadolintModule) ScanWithRules(ctx context.Context, dockerfilePath string, ignoredRules []string) (string, error) {
+	args := []string{"/bin/hadolint"}
+	for _, rule := range ignoredRules {
 		args = append(args, "--ignore", rule)
 	}
-	args = append(args, "/workspace/Dockerfile")
+	args = append(args, "--format", "json", "Dockerfile")
 
 	container := m.client.Container().
 		From("hadolint/hadolint:latest").
 		WithFile("/workspace/Dockerfile", m.client.Host().File(dockerfilePath)).
-		WithExec(args)
+		WithWorkdir("/workspace").
+		WithExec(args, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to scan dockerfile with ignore rules: %w", err)
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
 	}
 
-	return output, nil
+	return "", fmt.Errorf("failed to run hadolint with rules: no output received")
 }

@@ -26,7 +26,7 @@ func NewPowerpipeModule(client *dagger.Client) *PowerpipeModule {
 // RunBenchmark runs a security benchmark
 func (m *PowerpipeModule) RunBenchmark(ctx context.Context, benchmark string, modPath string) (string, error) {
 	container := m.client.Container().
-		From("turbot/powerpipe:latest")
+		From("ghcr.io/turbot/powerpipe:latest")
 
 	if modPath != "" {
 		container = container.WithDirectory("/mod", m.client.Host().Directory(modPath))
@@ -36,6 +36,8 @@ func (m *PowerpipeModule) RunBenchmark(ctx context.Context, benchmark string, mo
 		powerpipeBinary,
 		"benchmark", "run", benchmark,
 		"--output", "json",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -49,7 +51,7 @@ func (m *PowerpipeModule) RunBenchmark(ctx context.Context, benchmark string, mo
 // RunControl runs a specific control
 func (m *PowerpipeModule) RunControl(ctx context.Context, control string, modPath string) (string, error) {
 	container := m.client.Container().
-		From("turbot/powerpipe:latest")
+		From("ghcr.io/turbot/powerpipe:latest")
 
 	if modPath != "" {
 		container = container.WithDirectory("/mod", m.client.Host().Directory(modPath))
@@ -59,6 +61,8 @@ func (m *PowerpipeModule) RunControl(ctx context.Context, control string, modPat
 		powerpipeBinary,
 		"control", "run", control,
 		"--output", "json",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -72,7 +76,7 @@ func (m *PowerpipeModule) RunControl(ctx context.Context, control string, modPat
 // ListBenchmarks lists available benchmarks
 func (m *PowerpipeModule) ListBenchmarks(ctx context.Context, modPath string) (string, error) {
 	container := m.client.Container().
-		From("turbot/powerpipe:latest")
+		From("ghcr.io/turbot/powerpipe:latest")
 
 	if modPath != "" {
 		container = container.WithDirectory("/mod", m.client.Host().Directory(modPath))
@@ -82,6 +86,8 @@ func (m *PowerpipeModule) ListBenchmarks(ctx context.Context, modPath string) (s
 		powerpipeBinary,
 		"benchmark", "list",
 		"--output", "json",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -95,8 +101,10 @@ func (m *PowerpipeModule) ListBenchmarks(ctx context.Context, modPath string) (s
 // GetVersion returns the version of Powerpipe
 func (m *PowerpipeModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
-		From("turbot/powerpipe:latest").
-		WithExec([]string{powerpipeBinary, "--version"})
+		From("ghcr.io/turbot/powerpipe:latest").
+		WithExec([]string{powerpipeBinary, "--version"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -109,7 +117,7 @@ func (m *PowerpipeModule) GetVersion(ctx context.Context) (string, error) {
 // RunQuery executes a Powerpipe query
 func (m *PowerpipeModule) RunQuery(ctx context.Context, query string, modPath string) (string, error) {
 	container := m.client.Container().
-		From("turbot/powerpipe:latest")
+		From("ghcr.io/turbot/powerpipe:latest")
 
 	if modPath != "" {
 		container = container.WithDirectory("/workspace", m.client.Host().Directory(modPath)).
@@ -120,6 +128,8 @@ func (m *PowerpipeModule) RunQuery(ctx context.Context, query string, modPath st
 		powerpipeBinary,
 		"query", "run", query,
 		"--output", "json",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -133,7 +143,7 @@ func (m *PowerpipeModule) RunQuery(ctx context.Context, query string, modPath st
 // ListQueries lists available queries
 func (m *PowerpipeModule) ListQueries(ctx context.Context, modPath string) (string, error) {
 	container := m.client.Container().
-		From("turbot/powerpipe:latest")
+		From("ghcr.io/turbot/powerpipe:latest")
 
 	if modPath != "" {
 		container = container.WithDirectory("/workspace", m.client.Host().Directory(modPath)).
@@ -144,6 +154,8 @@ func (m *PowerpipeModule) ListQueries(ctx context.Context, modPath string) (stri
 		powerpipeBinary,
 		"query", "list",
 		"--output", "json",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -157,7 +169,7 @@ func (m *PowerpipeModule) ListQueries(ctx context.Context, modPath string) (stri
 // StartServer starts the Powerpipe server
 func (m *PowerpipeModule) StartServer(ctx context.Context, modPath string, port int) (string, error) {
 	container := m.client.Container().
-		From("turbot/powerpipe:latest")
+		From("ghcr.io/turbot/powerpipe:latest")
 
 	if modPath != "" {
 		container = container.WithDirectory("/workspace", m.client.Host().Directory(modPath)).
@@ -169,7 +181,9 @@ func (m *PowerpipeModule) StartServer(ctx context.Context, modPath string, port 
 		args = append(args, "--port", fmt.Sprintf("%d", port))
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -182,7 +196,7 @@ func (m *PowerpipeModule) StartServer(ctx context.Context, modPath string, port 
 // ListDashboards lists available dashboards
 func (m *PowerpipeModule) ListDashboards(ctx context.Context, modPath string) (string, error) {
 	container := m.client.Container().
-		From("turbot/powerpipe:latest")
+		From("ghcr.io/turbot/powerpipe:latest")
 
 	if modPath != "" {
 		container = container.WithDirectory("/workspace", m.client.Host().Directory(modPath)).
@@ -193,6 +207,8 @@ func (m *PowerpipeModule) ListDashboards(ctx context.Context, modPath string) (s
 		powerpipeBinary,
 		"dashboard", "list",
 		"--output", "json",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)

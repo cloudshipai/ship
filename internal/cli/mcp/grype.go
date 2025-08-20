@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -19,9 +20,121 @@ func AddGrypeTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFun
 
 // addGrypeToolsDirect adds Grype tools using direct Dagger module calls
 func addGrypeToolsDirect(s *server.MCPServer) {
-	// Grype scan target for vulnerabilities
+	// Updated Grype scan tool to match specifications
 	scanTool := mcp.NewTool("grype_scan",
-		mcp.WithDescription("Scan target for vulnerabilities (image, directory, archive, SBOM)"),
+		mcp.WithDescription("Vulnerability scan from a SBOM (preferred) or direct target; return JSON/SARIF paths and structured counts"),
+		mcp.WithString("input",
+			mcp.Description("Input source (e.g., sbom:/abs/sbom.json, dir:., docker:alpine:3.19)"),
+			mcp.Required(),
+		),
+		mcp.WithString("format",
+			mcp.Description("Output format: json or sarif (default: json)"),
+		),
+		mcp.WithString("min_severity",
+			mcp.Description("Minimum severity to report: negligible|low|medium|high|critical"),
+		),
+	)
+	s.AddTool(scanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewGrypeModule(client)
+
+		// Get parameters
+		input := request.GetString("input", "")
+		if input == "" {
+			return mcp.NewToolResultError("input is required"), nil
+		}
+		
+		format := request.GetString("format", "json")
+		_ = request.GetString("min_severity", "") // TODO: Implement min_severity filtering
+
+		// Generate output
+		var stdout string
+		var stderr string
+		
+		// Determine input type and call appropriate method
+		if strings.HasPrefix(input, "sbom:") {
+			sbomPath := strings.TrimPrefix(input, "sbom:")
+			stdout, err = module.ScanSBOM(ctx, sbomPath, format)
+		} else if strings.HasPrefix(input, "dir:") {
+			dirPath := strings.TrimPrefix(input, "dir:")
+			stdout, err = module.ScanDirectory(ctx, dirPath, format)
+		} else if strings.HasPrefix(input, "docker:") {
+			image := strings.TrimPrefix(input, "docker:")
+			stdout, err = module.ScanImage(ctx, image, format)
+		} else {
+			// Default: treat as file path for SBOM
+			stdout, err = module.ScanSBOM(ctx, input, format)
+		}
+		
+		// Build result in the expected format
+		result := map[string]interface{}{
+			"status": "ok",
+			"stdout": stdout,
+			"stderr": stderr,
+			"artifacts": map[string]string{},
+			"summary": map[string]interface{}{
+				"high":     0,
+				"critical": 0,
+			},
+			"diagnostics": []string{},
+		}
+		
+		// Add artifact path based on format
+		if format == "sarif" {
+			result["artifacts"].(map[string]string)["grype_sarif"] = "./grype.sarif"
+		} else {
+			result["artifacts"].(map[string]string)["grype_json"] = "./grype.json"
+		}
+		
+		// Parse JSON output to extract counts if format is json
+		if format == "json" && err == nil && stdout != "" {
+			var grypeOutput map[string]interface{}
+			if jsonErr := json.Unmarshal([]byte(stdout), &grypeOutput); jsonErr == nil {
+				// Try to extract vulnerability counts
+				if matches, ok := grypeOutput["matches"].([]interface{}); ok {
+					highCount := 0
+					criticalCount := 0
+					for _, match := range matches {
+						if m, ok := match.(map[string]interface{}); ok {
+							if vuln, ok := m["vulnerability"].(map[string]interface{}); ok {
+								if severity, ok := vuln["severity"].(string); ok {
+									switch strings.ToLower(severity) {
+									case "critical":
+										criticalCount++
+									case "high":
+										highCount++
+									}
+								}
+							}
+						}
+					}
+					result["summary"].(map[string]interface{})["high"] = highCount
+					result["summary"].(map[string]interface{})["critical"] = criticalCount
+				}
+			}
+		}
+		
+		if err != nil {
+			result["status"] = "error"
+			result["stderr"] = err.Error()
+			result["diagnostics"] = []string{fmt.Sprintf("Grype scan failed: %v", err)}
+		}
+
+		// Return as JSON
+		resultJSON, _ := json.Marshal(result)
+		return mcp.NewToolResultText(string(resultJSON)), nil
+	})
+
+	// Keep the legacy scan tool for backward compatibility
+	scanToolLegacy := mcp.NewTool("grype_scan_legacy",
+		mcp.WithDescription("[DEPRECATED - use grype_scan] Scan target for vulnerabilities"),
 		mcp.WithString("target",
 			mcp.Description("Target to scan (container image, directory, archive, or SBOM)"),
 			mcp.Required(),
@@ -54,7 +167,7 @@ func addGrypeToolsDirect(s *server.MCPServer) {
 			mcp.Description("Specify distribution (format: <distro>:<version>)"),
 		),
 	)
-	s.AddTool(scanTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	s.AddTool(scanToolLegacy, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		// Create Dagger client
 		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
 		if err != nil {

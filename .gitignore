@@ -42,9 +42,24 @@ dist/
 *.exe
 *.exe~
 test-fresh/
+*fresh*.md
+
+# Status and report files (generated/temporary)
+*STATUS*.md
+*REPORT*.md
+*MODULE*.md
+*DAGGER*.md
+*COMPLETE*.md
+*FINAL*.md
+*ALL_MODULES*.md
+*COMPREHENSIVE*.md
+*FIX_STATUS*.md
+*DOCKER*.md
+*MCP*.md
 
 # Temporary test files and scripts (should be in scripts/ or test/ dirs)
 test-*
+test*
 *.test.*
 temp-*
 tmp-*
@@ -69,6 +84,17 @@ tf.plan
 
 # Docker and container artifacts
 docker-compose.override.yml
+docker/
+docker-compose.rekor.yml
+Dockerfile.rekor
+
+# Python and Go check/quick files
+check_all_modules.py
+quick_check_modules.py
+quick_check.go
+
+# Rekor configuration
+rekor-simple.yml
 
 # OS specific
 .DS_Store

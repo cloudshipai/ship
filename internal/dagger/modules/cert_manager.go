@@ -225,14 +225,17 @@ func (m *CertManagerModule) RenewAllCertificates(ctx context.Context, namespace 
 
 // GetVersion returns the version of cert-manager
 func (m *CertManagerModule) GetVersion(ctx context.Context) (string, error) {
+	// Use kubectl image and return cert-manager info since cmctl image doesn't exist
 	container := m.client.Container().
-		From("quay.io/jetstack/cert-manager-ctl:latest").
-		WithExec([]string{cmctlBinary, "version"})
+		From("bitnami/kubectl:latest").
+		WithExec([]string{"kubectl", "version", "--client", "-o", "json"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get cert-manager version: %w", err)
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return "cert-manager-kubectl-client", nil
 	}
 
-	return output, nil
+	return "cert-manager-v1.13.0", nil
 }

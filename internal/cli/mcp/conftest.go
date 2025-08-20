@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/cloudshipai/ship/internal/dagger/modules"
@@ -12,8 +13,108 @@ import (
 
 // AddConftestTools adds Conftest (OPA policy testing) MCP tool implementations
 func AddConftestTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
-	// Ignore executeShipCommand - we use direct Dagger calls
+	// Add new unified tool first
+	addNewConftestValidateTool(s)
+	
+	// Keep existing tools for backward compatibility
 	addConftestToolsDirect(s)
+}
+
+// addNewConftestValidateTool adds the new unified Conftest validation tool
+func addNewConftestValidateTool(s *server.MCPServer) {
+	// Conftest validate tool - unified interface
+	validateTool := mcp.NewTool("conftest_validate",
+		mcp.WithDescription("Validate YAML/JSON/TF/Dockerfile/etc. against OPA policies"),
+		mcp.WithString("input",
+			mcp.Description("Config file/dir to validate (YAML, JSON, TF, Dockerfile, etc.)"),
+			mcp.Required(),
+		),
+		mcp.WithString("policy",
+			mcp.Description("OPA policy path or OCI reference (default: ./policy)"),
+		),
+		mcp.WithString("namespace",
+			mcp.Description("OPA namespace to use (default: main)"),
+		),
+		mcp.WithString("format",
+			mcp.Description("Output format: json, table, tap, junit, github (default: json)"),
+		),
+	)
+	s.AddTool(validateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Create Dagger client
+		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
+		}
+		defer client.Close()
+
+		// Create module instance
+		module := modules.NewConftestModule(client)
+
+		// Get parameters
+		input := request.GetString("input", "")
+		if input == "" {
+			return mcp.NewToolResultError("input is required"), nil
+		}
+		
+		policy := request.GetString("policy", "./policy")
+		namespace := request.GetString("namespace", "main")
+		format := request.GetString("format", "json")
+		
+		// Call TestWithOptions to validate
+		stdout, err := module.TestWithOptions(ctx, input, policy, namespace, false, format, "")
+		
+		// Build result in the expected format
+		result := map[string]interface{}{
+			"status": "ok",
+			"stdout": stdout,
+			"stderr": "",
+			"artifacts": map[string]string{},
+			"summary": map[string]interface{}{
+				"violations": 0,
+				"warnings":   0,
+			},
+			"diagnostics": []string{},
+		}
+		
+		// Add artifact path based on format
+		switch format {
+		case "json":
+			result["artifacts"].(map[string]string)["conftest_json"] = "./conftest.json"
+		case "junit":
+			result["artifacts"].(map[string]string)["conftest_junit"] = "./conftest.xml"
+		default:
+			// For other formats, we just return the stdout
+		}
+		
+		// Parse JSON output to extract counts if format is json
+		if format == "json" && err == nil && stdout != "" {
+			var conftestOutput []map[string]interface{}
+			if jsonErr := json.Unmarshal([]byte(stdout), &conftestOutput); jsonErr == nil {
+				violations := 0
+				warnings := 0
+				for _, result := range conftestOutput {
+					if failures, ok := result["failures"].([]interface{}); ok {
+						violations += len(failures)
+					}
+					if warns, ok := result["warnings"].([]interface{}); ok {
+						warnings += len(warns)
+					}
+				}
+				result["summary"].(map[string]interface{})["violations"] = violations
+				result["summary"].(map[string]interface{})["warnings"] = warnings
+			}
+		}
+		
+		if err != nil {
+			result["status"] = "error"
+			result["stderr"] = err.Error()
+			result["diagnostics"] = []string{fmt.Sprintf("Conftest validation failed: %v", err)}
+		}
+
+		// Return as JSON
+		resultJSON, _ := json.Marshal(result)
+		return mcp.NewToolResultText(string(resultJSON)), nil
+	})
 }
 
 // addConftestToolsDirect implements direct Dagger calls for Conftest tools

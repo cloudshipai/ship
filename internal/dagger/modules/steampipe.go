@@ -26,14 +26,18 @@ func NewSteampipeModule(client *dagger.Client) *SteampipeModule {
 // Query executes a SQL query against cloud resources
 func (m *SteampipeModule) Query(ctx context.Context, query string, plugin string) (string, error) {
 	container := m.client.Container().
-		From("turbot/steampipe:latest").
+		From("ghcr.io/turbot/steampipe:latest").
 		WithExec([]string{
 			steampipeBinary, "plugin", "install", plugin,
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		}).
 		WithExec([]string{
 			steampipeBinary, "query",
 			"--output", "json",
 			query,
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -47,15 +51,19 @@ func (m *SteampipeModule) Query(ctx context.Context, query string, plugin string
 // QueryFromFile executes queries from a file
 func (m *SteampipeModule) QueryFromFile(ctx context.Context, queryFile string, plugin string) (string, error) {
 	container := m.client.Container().
-		From("turbot/steampipe:latest").
+		From("ghcr.io/turbot/steampipe:latest").
 		WithFile("/query.sql", m.client.Host().File(queryFile)).
 		WithExec([]string{
 			steampipeBinary, "plugin", "install", plugin,
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		}).
 		WithExec([]string{
 			steampipeBinary, "query",
 			"--output", "json",
 			"/query.sql",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -69,9 +77,11 @@ func (m *SteampipeModule) QueryFromFile(ctx context.Context, queryFile string, p
 // ListPlugins lists available plugins
 func (m *SteampipeModule) ListPlugins(ctx context.Context) (string, error) {
 	container := m.client.Container().
-		From("turbot/steampipe:latest").
+		From("ghcr.io/turbot/steampipe:latest").
 		WithExec([]string{
 			steampipeBinary, "plugin", "list",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -85,8 +95,10 @@ func (m *SteampipeModule) ListPlugins(ctx context.Context) (string, error) {
 // GetVersion returns the version of Steampipe
 func (m *SteampipeModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
-		From("turbot/steampipe:latest").
-		WithExec([]string{steampipeBinary, "--version"})
+		From("ghcr.io/turbot/steampipe:latest").
+		WithExec([]string{steampipeBinary, "--version"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -99,12 +111,16 @@ func (m *SteampipeModule) GetVersion(ctx context.Context) (string, error) {
 // QueryInteractive starts an interactive query session
 func (m *SteampipeModule) QueryInteractive(ctx context.Context, plugin string) (string, error) {
 	container := m.client.Container().
-		From("turbot/steampipe:latest").
+		From("ghcr.io/turbot/steampipe:latest").
 		WithExec([]string{
 			steampipeBinary, "plugin", "install", plugin,
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		}).
 		WithExec([]string{
 			steampipeBinary, "query", "--output", "json",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -118,9 +134,11 @@ func (m *SteampipeModule) QueryInteractive(ctx context.Context, plugin string) (
 // InstallPlugin installs a Steampipe plugin
 func (m *SteampipeModule) InstallPlugin(ctx context.Context, plugin string) (string, error) {
 	container := m.client.Container().
-		From("turbot/steampipe:latest").
+		From("ghcr.io/turbot/steampipe:latest").
 		WithExec([]string{
 			steampipeBinary, "plugin", "install", plugin,
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -134,9 +152,11 @@ func (m *SteampipeModule) InstallPlugin(ctx context.Context, plugin string) (str
 // UpdatePlugin updates a Steampipe plugin
 func (m *SteampipeModule) UpdatePlugin(ctx context.Context, plugin string) (string, error) {
 	container := m.client.Container().
-		From("turbot/steampipe:latest").
+		From("ghcr.io/turbot/steampipe:latest").
 		WithExec([]string{
 			steampipeBinary, "plugin", "update", plugin,
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -150,9 +170,11 @@ func (m *SteampipeModule) UpdatePlugin(ctx context.Context, plugin string) (stri
 // UninstallPlugin uninstalls a Steampipe plugin
 func (m *SteampipeModule) UninstallPlugin(ctx context.Context, plugin string) (string, error) {
 	container := m.client.Container().
-		From("turbot/steampipe:latest").
+		From("ghcr.io/turbot/steampipe:latest").
 		WithExec([]string{
 			steampipeBinary, "plugin", "uninstall", plugin,
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -171,8 +193,10 @@ func (m *SteampipeModule) StartService(ctx context.Context, port int) (string, e
 	}
 
 	container := m.client.Container().
-		From("turbot/steampipe:latest").
-		WithExec(args)
+		From("ghcr.io/turbot/steampipe:latest").
+		WithExec(args, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -185,9 +209,11 @@ func (m *SteampipeModule) StartService(ctx context.Context, port int) (string, e
 // GetServiceStatus gets the status of the Steampipe service
 func (m *SteampipeModule) GetServiceStatus(ctx context.Context) (string, error) {
 	container := m.client.Container().
-		From("turbot/steampipe:latest").
+		From("ghcr.io/turbot/steampipe:latest").
 		WithExec([]string{
 			steampipeBinary, "service", "status",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -201,9 +227,11 @@ func (m *SteampipeModule) GetServiceStatus(ctx context.Context) (string, error) 
 // StopService stops the Steampipe service
 func (m *SteampipeModule) StopService(ctx context.Context) (string, error) {
 	container := m.client.Container().
-		From("turbot/steampipe:latest").
+		From("ghcr.io/turbot/steampipe:latest").
 		WithExec([]string{
 			steampipeBinary, "service", "stop",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)

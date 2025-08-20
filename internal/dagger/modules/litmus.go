@@ -40,6 +40,8 @@ func (m *LitmusModule) CreateExperiment(ctx context.Context, experimentPath stri
 		"experiment",
 		"-f", "/experiment.yaml",
 		"--output", "json",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -64,6 +66,8 @@ func (m *LitmusModule) GetExperiments(ctx context.Context, kubeconfig string) (s
 		"get",
 		"experiments",
 		"--output", "json",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -89,6 +93,8 @@ func (m *LitmusModule) GetChaosResults(ctx context.Context, experimentName strin
 		"chaosresults",
 		experimentName,
 		"--output", "json",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -103,14 +109,16 @@ func (m *LitmusModule) GetChaosResults(ctx context.Context, experimentName strin
 func (m *LitmusModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("litmuschaos/litmusctl:latest").
-		WithExec([]string{litmusctlBinary, "version"})
+		WithExec([]string{litmusctlBinary, "version"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get litmus version: %w", err)
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
 	}
 
-	return output, nil
+	return "", fmt.Errorf("failed to get litmus version: no output received")
 }
 
 // Install installs Litmus using Helm
@@ -126,8 +134,12 @@ func (m *LitmusModule) Install(ctx context.Context, namespace string, releaseNam
 		From("alpine/helm:latest")
 
 	// Add Litmus Helm repository
-	container = container.WithExec([]string{"helm", "repo", "add", "litmuschaos", "https://litmuschaos.github.io/litmus-helm/"}).
-		WithExec([]string{"helm", "repo", "update"})
+	container = container.WithExec([]string{"helm", "repo", "add", "litmuschaos", "https://litmuschaos.github.io/litmus-helm/"}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	}).
+		WithExec([]string{"helm", "repo", "update"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	// Install Litmus
 	args := []string{"helm", "install", releaseName, "litmuschaos/litmus", "--namespace", namespace}
@@ -135,7 +147,9 @@ func (m *LitmusModule) Install(ctx context.Context, namespace string, releaseNam
 		args = append(args, "--create-namespace")
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -155,7 +169,9 @@ func (m *LitmusModule) ConnectChaosInfra(ctx context.Context, projectID string) 
 		args = append(args, "--project-id", projectID)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -169,7 +185,9 @@ func (m *LitmusModule) ConnectChaosInfra(ctx context.Context, projectID string) 
 func (m *LitmusModule) CreateProject(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("litmuschaos/litmusctl:latest").
-		WithExec([]string{litmusctlBinary, "create", "project"})
+		WithExec([]string{litmusctlBinary, "create", "project"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -193,7 +211,9 @@ func (m *LitmusModule) CreateChaosExperiment(ctx context.Context, manifestFile s
 		args = append(args, "--chaos-infra-id", chaosInfraID)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -213,7 +233,9 @@ func (m *LitmusModule) RunChaosExperiment(ctx context.Context, experimentID stri
 		args = append(args, "--project-id", projectID)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -227,14 +249,16 @@ func (m *LitmusModule) RunChaosExperiment(ctx context.Context, experimentID stri
 func (m *LitmusModule) GetProjects(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("litmuschaos/litmusctl:latest").
-		WithExec([]string{litmusctlBinary, "get", "projects"})
+		WithExec([]string{litmusctlBinary, "get", "projects"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get litmus projects: %w", err)
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
 	}
 
-	return output, nil
+	return "", fmt.Errorf("failed to get litmus projects: no output received")
 }
 
 // GetChaosInfra lists chaos infrastructure using litmusctl
@@ -247,7 +271,9 @@ func (m *LitmusModule) GetChaosInfra(ctx context.Context, projectID string) (str
 		args = append(args, "--project-id", projectID)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -261,7 +287,9 @@ func (m *LitmusModule) GetChaosInfra(ctx context.Context, projectID string) (str
 func (m *LitmusModule) ConfigSetAccount(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("litmuschaos/litmusctl:latest").
-		WithExec([]string{litmusctlBinary, "config", "set-account"})
+		WithExec([]string{litmusctlBinary, "config", "set-account"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -286,7 +314,9 @@ func (m *LitmusModule) ApplyChaosExperiment(ctx context.Context, manifestFile st
 		args = append(args, "-n", namespace)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

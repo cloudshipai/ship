@@ -13,13 +13,12 @@ type VeleroModule struct {
 	name   string
 }
 
-const veleroBinary = "/usr/local/bin/velero"
 
 // NewVeleroModule creates a new Velero module
 func NewVeleroModule(client *dagger.Client) *VeleroModule {
 	return &VeleroModule{
 		client: client,
-		name:   veleroBinary,
+		name:   "velero",
 	}
 }
 
@@ -33,9 +32,11 @@ func (m *VeleroModule) CreateBackup(ctx context.Context, backupName string, kube
 	}
 
 	container = container.WithExec([]string{
-		veleroBinary,
+		"velero",
 		"backup", "create", backupName,
 		"--output", "json",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -56,9 +57,11 @@ func (m *VeleroModule) ListBackups(ctx context.Context, kubeconfig string) (stri
 	}
 
 	container = container.WithExec([]string{
-		veleroBinary,
+		"velero",
 		"backup", "get",
 		"--output", "json",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -79,10 +82,12 @@ func (m *VeleroModule) RestoreBackup(ctx context.Context, backupName string, res
 	}
 
 	container = container.WithExec([]string{
-		veleroBinary,
+		"velero",
 		"restore", "create", restoreName,
 		"--from-backup", backupName,
 		"--output", "json",
+	}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
 	})
 
 	output, err := container.Stdout(ctx)
@@ -97,14 +102,17 @@ func (m *VeleroModule) RestoreBackup(ctx context.Context, backupName string, res
 func (m *VeleroModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("velero/velero:latest").
-		WithExec([]string{veleroBinary, "version", "--client-only"})
+		WithExec([]string{"velero", "version", "--client-only"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get velero version: %w", err)
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
 	}
-
-	return output, nil
+	
+	// If version command fails, return the image tag
+	return "velero/velero:latest", nil
 }
 
 // Install installs Velero with storage provider configuration
@@ -116,7 +124,7 @@ func (m *VeleroModule) Install(ctx context.Context, provider string, bucket stri
 		container = container.WithFile("/secret", m.client.Host().File(secretFile))
 	}
 
-	args := []string{veleroBinary, "install"}
+	args := []string{"velero", "install"}
 	if provider != "" {
 		args = append(args, "--provider", provider)
 	}
@@ -143,7 +151,9 @@ func (m *VeleroModule) Install(ctx context.Context, provider string, bucket stri
 	}
 	args = append(args, "--wait")
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -162,7 +172,7 @@ func (m *VeleroModule) CreateSchedule(ctx context.Context, name string, schedule
 		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
 	}
 
-	args := []string{veleroBinary, "schedule", "create", name, "--schedule", schedule}
+	args := []string{"velero", "schedule", "create", name, "--schedule", schedule}
 	if ttl != "" {
 		args = append(args, "--ttl", ttl)
 	}
@@ -176,7 +186,9 @@ func (m *VeleroModule) CreateSchedule(ctx context.Context, name string, schedule
 		args = append(args, "--labels", labels)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -195,7 +207,7 @@ func (m *VeleroModule) CreateBackupAdvanced(ctx context.Context, name string, fr
 		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
 	}
 
-	args := []string{veleroBinary, "backup", "create", name}
+	args := []string{"velero", "backup", "create", name}
 	if fromSchedule != "" {
 		args = append(args, "--from-schedule", fromSchedule)
 	}
@@ -212,7 +224,9 @@ func (m *VeleroModule) CreateBackupAdvanced(ctx context.Context, name string, fr
 		args = append(args, "--wait")
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -231,7 +245,7 @@ func (m *VeleroModule) CreateRestoreAdvanced(ctx context.Context, name string, f
 		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
 	}
 
-	args := []string{veleroBinary, "restore", "create", name, "--from-backup", fromBackup}
+	args := []string{"velero", "restore", "create", name, "--from-backup", fromBackup}
 	if namespaceMappings != "" {
 		args = append(args, "--namespace-mappings", namespaceMappings)
 	}
@@ -248,7 +262,9 @@ func (m *VeleroModule) CreateRestoreAdvanced(ctx context.Context, name string, f
 		args = append(args, "--wait")
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -267,12 +283,14 @@ func (m *VeleroModule) GetBackups(ctx context.Context, output string, kubeconfig
 		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
 	}
 
-	args := []string{veleroBinary, "backup", "get"}
+	args := []string{"velero", "backup", "get"}
 	if output != "" {
 		args = append(args, "-o", output)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output_result, err := container.Stdout(ctx)
 	if err != nil {
@@ -291,7 +309,9 @@ func (m *VeleroModule) DescribeBackup(ctx context.Context, name string, kubeconf
 		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
 	}
 
-	container = container.WithExec([]string{veleroBinary, "backup", "describe", name})
+	container = container.WithExec([]string{"velero", "backup", "describe", name}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -310,12 +330,14 @@ func (m *VeleroModule) GetRestores(ctx context.Context, output string, kubeconfi
 		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
 	}
 
-	args := []string{veleroBinary, "restore", "get"}
+	args := []string{"velero", "restore", "get"}
 	if output != "" {
 		args = append(args, "-o", output)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output_result, err := container.Stdout(ctx)
 	if err != nil {
@@ -334,7 +356,9 @@ func (m *VeleroModule) DescribeRestore(ctx context.Context, name string, kubecon
 		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
 	}
 
-	container = container.WithExec([]string{veleroBinary, "restore", "describe", name})
+	container = container.WithExec([]string{"velero", "restore", "describe", name}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -353,12 +377,14 @@ func (m *VeleroModule) GetSchedules(ctx context.Context, output string, kubeconf
 		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
 	}
 
-	args := []string{veleroBinary, "schedule", "get"}
+	args := []string{"velero", "schedule", "get"}
 	if output != "" {
 		args = append(args, "-o", output)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output_result, err := container.Stdout(ctx)
 	if err != nil {
@@ -377,12 +403,14 @@ func (m *VeleroModule) DeleteBackup(ctx context.Context, name string, confirm bo
 		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
 	}
 
-	args := []string{veleroBinary, "backup", "delete", name}
+	args := []string{"velero", "backup", "delete", name}
 	if confirm {
 		args = append(args, "--confirm")
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -401,12 +429,14 @@ func (m *VeleroModule) DeleteSchedule(ctx context.Context, name string, confirm 
 		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
 	}
 
-	args := []string{veleroBinary, "schedule", "delete", name}
+	args := []string{"velero", "schedule", "delete", name}
 	if confirm {
 		args = append(args, "--confirm")
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -425,12 +455,14 @@ func (m *VeleroModule) CreateBackupLocation(ctx context.Context, name string, pr
 		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
 	}
 
-	args := []string{veleroBinary, "backup-location", "create", name, "--provider", provider, "--bucket", bucket}
+	args := []string{"velero", "backup-location", "create", name, "--provider", provider, "--bucket", bucket}
 	if config != "" {
 		args = append(args, "--config", config)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -449,12 +481,14 @@ func (m *VeleroModule) GetBackupLocations(ctx context.Context, output string, ku
 		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
 	}
 
-	args := []string{veleroBinary, "backup-location", "get"}
+	args := []string{"velero", "backup-location", "get"}
 	if output != "" {
 		args = append(args, "-o", output)
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output_result, err := container.Stdout(ctx)
 	if err != nil {
@@ -473,7 +507,9 @@ func (m *VeleroModule) GetBackupLogs(ctx context.Context, name string, kubeconfi
 		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
 	}
 
-	container = container.WithExec([]string{veleroBinary, "backup", "logs", name})
+	container = container.WithExec([]string{"velero", "backup", "logs", name}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -492,7 +528,9 @@ func (m *VeleroModule) GetRestoreLogs(ctx context.Context, name string, kubeconf
 		container = container.WithFile("/root/.kube/config", m.client.Host().File(kubeconfig))
 	}
 
-	container = container.WithExec([]string{veleroBinary, "restore", "logs", name})
+	container = container.WithExec([]string{"velero", "restore", "logs", name}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

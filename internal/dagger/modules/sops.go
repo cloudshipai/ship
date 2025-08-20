@@ -46,7 +46,9 @@ func (m *SOPSModule) EncryptFile(ctx context.Context, filePath string, kmsArn st
 
 	args = append(args, "/workspace/input")
 
-	result := container.WithExec(args)
+	result := container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 	output, err := result.Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to encrypt file with SOPS: %w", err)
@@ -70,7 +72,9 @@ func (m *SOPSModule) DecryptFile(ctx context.Context, filePath string, outputFil
 
 	args = append(args, "/workspace/encrypted")
 
-	result := container.WithExec(args)
+	result := container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 	output, err := result.Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to decrypt file with SOPS: %w", err)
@@ -103,7 +107,9 @@ func (m *SOPSModule) UpdateKeys(ctx context.Context, filePath string, addKms str
 
 	args = append(args, "/workspace/encrypted")
 
-	result := container.WithExec(args)
+	result := container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 	output, err := result.Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to update keys with SOPS: %w", err)
@@ -123,7 +129,9 @@ func (m *SOPSModule) EditFile(ctx context.Context, filePath string) (string, err
 	// This command will show the decrypted content
 	args := []string{sopsBinary, "--decrypt", "/workspace/encrypted"}
 
-	result := container.WithExec(args)
+	result := container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 	output, err := result.Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to show file content with SOPS: %w", err)
@@ -137,7 +145,9 @@ func (m *SOPSModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("mozilla/sops:latest")
 
-	result := container.WithExec([]string{sopsBinary, "--version"})
+	result := container.WithExec([]string{sopsBinary, "--version"}, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 	output, err := result.Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get SOPS version: %w", err)
@@ -165,7 +175,9 @@ func (m *SOPSModule) PublishKeys(ctx context.Context, keyType string, keyPath st
 		args = []string{"gpg", "--import", "/workspace/keyfile", "&&", "gpg", "--list-keys"}
 	}
 
-	result := container.WithExec(args)
+	result := container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 	output, err := result.Stdout(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to publish keys: %w", err)

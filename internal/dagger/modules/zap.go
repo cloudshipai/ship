@@ -32,6 +32,8 @@ func (m *ZapModule) BaselineScan(ctx context.Context, target string) (string, er
 			"-t", target,
 			"-J", "/zap/wrk/baseline-report.json",
 			"-r", "/zap/wrk/baseline-report.html",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -52,6 +54,8 @@ func (m *ZapModule) FullScan(ctx context.Context, target string, maxDuration int
 			"-J", "/zap/wrk/full-report.json",
 			"-r", "/zap/wrk/full-report.html",
 			"-m", fmt.Sprintf("%d", maxDuration),
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -74,6 +78,8 @@ func (m *ZapModule) ApiScan(ctx context.Context, target string, apiSpecPath stri
 			"-d", "/zap/wrk/api-spec.json",
 			"-J", "/zap/wrk/api-report.json",
 			"-r", "/zap/wrk/api-report.html",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -95,6 +101,8 @@ func (m *ZapModule) ScanWithContext(ctx context.Context, target string, contextP
 			"-n", "/zap/wrk/context.context",
 			"-J", "/zap/wrk/context-report.json",
 			"-r", "/zap/wrk/context-report.html",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -129,7 +137,9 @@ func (m *ZapModule) SpiderScan(ctx context.Context, target string, maxDepth int,
 		args = append(args, "-r", "/zap/wrk/spider-report.html")
 	}
 
-	container = container.WithExec(args)
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -143,7 +153,9 @@ func (m *ZapModule) SpiderScan(ctx context.Context, target string, maxDepth int,
 func (m *ZapModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("ghcr.io/zaproxy/zaproxy:stable").
-		WithExec([]string{zapBinary, "-version"})
+		WithExec([]string{zapBinary, "-version"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

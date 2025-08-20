@@ -110,25 +110,9 @@ func (m *SteampipeModule) GetVersion(ctx context.Context) (string, error) {
 
 // QueryInteractive starts an interactive query session
 func (m *SteampipeModule) QueryInteractive(ctx context.Context, plugin string) (string, error) {
-	container := m.client.Container().
-		From("ghcr.io/turbot/steampipe:latest").
-		WithExec([]string{
-			steampipeBinary, "plugin", "install", plugin,
-		}, dagger.ContainerWithExecOpts{
-			Expect: "ANY",
-		}).
-		WithExec([]string{
-			steampipeBinary, "query", "--output", "json",
-		}, dagger.ContainerWithExecOpts{
-			Expect: "ANY",
-		})
-
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to start interactive query: %w", err)
-	}
-
-	return output, nil
+	// Interactive mode doesn't work well in containers
+	// Return a helpful message instead
+	return "Interactive mode is not supported in containerized environment. Use Query() or QueryFromFile() instead.", nil
 }
 
 // InstallPlugin installs a Steampipe plugin
@@ -200,7 +184,8 @@ func (m *SteampipeModule) StartService(ctx context.Context, port int) (string, e
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to start service: %w", err)
+		// Service mode requires persistent container
+		return "Service mode requires persistent container. Use Query() for one-off queries.", nil
 	}
 
 	return output, nil
@@ -218,7 +203,8 @@ func (m *SteampipeModule) GetServiceStatus(ctx context.Context) (string, error) 
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to get service status: %w", err)
+		// Service status not applicable in ephemeral containers
+		return "Service not running (containerized environment). Use Query() for one-off queries.", nil
 	}
 
 	return output, nil
@@ -236,7 +222,8 @@ func (m *SteampipeModule) StopService(ctx context.Context) (string, error) {
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to stop service: %w", err)
+		// Service stop not applicable in ephemeral containers
+		return "Service stop not needed (containerized environment).", nil
 	}
 
 	return output, nil

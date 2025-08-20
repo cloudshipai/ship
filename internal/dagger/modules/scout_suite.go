@@ -27,13 +27,17 @@ func NewScoutSuiteModule(client *dagger.Client) *ScoutSuiteModule {
 func (m *ScoutSuiteModule) ScanAWS(ctx context.Context, profile string) (string, error) {
 	container := m.client.Container().
 		From("python:3.11-slim").
-		WithExec([]string{"pip", "install", "scoutsuite"}).
+		WithExec([]string{"pip", "install", "scoutsuite"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
 		WithEnvVariable("AWS_PROFILE", profile).
 		WithExec([]string{
 			scoutSuiteBinary,
 			"aws",
 			"--report-dir", "/tmp/scout-report",
 			"--force",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -48,12 +52,16 @@ func (m *ScoutSuiteModule) ScanAWS(ctx context.Context, profile string) (string,
 func (m *ScoutSuiteModule) ScanAzure(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("python:3.11-slim").
-		WithExec([]string{"pip", "install", "scoutsuite"}).
+		WithExec([]string{"pip", "install", "scoutsuite"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
 		WithExec([]string{
 			scoutSuiteBinary,
 			"azure",
 			"--report-dir", "/tmp/scout-report",
 			"--force",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -68,7 +76,9 @@ func (m *ScoutSuiteModule) ScanAzure(ctx context.Context) (string, error) {
 func (m *ScoutSuiteModule) ScanGCP(ctx context.Context, projectID string) (string, error) {
 	container := m.client.Container().
 		From("python:3.11-slim").
-		WithExec([]string{"pip", "install", "scoutsuite"}).
+		WithExec([]string{"pip", "install", "scoutsuite"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
 		WithEnvVariable("GOOGLE_CLOUD_PROJECT", projectID).
 		WithExec([]string{
 			scoutSuiteBinary,
@@ -76,6 +86,8 @@ func (m *ScoutSuiteModule) ScanGCP(ctx context.Context, projectID string) (strin
 			"--project-id", projectID,
 			"--report-dir", "/tmp/scout-report",
 			"--force",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
 		})
 
 	output, err := container.Stdout(ctx)
@@ -90,8 +102,12 @@ func (m *ScoutSuiteModule) ScanGCP(ctx context.Context, projectID string) (strin
 func (m *ScoutSuiteModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("python:3.11-slim").
-		WithExec([]string{"pip", "install", "scoutsuite"}).
-		WithExec([]string{scoutSuiteBinary, "--version"})
+		WithExec([]string{"pip", "install", "scoutsuite"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
+		WithExec([]string{scoutSuiteBinary, "--version"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -117,8 +133,12 @@ func (m *ScoutSuiteModule) ServeReport(ctx context.Context, provider string, rep
 
 	container := m.client.Container().
 		From("python:3.11-slim").
-		WithExec([]string{"pip", "install", "scoutsuite"}).
-		WithExec(args)
+		WithExec([]string{"pip", "install", "scoutsuite"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
+		WithExec(args, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
@@ -138,8 +158,12 @@ func (m *ScoutSuiteModule) Help(ctx context.Context, provider string) (string, e
 
 	container := m.client.Container().
 		From("python:3.11-slim").
-		WithExec([]string{"pip", "install", "scoutsuite"}).
-		WithExec(args)
+		WithExec([]string{"pip", "install", "scoutsuite"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		}).
+		WithExec(args, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
 	output, err := container.Stdout(ctx)
 	if err != nil {

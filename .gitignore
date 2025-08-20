@@ -56,6 +56,11 @@ test-fresh/
 *FIX_STATUS*.md
 *DOCKER*.md
 *MCP*.md
+*POPULARITY*.md
+*SECURITY*.md
+
+# Quick test and fix files
+quick_test_fixes.go
 
 # Temporary test files and scripts (should be in scripts/ or test/ dirs)
 test-*

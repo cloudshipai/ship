@@ -30,6 +30,7 @@ var ToolRegistry = map[string][]ToolInfo{
 		{Name: "kube-hunter", Description: "Kubernetes penetration testing", AddFunc: AddKubeHunterTools, HasVariables: false},
 		{Name: "falco", Description: "Runtime security monitoring", AddFunc: AddFalcoTools, HasVariables: false},
 		{Name: "nikto", Description: "Web server security scanner", AddFunc: AddNiktoTools, HasVariables: false},
+		{Name: "nuclei", Description: "Fast vulnerability scanner with community templates", AddFunc: AddNucleiTools, HasVariables: false},
 		{Name: "zap", Description: "OWASP ZAP web application scanner", AddFunc: AddZapTools, HasVariables: false},
 		{Name: "git-secrets", Description: "Git repository secret scanner", AddFunc: AddGitSecretsTools, HasVariables: false},
 		{Name: "trufflehog", Description: "Advanced secret scanning with verification", AddFunc: AddTrufflehogTools, HasVariables: false},

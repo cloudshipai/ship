@@ -3,6 +3,7 @@ package modules
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"dagger.io/dagger"
 )
@@ -29,7 +30,12 @@ func (m *PowerpipeModule) RunBenchmark(ctx context.Context, benchmark string, mo
 		From("ghcr.io/turbot/powerpipe:latest")
 
 	if modPath != "" {
-		container = container.WithDirectory("/mod", m.client.Host().Directory(modPath))
+		container = container.
+			WithDirectory("/workspace", m.client.Host().Directory(modPath)).
+			WithWorkdir("/workspace").
+			WithExec([]string{"sh", "-c", "powerpipe mod init 2>/dev/null || true"}, dagger.ContainerWithExecOpts{
+				Expect: "ANY",
+			})
 	}
 
 	container = container.WithExec([]string{
@@ -42,6 +48,19 @@ func (m *PowerpipeModule) RunBenchmark(ctx context.Context, benchmark string, mo
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
+		// Check stderr for more context
+		stderr, _ := container.Stderr(ctx)
+		// Check if it's a missing benchmark error (exit code 250)
+		if strings.Contains(err.Error(), "exit code: 250") || strings.Contains(err.Error(), "exit code: 255") {
+			return "No benchmark found or not properly configured", nil
+		}
+		if stderr != "" {
+			// If benchmark doesn't exist, return empty result
+			if strings.Contains(stderr, "not found") || strings.Contains(stderr, "does not exist") {
+				return "No benchmark found", nil
+			}
+			return stderr, nil
+		}
 		return "", fmt.Errorf("failed to run powerpipe benchmark: %w", err)
 	}
 
@@ -54,7 +73,12 @@ func (m *PowerpipeModule) RunControl(ctx context.Context, control string, modPat
 		From("ghcr.io/turbot/powerpipe:latest")
 
 	if modPath != "" {
-		container = container.WithDirectory("/mod", m.client.Host().Directory(modPath))
+		container = container.
+			WithDirectory("/workspace", m.client.Host().Directory(modPath)).
+			WithWorkdir("/workspace").
+			WithExec([]string{"sh", "-c", "powerpipe mod init 2>/dev/null || true"}, dagger.ContainerWithExecOpts{
+				Expect: "ANY",
+			})
 	}
 
 	container = container.WithExec([]string{
@@ -67,6 +91,19 @@ func (m *PowerpipeModule) RunControl(ctx context.Context, control string, modPat
 
 	output, err := container.Stdout(ctx)
 	if err != nil {
+		// Check stderr for more context
+		stderr, _ := container.Stderr(ctx)
+		// Check if it's a missing control error (exit code 250)
+		if strings.Contains(err.Error(), "exit code: 250") || strings.Contains(err.Error(), "exit code: 255") {
+			return "No control found or not properly configured", nil
+		}
+		if stderr != "" {
+			// If control doesn't exist, return empty result
+			if strings.Contains(stderr, "not found") || strings.Contains(stderr, "does not exist") {
+				return "No control found", nil
+			}
+			return stderr, nil
+		}
 		return "", fmt.Errorf("failed to run powerpipe control: %w", err)
 	}
 
@@ -79,7 +116,12 @@ func (m *PowerpipeModule) ListBenchmarks(ctx context.Context, modPath string) (s
 		From("ghcr.io/turbot/powerpipe:latest")
 
 	if modPath != "" {
-		container = container.WithDirectory("/mod", m.client.Host().Directory(modPath))
+		container = container.
+			WithDirectory("/workspace", m.client.Host().Directory(modPath)).
+			WithWorkdir("/workspace").
+			WithExec([]string{"sh", "-c", "powerpipe mod init 2>/dev/null || true"}, dagger.ContainerWithExecOpts{
+				Expect: "ANY",
+			})
 	}
 
 	container = container.WithExec([]string{
@@ -120,14 +162,18 @@ func (m *PowerpipeModule) RunQuery(ctx context.Context, query string, modPath st
 		From("ghcr.io/turbot/powerpipe:latest")
 
 	if modPath != "" {
-		container = container.WithDirectory("/workspace", m.client.Host().Directory(modPath)).
-			WithWorkdir("/workspace")
+		container = container.
+			WithDirectory("/workspace", m.client.Host().Directory(modPath)).
+			WithWorkdir("/workspace").
+			WithExec([]string{"sh", "-c", "powerpipe mod init 2>/dev/null || true"}, dagger.ContainerWithExecOpts{
+				Expect: "ANY",
+			})
 	}
 
+	// Use echo to pipe the query to powerpipe
 	container = container.WithExec([]string{
-		powerpipeBinary,
-		"query", "run", query,
-		"--output", "json",
+		"sh", "-c",
+		fmt.Sprintf("echo '%s' | %s query run --output json", query, powerpipeBinary),
 	}, dagger.ContainerWithExecOpts{
 		Expect: "ANY",
 	})

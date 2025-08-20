@@ -12,11 +12,18 @@ import (
 
 // AddNucleiTools adds Nuclei vulnerability scanning tools to the MCP server
 func AddNucleiTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
+	// Ignore executeShipCommand - we use direct Dagger calls
+	addNucleiToolsDirect(s)
+}
+
+// addNucleiToolsDirect adds Nuclei tools using direct Dagger module calls
+func addNucleiToolsDirect(s *server.MCPServer) {
 	// Scan URL
 	scanURLTool := mcp.NewTool("nuclei_scan_url",
 		mcp.WithDescription("Scan a URL for vulnerabilities using Nuclei templates"),
 		mcp.WithString("url",
 			mcp.Description("Target URL to scan"),
+			mcp.Required(),
 		),
 		mcp.WithString("severity",
 			mcp.Description("Filter by severity (info, low, medium, high, critical)"),
@@ -25,6 +32,10 @@ func AddNucleiTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 	s.AddTool(scanURLTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		url := request.GetString("url", "")
 		severity := request.GetString("severity", "")
+
+		if url == "" {
+			return mcp.NewToolResultError("url is required"), nil
+		}
 
 		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
 		if err != nil {
@@ -35,7 +46,7 @@ func AddNucleiTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		module := modules.NewNucleiModule(client)
 		result, err := module.ScanURL(ctx, url, severity)
 		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("nuclei scan failed: %v", err)), nil
+			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
 
 		return mcp.NewToolResultText(result), nil
@@ -46,6 +57,7 @@ func AddNucleiTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		mcp.WithDescription("Scan using specific Nuclei template(s)"),
 		mcp.WithString("url",
 			mcp.Description("Target URL to scan"),
+			mcp.Required(),
 		),
 		mcp.WithString("template",
 			mcp.Description("Template path or name"),
@@ -54,6 +66,10 @@ func AddNucleiTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 	s.AddTool(scanWithTemplateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		url := request.GetString("url", "")
 		template := request.GetString("template", "")
+
+		if url == "" {
+			return mcp.NewToolResultError("url is required"), nil
+		}
 
 		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
 		if err != nil {
@@ -64,7 +80,7 @@ func AddNucleiTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		module := modules.NewNucleiModule(client)
 		result, err := module.ScanWithTemplate(ctx, url, template)
 		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("nuclei scan failed: %v", err)), nil
+			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
 
 		return mcp.NewToolResultText(result), nil
@@ -75,14 +91,23 @@ func AddNucleiTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		mcp.WithDescription("Scan using specific vulnerability tags"),
 		mcp.WithString("url",
 			mcp.Description("Target URL to scan"),
+			mcp.Required(),
 		),
 		mcp.WithString("tags",
-			mcp.Description("Comma-separated list of tags"),
+			mcp.Description("Comma-separated tags (e.g., cve,sqli,xss)"),
+			mcp.Required(),
 		),
 	)
 	s.AddTool(scanWithTagsTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		url := request.GetString("url", "")
 		tags := request.GetString("tags", "")
+
+		if url == "" {
+			return mcp.NewToolResultError("url is required"), nil
+		}
+		if tags == "" {
+			return mcp.NewToolResultError("tags is required"), nil
+		}
 
 		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
 		if err != nil {
@@ -93,7 +118,7 @@ func AddNucleiTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		module := modules.NewNucleiModule(client)
 		result, err := module.ScanWithTags(ctx, url, tags)
 		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("nuclei scan failed: %v", err)), nil
+			return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 		}
 
 		return mcp.NewToolResultText(result), nil
@@ -113,7 +138,7 @@ func AddNucleiTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		module := modules.NewNucleiModule(client)
 		result, err := module.UpdateTemplates(ctx)
 		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("nuclei update templates failed: %v", err)), nil
+			return mcp.NewToolResultError(fmt.Sprintf("update failed: %v", err)), nil
 		}
 
 		return mcp.NewToolResultText(result), nil
@@ -124,10 +149,15 @@ func AddNucleiTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		mcp.WithDescription("Validate a Nuclei template"),
 		mcp.WithString("template_path",
 			mcp.Description("Path to template file to validate"),
+			mcp.Required(),
 		),
 	)
 	s.AddTool(validateTemplateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		templatePath := request.GetString("template_path", "")
+
+		if templatePath == "" {
+			return mcp.NewToolResultError("template_path is required"), nil
+		}
 
 		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
 		if err != nil {
@@ -138,7 +168,7 @@ func AddNucleiTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		module := modules.NewNucleiModule(client)
 		result, err := module.ValidateTemplate(ctx, templatePath)
 		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("nuclei template validation failed: %v", err)), nil
+			return mcp.NewToolResultError(fmt.Sprintf("validation failed: %v", err)), nil
 		}
 
 		return mcp.NewToolResultText(result), nil
@@ -149,6 +179,7 @@ func AddNucleiTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		mcp.WithDescription("Generate a vulnerability scan report"),
 		mcp.WithString("url",
 			mcp.Description("Target URL to scan"),
+			mcp.Required(),
 		),
 		mcp.WithString("report_type",
 			mcp.Description("Report format (json, markdown, sarif)"),
@@ -156,9 +187,10 @@ func AddNucleiTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 	)
 	s.AddTool(generateReportTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		url := request.GetString("url", "")
-		reportType := request.GetString("report_type", "")
-		if reportType == "" {
-			reportType = "json"
+		reportType := request.GetString("report_type", "json")
+
+		if url == "" {
+			return mcp.NewToolResultError("url is required"), nil
 		}
 
 		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
@@ -170,7 +202,7 @@ func AddNucleiTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 		module := modules.NewNucleiModule(client)
 		result, err := module.GenerateReport(ctx, url, reportType)
 		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("nuclei report generation failed: %v", err)), nil
+			return mcp.NewToolResultError(fmt.Sprintf("report generation failed: %v", err)), nil
 		}
 
 		return mcp.NewToolResultText(result), nil

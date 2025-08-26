@@ -35,6 +35,8 @@ func init() {
 	mcpCmd.Flags().String("host", "localhost", "Host to bind to")
 	mcpCmd.Flags().Bool("stdio", true, "Use stdio transport (default)")
 	mcpCmd.Flags().StringToString("var", nil, "Environment variables for MCP servers and containers (e.g., --var API_KEY=value --var DEBUG=true)")
+	mcpCmd.Flags().StringToString("image-tag", nil, "Override container image tags for tools (e.g., --image-tag trivy=aquasec/trivy:0.50.0 --image-tag checkov=bridgecrew/checkov:3.2.0)")
+	mcpCmd.Flags().Bool("version", false, "Show version information for tools")
 }
 
 func runMCPServer(cmd *cobra.Command, args []string) error {
@@ -42,6 +44,13 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 	host, _ := cmd.Flags().GetString("host")
 	useStdio, _ := cmd.Flags().GetBool("stdio")
 	envVars, _ := cmd.Flags().GetStringToString("var")
+	imageTags, _ := cmd.Flags().GetStringToString("image-tag")
+	showVersion, _ := cmd.Flags().GetBool("version")
+
+	// Handle version requests
+	if showVersion {
+		return handleVersionRequest(args)
+	}
 
 	// Determine which tool to serve
 	toolName := "all"
@@ -59,6 +68,11 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 	// Set environment variables for containerized tools
 	if len(envVars) > 0 {
 		setContainerEnvironmentVars(envVars)
+	}
+
+	// Set image tag overrides as environment variables
+	if len(imageTags) > 0 {
+		setImageTagOverrides(imageTags)
 	}
 
 	// Add specific tools based on argument using the modular registry
@@ -252,6 +266,60 @@ func executeShipCommand(args []string) (*mcp.CallToolResult, error) {
 	}
 
 	return mcp.NewToolResultText(outputStr), nil
+}
+
+func handleVersionRequest(args []string) error {
+	toolName := "all"
+	if len(args) > 0 {
+		toolName = args[0]
+	}
+
+	fmt.Printf("Ship CLI Version Information for: %s\n", toolName)
+	fmt.Println("=====================================")
+
+	switch toolName {
+	case "all":
+		fmt.Println("Displaying version information for all available tools...")
+		// Get versions for key containerized tools
+		tools := []string{"checkov", "trivy", "tflint", "infracost", "terragrunt", "terraform", "ansible"}
+		for _, tool := range tools {
+			if output, err := getToolVersion(tool); err == nil {
+				fmt.Printf("\n%s:\n%s\n", strings.ToUpper(tool), strings.TrimSpace(output))
+			} else {
+				fmt.Printf("\n%s: Version information unavailable (%v)\n", strings.ToUpper(tool), err)
+			}
+		}
+	default:
+		// Get version for specific tool
+		if output, err := getToolVersion(toolName); err == nil {
+			fmt.Printf("\n%s:\n%s\n", strings.ToUpper(toolName), strings.TrimSpace(output))
+		} else {
+			return fmt.Errorf("failed to get version for %s: %v", toolName, err)
+		}
+	}
+
+	return nil
+}
+
+func getToolVersion(toolName string) (string, error) {
+	// Use the existing executeShipCommand to get version information
+	args := []string{toolName, "--version"}
+	result, err := executeShipCommand(args)
+	if err != nil {
+		return "", err
+	}
+
+	if result.IsError {
+		return "", fmt.Errorf("error getting version for %s", toolName)
+	}
+
+	if result != nil && len(result.Content) > 0 {
+		if textContent, ok := result.Content[0].(mcp.TextContent); ok {
+			return textContent.Text, nil
+		}
+	}
+
+	return "", fmt.Errorf("no version information available")
 }
 
 func needsChunking(text string) bool {
@@ -473,6 +541,16 @@ func validateAndMergeVariables(config *ship.MCPServerConfig, userVars map[string
 func setContainerEnvironmentVars(envVars map[string]string) {
 	for key, value := range envVars {
 		os.Setenv(key, value)
+	}
+}
+
+// setImageTagOverrides sets environment variables for container image tag overrides
+func setImageTagOverrides(imageTags map[string]string) {
+	for toolName, imageTag := range imageTags {
+		// Convert tool name to uppercase and set as environment variable
+		// Format: SHIP_IMAGE_TAG_<TOOLNAME>=<image:tag>
+		envKey := fmt.Sprintf("SHIP_IMAGE_TAG_%s", strings.ToUpper(toolName))
+		os.Setenv(envKey, imageTag)
 	}
 }
 

@@ -28,7 +28,7 @@ func NewCheckovModule(client *dagger.Client) *CheckovModule {
 // ScanDirectory scans a directory for security issues
 func (m *CheckovModule) ScanDirectory(ctx context.Context, dir string) (string, error) {
 	container := m.client.Container().
-		From("bridgecrew/checkov:latest").
+		From(getImageTag("checkov", "bridgecrew/checkov:latest")).
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
@@ -59,7 +59,7 @@ func (m *CheckovModule) ScanFile(ctx context.Context, filePath string) (string, 
 	filename := filepath.Base(filePath)
 
 	container := m.client.Container().
-		From("bridgecrew/checkov:latest").
+		From(getImageTag("checkov", "bridgecrew/checkov:latest")).
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec([]string{
@@ -87,7 +87,7 @@ func (m *CheckovModule) ScanFile(ctx context.Context, filePath string) (string, 
 // ScanWithPolicy scans using custom policies
 func (m *CheckovModule) ScanWithPolicy(ctx context.Context, dir string, policyPath string) (string, error) {
 	container := m.client.Container().
-		From("bridgecrew/checkov:latest").
+		From(getImageTag("checkov", "bridgecrew/checkov:latest")).
 		WithDirectory("/workspace", m.client.Host().Directory(dir))
 
 	args := []string{
@@ -127,7 +127,7 @@ func (m *CheckovModule) ScanMultiFramework(ctx context.Context, dir string, fram
 	}
 
 	container := m.client.Container().
-		From("bridgecrew/checkov:latest").
+		From(getImageTag("checkov", "bridgecrew/checkov:latest")).
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec(args)
@@ -157,7 +157,7 @@ func (m *CheckovModule) ScanWithSeverity(ctx context.Context, dir string, severi
 	}
 
 	container := m.client.Container().
-		From("bridgecrew/checkov:latest").
+		From(getImageTag("checkov", "bridgecrew/checkov:latest")).
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec(args)
@@ -185,7 +185,7 @@ func (m *CheckovModule) ScanWithSkips(ctx context.Context, dir string, skipCheck
 	}
 
 	container := m.client.Container().
-		From("bridgecrew/checkov:latest").
+		From(getImageTag("checkov", "bridgecrew/checkov:latest")).
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec(args)
@@ -209,7 +209,7 @@ func (m *CheckovModule) ScanDockerImage(ctx context.Context, dockerImage string,
 	}
 
 	container := m.client.Container().
-		From("bridgecrew/checkov:latest")
+		From(getImageTag("checkov", "bridgecrew/checkov:latest"))
 
 	if dockerfilePath != "" {
 		container = container.WithFile("/workspace/Dockerfile", m.client.Host().File(dockerfilePath))
@@ -233,7 +233,7 @@ func (m *CheckovModule) ScanPackages(ctx context.Context, dir string, output str
 	}
 
 	container := m.client.Container().
-		From("bridgecrew/checkov:latest").
+		From(getImageTag("checkov", "bridgecrew/checkov:latest")).
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec(args, dagger.ContainerWithExecOpts{Expect: "ANY"})
@@ -254,7 +254,7 @@ func (m *CheckovModule) ScanSecrets(ctx context.Context, dir string, output stri
 	}
 
 	container := m.client.Container().
-		From("bridgecrew/checkov:latest").
+		From(getImageTag("checkov", "bridgecrew/checkov:latest")).
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec(args, dagger.ContainerWithExecOpts{Expect: "ANY"})
@@ -270,7 +270,7 @@ func (m *CheckovModule) ScanSecrets(ctx context.Context, dir string, output stri
 // ScanWithConfig scans using configuration file
 func (m *CheckovModule) ScanWithConfig(ctx context.Context, dir string, configFile string) (string, error) {
 	container := m.client.Container().
-		From("bridgecrew/checkov:latest").
+		From(getImageTag("checkov", "bridgecrew/checkov:latest")).
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithFile("/workspace/config.yml", m.client.Host().File(configFile)).
 		WithWorkdir("/workspace").
@@ -287,7 +287,7 @@ func (m *CheckovModule) ScanWithConfig(ctx context.Context, dir string, configFi
 // CreateConfig generates configuration file from current settings
 func (m *CheckovModule) CreateConfig(ctx context.Context, configPath string) (string, error) {
 	container := m.client.Container().
-		From("bridgecrew/checkov:latest").
+		From(getImageTag("checkov", "bridgecrew/checkov:latest")).
 		WithExec([]string{checkovBinary, "--create-config", "/workspace/config.yml"})
 
 	output, err := container.Stdout(ctx)
@@ -306,7 +306,7 @@ func (m *CheckovModule) ScanWithExternalModules(ctx context.Context, dir string,
 	}
 
 	container := m.client.Container().
-		From("bridgecrew/checkov:latest").
+		From(getImageTag("checkov", "bridgecrew/checkov:latest")).
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec(args, dagger.ContainerWithExecOpts{Expect: "ANY"})
@@ -322,7 +322,7 @@ func (m *CheckovModule) ScanWithExternalModules(ctx context.Context, dir string,
 // GetVersion returns the version of Checkov
 func (m *CheckovModule) GetVersion(ctx context.Context) (string, error) {
 	container := m.client.Container().
-		From("bridgecrew/checkov:latest").
+		From(getImageTag("checkov", "bridgecrew/checkov:latest")).
 		WithExec([]string{checkovBinary, "--version"})
 
 	output, err := container.Stdout(ctx)
@@ -353,7 +353,7 @@ func (m *CheckovModule) ScanDirectoryWithOptions(ctx context.Context, dir string
 	}
 
 	container := m.client.Container().
-		From("bridgecrew/checkov:latest").
+		From(getImageTag("checkov", "bridgecrew/checkov:latest")).
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec(args, dagger.ContainerWithExecOpts{Expect: "ANY"})
@@ -380,7 +380,7 @@ func (m *CheckovModule) ScanFileWithOptions(ctx context.Context, filePath string
 	}
 
 	container := m.client.Container().
-		From("bridgecrew/checkov:latest").
+		From(getImageTag("checkov", "bridgecrew/checkov:latest")).
 		WithFile("/workspace/input", m.client.Host().File(filePath)).
 		WithWorkdir("/workspace").
 		WithExec(args, dagger.ContainerWithExecOpts{Expect: "ANY"})
@@ -406,7 +406,7 @@ func (m *CheckovModule) ScanWithSpecificChecks(ctx context.Context, dir string, 
 	args = append(args, "--output", "json")
 
 	container := m.client.Container().
-		From("bridgecrew/checkov:latest").
+		From(getImageTag("checkov", "bridgecrew/checkov:latest")).
 		WithDirectory("/workspace", m.client.Host().Directory(dir)).
 		WithWorkdir("/workspace").
 		WithExec(args, dagger.ContainerWithExecOpts{Expect: "ANY"})

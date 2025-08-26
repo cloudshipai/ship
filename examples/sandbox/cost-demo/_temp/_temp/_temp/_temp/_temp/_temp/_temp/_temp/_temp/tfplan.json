@@ -1,0 +1,21 @@
+{
+  "format_version": "1.0",
+  "terraform_version": "1.0.0",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "aws_instance.test",
+          "mode": "managed",
+          "type": "aws_instance",
+          "name": "test",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "values": {
+            "instance_type": "t2.micro",
+            "ami": "ami-12345678"
+          }
+        }
+      ]
+    }
+  }
+}

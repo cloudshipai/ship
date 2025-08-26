@@ -7,7 +7,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 CloudshipAI CLI ("ship") - A fully functional command-line tool that enables both non-technical users and power users to:
 - Run comprehensive Terraform analysis tools in containerized environments
 - Generate infrastructure documentation and diagrams  
-- Push artifacts (terraform plans, SBOMs, etc.) to Cloudship for analysis
 - Host an MCP server for LLM integrations
 
 The project is production-ready with a complete architecture using:
@@ -78,13 +77,9 @@ ship/
 ├── internal/
 │   ├── cli/                   # Cobra command implementations
 │   │   ├── root.go           # Root command and logger setup
-│   │   ├── auth.go           # Authentication commands
-│   │   ├── push.go           # Artifact upload commands
 │   │   ├── mcp_cmd.go        # MCP server command
-│   │   └── terraform_tools_cmd.go  # Terraform analysis tools
-│   ├── auth/                  # Authentication logic
+│   │   └── modules_cmd.go    # Dagger module management
 │   ├── config/                # Configuration management (~/.ship/config.yaml)
-│   ├── cloudship/             # CloudShip API client
 │   ├── dagger/                # Dagger engine and modules
 │   │   └── modules/           # Individual tool implementations
 │   │       ├── tflint.go     # TFLint integration
@@ -123,25 +118,19 @@ The CLI uses a **containerized execution model** via Dagger:
 The CLI provides comprehensive Terraform analysis through these tools:
 
 ### Core Commands
-- **`ship auth`** - Manage CloudShip API authentication
-- **`ship push`** - Upload artifacts to CloudShip for analysis
 - **`ship mcp`** - Start MCP server for AI assistant integration
 - **`ship modules`** - Manage and discover external Dagger modules
-- **`ship terraform-tools`** - Run containerized Terraform analysis tools
 
-### Terraform Tools (via Dagger containers)
-- **`lint`** - TFLint for syntax and best practices
-- **`checkov-scan`** - Security and compliance scanning with Checkov
-- **`security-scan`** - Alternative security scanning with Trivy
-- **`cost-estimate`** - Cost estimation with Infracost
-- **`cost-analysis`** - Alternative cost analysis with OpenInfraQuote
-- **`generate-docs`** - Documentation generation with terraform-docs
-- **`generate-diagram`** - Infrastructure diagrams with InfraMap
-
-All terraform-tools commands support:
-- `--push` flag for automatic CloudShip upload
-- Output redirection and format options
-- Directory specification for multi-module projects
+### MCP Tools (via Dagger containers)
+The CLI now exclusively operates through MCP tools, providing comprehensive security and infrastructure analysis capabilities including:
+- **TFLint** - Terraform syntax and best practices checking
+- **Checkov** - Security and compliance scanning
+- **Trivy** - Container and filesystem vulnerability scanning
+- **TFSec** - Terraform security scanning
+- **OpenInfraQuote** - Cloud cost analysis
+- **Terraform-docs** - Documentation generation
+- **InfraMap** - Infrastructure diagram generation
+- **And 100+ additional security and infrastructure tools**
 
 ## Development Context
 

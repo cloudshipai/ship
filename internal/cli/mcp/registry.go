@@ -63,7 +63,6 @@ var ToolRegistry = map[string][]ToolInfo{
 	"terraform": {
 		{Name: "tflint", Description: "Terraform linter", AddFunc: AddTfLintTools, HasVariables: false},
 		{Name: "terraform-docs", Description: "Terraform documentation generator", AddFunc: AddTerraformDocsTools, HasVariables: false},
-		{Name: "infracost", Description: "Infrastructure cost estimation", AddFunc: AddInfracostTools, HasVariables: true},
 		{Name: "inframap", Description: "Infrastructure visualization", AddFunc: AddInfraMapTools, HasVariables: false},
 		{Name: "iac-plan", Description: "Infrastructure as code planning", AddFunc: AddIacPlanTools, HasVariables: false},
 		{Name: "terraformer", Description: "Infrastructure import and management", AddFunc: AddTerraformerTools, HasVariables: true},

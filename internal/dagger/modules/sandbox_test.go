@@ -61,7 +61,7 @@ func testVulnerableAppSandbox(t *testing.T, ctx context.Context, client *dagger.
 		}
 
 		// Test JSON output format
-		jsonResult, err := checkov.ScanDirectoryWithFormat(ctx, sandboxDir, "json")
+		jsonResult, err := checkov.ScanDirectoryWithOptions(ctx, sandboxDir, "terraform", "json", false, false)
 		if err != nil {
 			t.Fatalf("Checkov JSON scan failed: %v", err)
 		}
@@ -122,7 +122,7 @@ func testContainerAppSandbox(t *testing.T, ctx context.Context, client *dagger.C
 		syft := &SyftModule{client: client}
 		
 		// Generate SBOM for directory
-		result, err := syft.GenerateSBOMDirectory(ctx, sandboxDir, "cyclonedx-json")
+		result, err := syft.GenerateSBOMFromDirectory(ctx, sandboxDir, "cyclonedx-json")
 		if err != nil {
 			t.Fatalf("Syft SBOM generation failed: %v", err)
 		}
@@ -180,8 +180,8 @@ func testTerraformQualitySandbox(t *testing.T, ctx context.Context, client *dagg
 			t.Errorf("Expected TFLint to find issues in quality sandbox, got: %s", result)
 		}
 
-		// Test JSON output format
-		jsonResult, err := tflint.LintDirectoryWithFormat(ctx, sandboxDir, "json")
+		// Test JSON output format - using LintDirectory which outputs JSON by default
+		jsonResult, err := tflint.LintDirectory(ctx, sandboxDir)
 		if err != nil {
 			t.Fatalf("TFLint JSON analysis failed: %v", err)
 		}
@@ -291,7 +291,7 @@ func BenchmarkSandboxTools(b *testing.B) {
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			_, err := syft.GenerateSBOMDirectory(ctx, sandboxDir, "cyclonedx-json")
+			_, err := syft.GenerateSBOMFromDirectory(ctx, sandboxDir, "cyclonedx-json")
 			if err != nil {
 				b.Fatalf("Syft SBOM generation failed: %v", err)
 			}

@@ -135,7 +135,6 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 		{"cloudquery", "Cloud asset inventory", "cloud", "cloudquery/cloudquery:latest"},
 		{"custodian", "Cloud governance engine", "cloud", "cloudcustodian/c7n:latest"},
 		{"terraformer", "Infrastructure import and management", "cloud", "quay.io/weaveworks/terraformer:latest"},
-		{"infracost", "Infrastructure cost estimation", "cloud", "infracost/infracost:latest"},
 		{"inframap", "Infrastructure visualization", "cloud", "cycloidio/inframap:latest"},
 		{"infrascan", "Infrastructure security scanning", "cloud", "bridgecrewio/checkov:latest"},
 		{"aws-iam-rotation", "AWS IAM credential rotation", "cloud", "amazon/aws-cli:latest"},

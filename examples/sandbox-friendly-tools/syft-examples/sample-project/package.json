@@ -1,0 +1,31 @@
+{
+  "name": "sample-project",
+  "version": "1.0.0",
+  "description": "Sample Node.js project for SBOM generation testing",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "express": "^4.18.0",
+    "lodash": "^4.17.20",
+    "axios": "^0.27.2",
+    "jsonwebtoken": "^8.5.1",
+    "bcrypt": "^5.0.1",
+    "mysql2": "^2.3.3",
+    "dotenv": "^16.0.0"
+  },
+  "devDependencies": {
+    "jest": "^28.1.0",
+    "nodemon": "^2.0.15",
+    "eslint": "^8.15.0"
+  },
+  "keywords": [
+    "sample",
+    "sbom",
+    "nodejs"
+  ],
+  "author": "Test Author",
+  "license": "MIT"
+}

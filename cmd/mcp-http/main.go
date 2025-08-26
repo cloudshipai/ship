@@ -51,7 +51,7 @@ func main() {
 		tools := map[string]interface{}{
 			"categories": map[string][]string{
 				"security":     {"gitleaks", "trivy", "grype", "syft", "checkov", "terrascan", "semgrep"},
-				"terraform":    {"tflint", "terraform-docs", "infracost", "inframap", "iac-plan"},
+				"terraform":    {"tflint", "terraform-docs", "inframap", "iac-plan"},
 				"kubernetes":   {"kube-bench", "kube-hunter", "falco", "kubescape"},
 				"aws":          {"cloudsplaining", "parliament", "pmapper", "policy-sentry", "prowler"},
 				"supply-chain": {"cosign", "guac", "rekor", "in-toto", "slsa-verifier"},

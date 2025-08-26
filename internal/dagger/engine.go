@@ -100,10 +100,6 @@ func (e *Engine) NewCheckovModule() *modules.CheckovModule {
 	return modules.NewCheckovModule(e.client)
 }
 
-// NewInfracostModule creates a new Infracost module
-func (e *Engine) NewInfracostModule() *modules.InfracostModule {
-	return modules.NewInfracostModule(e.client)
-}
 
 // NewLLMModule has been removed - use the new Eino agent system instead
 // See internal/agent package for the new AI-powered investigation capabilities

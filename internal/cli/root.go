@@ -31,7 +31,7 @@ Key capabilities:
 - Terraform linting, security scanning, and cost analysis with TFLint, Checkov, and Trivy
 - Infrastructure diagram generation from HCL files or state with InfraMap
 - Documentation generation for Terraform modules with terraform-docs
-- Cost analysis with OpenInfraQuote and Infracost
+- Cost analysis with OpenInfraQuote
 - Containerized tool execution with Dagger for consistency
 - MCP server for Claude Code, Cursor, and other AI assistants`,
 	SilenceUsage: true,

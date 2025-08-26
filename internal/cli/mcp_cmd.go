@@ -281,7 +281,7 @@ func handleVersionRequest(args []string) error {
 	case "all":
 		fmt.Println("Displaying version information for all available tools...")
 		// Get versions for key containerized tools
-		tools := []string{"checkov", "trivy", "tflint", "infracost", "terragrunt", "terraform", "ansible"}
+		tools := []string{"checkov", "trivy", "tflint", "terragrunt", "terraform", "ansible"}
 		for _, tool := range tools {
 			if output, err := getToolVersion(tool); err == nil {
 				fmt.Printf("\n%s:\n%s\n", strings.ToUpper(tool), strings.TrimSpace(output))

@@ -324,4 +324,113 @@ func TerraformRegistry() ship.Registry {
 - Never log sensitive information
 - Use Dagger secrets for credentials
 
+## AI Development Tools
+
+### OpenCode
+
+**Name:** `opencode`  
+**Description:** OpenCode AI coding assistant with comprehensive development capabilities  
+**Image:** `node:18` with `opencode-ai` npm package
+
+**Features:**
+- Interactive chat for coding questions and guidance
+- Code generation based on natural language prompts
+- File analysis and code review capabilities
+- Refactoring assistance with natural language instructions
+- Test generation and execution
+- Documentation generation in multiple formats
+
+**Environment Variables:**
+- `OPENAI_API_KEY`: OpenAI API key for GPT models
+- `ANTHROPIC_API_KEY`: Anthropic API key for Claude models
+- `CLAUDE_API_KEY`: Alternative Claude API key
+- `GEMINI_API_KEY`: Google Gemini API key
+- `GROQ_API_KEY`: Groq API key for fast inference
+- `OPENROUTER_API_KEY`: OpenRouter API key for model access
+
+**CLI Usage:**
+```bash
+# Basic chat
+ship opencode chat "explain this code structure"
+
+# With specific model
+ship opencode chat "generate a REST API" --model "openai/gpt-4o-mini"
+
+# Generate code with output file
+ship opencode generate "create user model" --output models/user.go
+
+# Analyze specific file
+ship opencode analyze main.go "explain the main function"
+
+# Session continuation
+ship opencode chat "My name is John" --continue
+```
+
+**Available Models:**
+- `openai/gpt-4o-mini` (recommended for speed)
+- `openai/gpt-4o` (for complex tasks)
+- `anthropic/claude-3-sonnet` (for detailed analysis)
+- `anthropic/claude-3-haiku` (for quick responses)
+- `google/gemini-pro`
+- `groq/llama-70b`
+
+**Session Support:**
+- Use `--continue` flag to resume last session
+- Use `--session "session-id"` for named sessions (limited functionality)
+- Sessions stored in `~/.local/share/opencode/` (mounted in container)
+
+**File Persistence:**
+- By default, files created/modified are exported to host
+- Use `--ephemeral` flag for temporary operations only
+
+## External MCP Servers
+
+### Grafana
+
+**Name:** `grafana`  
+**Description:** Grafana monitoring and visualization platform integration  
+**Type:** External MCP Server via Docker  
+**Image:** `mcp/grafana:latest`
+
+**Available Tools (41 discovered):**
+- **Query Tools**: `grafana_query_prometheus`, `grafana_query_loki_logs`
+- **Dashboard Management**: `grafana_search_dashboards`, `grafana_get_dashboard_by_uid`, `grafana_update_dashboard`
+- **Alert Management**: `grafana_list_alert_rules`, `grafana_get_alert_rule_by_uid`
+- **Data Sources**: `grafana_list_datasources`, `grafana_get_datasource_by_name`
+- **OnCall Integration**: `grafana_list_oncall_teams`, `grafana_get_current_oncall_users`
+- **Incident Management**: `grafana_create_incident`, `grafana_list_incidents`
+- **Monitoring**: `grafana_find_error_pattern_logs`, `grafana_find_slow_requests`
+
+**Required Variables:**
+- `GRAFANA_URL`: Grafana server URL (e.g., `http://localhost:3000` or `https://myinstance.grafana.net`)
+
+**Optional Authentication (choose one):**
+- `GRAFANA_API_KEY`: Service account token (recommended)
+- `GRAFANA_USERNAME` + `GRAFANA_PASSWORD`: Basic authentication
+
+**Usage:**
+```bash
+# With API key (recommended)
+ship mcp grafana \
+  --var GRAFANA_URL=http://localhost:3000 \
+  --var GRAFANA_API_KEY=glsa_xyz123
+
+# With username/password
+ship mcp grafana \
+  --var GRAFANA_URL=http://localhost:3000 \
+  --var GRAFANA_USERNAME=admin \
+  --var GRAFANA_PASSWORD=admin
+
+# For Grafana Cloud
+ship mcp grafana \
+  --var GRAFANA_URL=https://myinstance.grafana.net \
+  --var GRAFANA_API_KEY=glsa_cloud_token
+```
+
+**Tool Examples:**
+- Query metrics: `grafana_query_prometheus`
+- Search dashboards: `grafana_search_dashboards`
+- List alerts: `grafana_list_alert_rules`
+- Get OnCall users: `grafana_get_current_oncall_users`
+
 This reference will be updated as new Ship tools are added to the collection.

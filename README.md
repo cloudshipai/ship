@@ -25,6 +25,8 @@ Ship is primarily an MCP (Model Context Protocol) framework for building AI assi
 - **💰 Cost Estimation**: OpenInfraQuote and Infracost for infrastructure cost analysis
 - **📝 Documentation Generation**: terraform-docs for beautiful module documentation
 - **📊 Infrastructure Diagrams**: InfraMap for visualizing infrastructure
+- **🤖 AI Development**: OpenCode AI coding assistant with chat, generation, and analysis
+- **📈 Monitoring**: Grafana integration for dashboards, alerts, and metrics analysis
 - **🐳 Containerized Execution**: All tools run via Dagger - no local installations needed
 - **☁️ Multi-Cloud Support**: Works with AWS, Azure, GCP, and other cloud providers
 
@@ -335,6 +337,11 @@ ship mcp all                # All Ship tools
 ship mcp lint               # Just TFLint
 ship mcp filesystem         # External filesystem MCP server
 ship mcp brave-search --var BRAVE_API_KEY=your_api_key  # External search with API key
+ship mcp grafana --var GRAFANA_URL=http://localhost:3000 --var GRAFANA_API_KEY=glsa_xyz  # Grafana monitoring
+
+# AI Development Tools
+ship opencode chat "explain this terraform module" --model "openai/gpt-4o-mini"
+ship opencode generate "create a kubernetes deployment" --output k8s/deployment.yaml
 ```
 
 ## 🛠️ Available Infrastructure Tools
@@ -349,6 +356,7 @@ ship mcp brave-search --var BRAVE_API_KEY=your_api_key  # External search with A
 | **OpenInfraQuote** | `tools.NewCostTool()` | Cost analysis for infrastructure | `cloudshipai/openinfraquote` |
 | **terraform-docs** | `tools.NewDocsTool()` | Documentation generation | `quay.io/terraform-docs/terraform-docs` |
 | **InfraMap** | `tools.NewDiagramTool()` | Infrastructure diagrams | `cycloidio/inframap` |
+| **OpenCode** | `ship opencode chat` | AI coding assistant with chat, generation, analysis | `node:18` + `opencode-ai` |
 
 ### External MCP Servers
 
@@ -359,6 +367,7 @@ Ship can proxy external MCP servers, discovering their tools dynamically:
 | **filesystem** | File and directory operations | `FILESYSTEM_ROOT` (optional) | `ship mcp filesystem --var FILESYSTEM_ROOT=/custom/path` |
 | **memory** | Persistent knowledge storage | `MEMORY_STORAGE_PATH`, `MEMORY_MAX_SIZE` (optional) | `ship mcp memory --var MEMORY_STORAGE_PATH=/data` |
 | **brave-search** | Web search capabilities | `BRAVE_API_KEY` (required), `BRAVE_SEARCH_COUNT` (optional) | `ship mcp brave-search --var BRAVE_API_KEY=your_key` |
+| **grafana** | Grafana monitoring and visualization | `GRAFANA_URL` (required), `GRAFANA_API_KEY` (optional), `GRAFANA_USERNAME`/`GRAFANA_PASSWORD` (optional) | `ship mcp grafana --var GRAFANA_URL=http://localhost:3000 --var GRAFANA_API_KEY=glsa_xyz` |
 
 > **Note**: External MCP servers are automatically installed via npm when needed. Tools are discovered dynamically at runtime.
 
@@ -399,6 +408,13 @@ ship mcp memory --var MEMORY_STORAGE_PATH=/data --var MEMORY_MAX_SIZE=100MB
 # Brave search (API key required)
 ship mcp brave-search --var BRAVE_API_KEY=your_key --var BRAVE_SEARCH_COUNT=20
 
+# Grafana monitoring (URL required, auth optional)
+ship mcp grafana --var GRAFANA_URL=http://localhost:3000 --var GRAFANA_API_KEY=glsa_xyz
+
+# OpenCode AI assistant (AI provider API keys via environment)
+ship opencode chat "analyze this code" --model "openai/gpt-4o-mini"
+export OPENAI_API_KEY=sk-...  # Set before running OpenCode
+
 # Containerized tools (any environment variable)
 ship mcp all --var AWS_PROFILE=production --var AWS_REGION=us-west-2
 ```
@@ -412,6 +428,7 @@ Use `ship modules info <tool-name>` to see available variables:
 ship modules info filesystem
 ship modules info memory
 ship modules info brave-search
+ship modules info grafana
 
 # See information about built-in tools
 ship modules info lint

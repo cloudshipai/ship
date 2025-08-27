@@ -11,12 +11,13 @@ The Ship Framework public API (`github.com/cloudshipai/ship/pkg/ship`) provides:
 - **Tool Interface**: For creating custom containerized tools
 - **Registry System**: For managing tools, prompts, and resources
 - **Dagger Integration**: For containerized tool execution
+- **MCPAdapter**: Integrate Ship tools into existing mcp-go servers
 
 ## Example Projects
 
 1. **basic-custom-server**: Simple MCP server with custom tools
-2. **container-tools**: Examples of containerized tool integration
-3. **terraform-proxy**: How to proxy existing Ship tools (advanced)
+2. **container-tools**: Examples of containerized tool integration  
+3. **bring-your-own-mcp**: Add Ship tools to your existing mcp-go server
 
 ## Quick Start
 

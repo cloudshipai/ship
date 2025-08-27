@@ -109,6 +109,7 @@ server.ServeStdio()
 📁 **Working Examples**: Complete examples in [`examples/ship-framework/`](examples/ship-framework/) show:
 - **basic-custom-server**: Simple tools with parameter handling
 - **container-tools**: Containerized tools (Terraform, Docker, YAML validation)
+- **bring-your-own-mcp**: Add Ship tools to existing mcp-go servers
 
 #### Framework Architecture
 
@@ -118,6 +119,7 @@ The Ship Framework provides these key components:
 **2. Tool Interface** - For implementing containerized tools  
 **3. Registry System** - Managing tools, prompts, and resources
 **4. Dagger Integration** - Secure container execution
+**5. MCPAdapter** - Integrate Ship tools into existing mcp-go servers
 
 **For Pre-built DevOps Tools** - Use the Ship CLI directly:
 ```bash

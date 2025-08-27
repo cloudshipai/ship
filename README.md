@@ -505,6 +505,55 @@ Ship MCP Framework is built on:
 - **Security**: Tools run in sandboxed containers
 - **Simplicity**: No need to install or manage tool versions
 
+## 🛠️ Available Tools Reference
+
+Ship provides **63 essential DevOps tools** across security, infrastructure, cloud, and development workflows. All tools run in isolated containers via Dagger.
+
+### Quick Reference by Workflow
+
+| Workflow | Primary Tools | Supporting Tools |
+|----------|---------------|------------------|
+| **Terraform Development** | `tflint`, `terraform-docs`, `checkov`, `tfsec` | `inframap`, `terrascan`, `openinfraquote` |
+| **Container Security** | `trivy`, `grype`, `syft` | `dockle`, `cosign`, `hadolint` |
+| **Secret Management** | `trufflehog`, `gitleaks`, `git-secrets` | `sops` |
+| **Kubernetes Operations** | `kubescape`, `kube-bench`, `velero` | `falco`, `kyverno`, `goldilocks` |
+| **Cloud Security** | `prowler`, `scout-suite`, `steampipe` | `cloudquery`, `custodian` |
+| **Web Application Testing** | `nuclei`, `zap`, `nikto` | `nmap` |
+| **Development & CI/CD** | `semgrep`, `actionlint`, `gitleaks` | `hadolint`, `conftest` |
+
+### Tool Categories Summary
+
+| Category | Count | Key Tools | Purpose |
+|----------|-------|-----------|---------|
+| **Terraform** | 7 | `tflint`, `terraform-docs`, `checkov` | IaC development & security |
+| **Security** | 41 | `trivy`, `trufflehog`, `kubescape` | Vulnerability & secret scanning |
+| **Cloud** | 11 | `prowler`, `terraformer`, `packer` | Cloud infrastructure & governance |
+| **Supply Chain** | 3 | `cosign`, `syft`, `dependency-track` | Supply chain security |
+| **AWS** | 4 | `cloudsplaining`, `prowler`, `parliament` | AWS security & IAM |
+| **Development** | 1 | `opencode` | AI-powered development |
+| **External MCPs** | 16 | `postgresql`, `playwright`, `bitbucket` | Third-party integrations |
+
+### Usage Examples
+
+```bash
+# Terraform workflow
+ship mcp terraform  # All Terraform tools (tflint, terraform-docs, checkov, etc.)
+
+# Container security pipeline  
+ship mcp security   # All security tools (trivy, grype, syft, etc.)
+
+# Kubernetes operations
+ship mcp kubernetes # All K8s tools (kubescape, velero, goldilocks, etc.)
+
+# Cloud security assessment
+ship mcp cloud      # All cloud tools (prowler, scout-suite, etc.)
+
+# Full DevOps toolkit
+ship mcp all        # All 63 tools across all categories
+```
+
+📋 **Complete Tools Reference**: See [docs/tools-reference-table.md](docs/tools-reference-table.md) for detailed tool descriptions and usage guidance.
+
 ## 🤝 Contributing
 
 We welcome contributions! See our [Contributing Guide](CONTRIBUTING.md) for details.

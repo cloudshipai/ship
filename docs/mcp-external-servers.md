@@ -49,6 +49,52 @@ Ship comes with pre-configured external MCP servers:
   - `GRAFANA_USERNAME` (optional): Username for basic auth (alternative to API key)
   - `GRAFANA_PASSWORD` (optional): Password for basic auth (alternative to API key)
 
+### Development & CI/CD Integration
+
+#### Bitbucket Server
+- **Name**: `bitbucket`
+- **Description**: Atlassian Bitbucket Cloud integration for repository management and CI/CD
+- **Tools**: Repository operations, pull request management, pipeline control
+- **Variables**:
+  - `BITBUCKET_USERNAME` (required): Atlassian Bitbucket username
+  - `BITBUCKET_APP_PASSWORD` (required): Bitbucket app password (from account settings)
+  - `BITBUCKET_WORKSPACE` (required): Bitbucket workspace name
+
+#### Trello Server
+- **Name**: `trello`  
+- **Description**: Trello project management integration
+- **Tools**: Board management, card operations, team collaboration
+- **Variables**:
+  - `TRELLO_API_KEY` (required): Trello API key (get from https://trello.com/app-key)
+  - `TRELLO_TOKEN` (required): Trello API token (authorize from the API key page)
+
+### Browser Automation & Testing
+
+#### Playwright Server
+- **Name**: `playwright`
+- **Description**: Browser automation capabilities using Playwright
+- **Tools**: Web automation, testing, screenshot capture, PDF generation
+- **Variables**:
+  - `PLAYWRIGHT_BROWSER` (optional): Browser to use (chromium, firefox, webkit) (default: chromium)
+  - `PLAYWRIGHT_HEADLESS` (optional): Run browser in headless mode (true/false) (default: true)
+
+### Database Integration
+
+#### Supabase Server
+- **Name**: `supabase`
+- **Description**: Supabase backend-as-a-service integration (read-only mode)
+- **Tools**: Database queries, authentication management, storage operations
+- **Variables**:
+  - `SUPABASE_ACCESS_TOKEN` (required): Supabase personal access token
+  - `SUPABASE_PROJECT_REF` (required): Supabase project reference ID
+
+#### PostgreSQL Server
+- **Name**: `postgresql`
+- **Description**: Direct PostgreSQL database operations and queries
+- **Tools**: SQL queries, table management, data analysis
+- **Variables**:
+  - `POSTGRES_CONNECTION_STRING` (required): PostgreSQL connection string
+
 ## CLI Usage
 
 ### Basic Usage
@@ -67,6 +113,21 @@ ship mcp brave-search --var BRAVE_API_KEY=your_api_key
 
 # Start Grafana server (requires URL and API key)
 ship mcp grafana --var GRAFANA_URL=http://localhost:3000 --var GRAFANA_API_KEY=your_service_account_token
+
+# Start Bitbucket server (requires credentials and workspace)
+ship mcp bitbucket --var BITBUCKET_USERNAME=your_username --var BITBUCKET_APP_PASSWORD=your_app_password --var BITBUCKET_WORKSPACE=your_workspace
+
+# Start Trello server (requires API credentials)
+ship mcp trello --var TRELLO_API_KEY=your_api_key --var TRELLO_TOKEN=your_token
+
+# Start Playwright browser automation
+ship mcp playwright --var PLAYWRIGHT_BROWSER=chromium --var PLAYWRIGHT_HEADLESS=false
+
+# Start Supabase integration (requires project info)
+ship mcp supabase --var SUPABASE_ACCESS_TOKEN=your_token --var SUPABASE_PROJECT_REF=your_project_ref
+
+# Start PostgreSQL server (requires connection string)
+ship mcp postgresql --var POSTGRES_CONNECTION_STRING=postgresql://user:password@localhost:5432/dbname
 ```
 
 ### Using Variables

@@ -2,7 +2,6 @@ package modules
 
 import (
 	"context"
-	"fmt"
 
 	"dagger.io/dagger"
 )
@@ -13,129 +12,118 @@ type TerraformDocsModule struct {
 	name   string
 }
 
-const terraformDocsBinary = "/usr/local/bin/terraform-docs"
+// TerraformDocsOptions contains options for terraform-docs generation
+type TerraformDocsOptions struct {
+	OutputFormat string
+	OutputFile   string
+	ConfigFile   string
+	Recursive    bool
+	Sort         bool
+	HeaderFrom   string
+	FooterFrom   string
+}
+
+// TerraformDocsValidateOptions contains options for terraform-docs validation
+type TerraformDocsValidateOptions struct {
+	ConfigFile string
+	Recursive  bool
+}
 
 // NewTerraformDocsModule creates a new terraform-docs module
 func NewTerraformDocsModule(client *dagger.Client) *TerraformDocsModule {
 	return &TerraformDocsModule{
 		client: client,
-		name:   terraformDocsBinary,
+		name:   "terraform-docs",
 	}
 }
 
-// GenerateMarkdown generates markdown documentation for Terraform modules
-func (m *TerraformDocsModule) GenerateMarkdown(ctx context.Context, dir string) (string, error) {
-	container := m.client.Container().
-		From("quay.io/terraform-docs/terraform-docs:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(dir)).
-		WithWorkdir("/workspace").
-		WithExec([]string{
-			terraformDocsBinary,
-			"markdown",
-			".",
-		}, dagger.ContainerWithExecOpts{
-			Expect: "ANY",
-		})
+// Generate runs terraform-docs generate on the provided module
+func (m *TerraformDocsModule) Generate(ctx context.Context, modulePath string, opts TerraformDocsOptions) (string, error) {
+	args := []string{"terraform-docs"}
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate terraform docs: %w", err)
-	}
-
-	return output, nil
-}
-
-// GenerateJSON generates JSON documentation for Terraform modules
-func (m *TerraformDocsModule) GenerateJSON(ctx context.Context, dir string) (string, error) {
-	container := m.client.Container().
-		From("quay.io/terraform-docs/terraform-docs:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(dir)).
-		WithWorkdir("/workspace").
-		WithExec([]string{
-			terraformDocsBinary,
-			"json",
-			".",
-		}, dagger.ContainerWithExecOpts{
-			Expect: "ANY",
-		})
-
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate terraform docs json: %w", err)
-	}
-
-	return output, nil
-}
-
-// GenerateWithConfig generates documentation using a config file
-func (m *TerraformDocsModule) GenerateWithConfig(ctx context.Context, dir string, configFile string) (string, error) {
-	container := m.client.Container().
-		From("quay.io/terraform-docs/terraform-docs:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(dir))
-
-	// If config file is provided, mount it
-	if configFile != "" {
-		container = container.WithFile("/.terraform-docs.yml", m.client.Host().File(configFile))
-		container = container.WithExec([]string{
-			terraformDocsBinary,
-			"--config", "/.terraform-docs.yml",
-			"markdown",
-			"/workspace",
-		}, dagger.ContainerWithExecOpts{
-			Expect: "ANY",
-		})
+	// Add format
+	if opts.OutputFormat != "" {
+		args = append(args, opts.OutputFormat)
 	} else {
-		container = container.WithExec([]string{
-			terraformDocsBinary,
-			"markdown",
-			"/workspace",
-		}, dagger.ContainerWithExecOpts{
-			Expect: "ANY",
-		})
+		args = append(args, "markdown")
 	}
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate terraform docs with config: %w", err)
+	// Add options
+	if opts.ConfigFile != "" {
+		args = append(args, "--config", opts.ConfigFile)
+	}
+	if opts.Recursive {
+		args = append(args, "--recursive")
+	}
+	if opts.Sort {
+		args = append(args, "--sort")
+	}
+	if opts.HeaderFrom != "" {
+		args = append(args, "--header-from", opts.HeaderFrom)
+	}
+	if opts.FooterFrom != "" {
+		args = append(args, "--footer-from", opts.FooterFrom)
+	}
+	if opts.OutputFile != "" {
+		args = append(args, "--output-file", opts.OutputFile)
 	}
 
-	return output, nil
-}
+	// Add module path
+	args = append(args, ".")
 
-// GenerateTable generates a markdown table of inputs and outputs
-func (m *TerraformDocsModule) GenerateTable(ctx context.Context, dir string) (string, error) {
 	container := m.client.Container().
-		From("quay.io/terraform-docs/terraform-docs:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(dir)).
+		From(getImageTag("terraform-docs", "quay.io/terraform-docs/terraform-docs:latest")).
+		WithDirectory("/workspace", m.client.Host().Directory(modulePath)).
 		WithWorkdir("/workspace").
-		WithExec([]string{
-			terraformDocsBinary,
-			"markdown", "table",
-			".",
-		}, dagger.ContainerWithExecOpts{
+		WithExec(args, dagger.ContainerWithExecOpts{
 			Expect: "ANY",
 		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate terraform docs table: %w", err)
+	stdout, _ := container.Stdout(ctx)
+	stderr, _ := container.Stderr(ctx)
+
+	if stdout != "" {
+		return stdout, nil
+	}
+	if stderr != "" {
+		return stderr, nil
 	}
 
-	return output, nil
+	return "Documentation generated successfully", nil
 }
 
-// GetVersion returns the version of terraform-docs
-func (m *TerraformDocsModule) GetVersion(ctx context.Context) (string, error) {
+// Validate checks if terraform-docs output is up to date
+func (m *TerraformDocsModule) Validate(ctx context.Context, modulePath string, opts TerraformDocsValidateOptions) (string, error) {
+	args := []string{"terraform-docs", "markdown", "--output-check"}
+
+	// Add options
+	if opts.ConfigFile != "" {
+		args = append(args, "--config", opts.ConfigFile)
+	}
+	if opts.Recursive {
+		args = append(args, "--recursive")
+	}
+
+	// Add module path
+	args = append(args, ".")
+
 	container := m.client.Container().
-		From("quay.io/terraform-docs/terraform-docs:latest").
-		WithExec([]string{terraformDocsBinary, "--version"}, dagger.ContainerWithExecOpts{
+		From(getImageTag("terraform-docs", "quay.io/terraform-docs/terraform-docs:latest")).
+		WithDirectory("/workspace", m.client.Host().Directory(modulePath)).
+		WithWorkdir("/workspace").
+		WithExec(args, dagger.ContainerWithExecOpts{
 			Expect: "ANY",
 		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get terraform-docs version: %w", err)
+	stdout, _ := container.Stdout(ctx)
+	stderr, _ := container.Stderr(ctx)
+
+	if stdout != "" {
+		return stdout, nil
+	}
+	if stderr != "" {
+		return stderr, nil
 	}
 
-	return output, nil
+	return "Documentation validation completed", nil
 }

@@ -80,11 +80,6 @@ func (e *Engine) NewOpenInfraQuoteModule() *modules.OpenInfraQuoteModule {
 	return modules.NewOpenInfraQuoteModule(e.client)
 }
 
-// NewInfraScanModule creates a new InfraScan module
-func (e *Engine) NewInfraScanModule() *modules.InfraScanModule {
-	return modules.NewInfraScanModule(e.client)
-}
-
 // NewTerraformDocsModule creates a new terraform-docs module
 func (e *Engine) NewTerraformDocsModule() *modules.TerraformDocsModule {
 	return modules.NewTerraformDocsModule(e.client)
@@ -93,6 +88,21 @@ func (e *Engine) NewTerraformDocsModule() *modules.TerraformDocsModule {
 // NewTFLintModule creates a new TFLint module
 func (e *Engine) NewTFLintModule() *modules.TFLintModule {
 	return modules.NewTFLintModule(e.client)
+}
+
+// NewGitSecretsModule creates a new git-secrets module
+func (e *Engine) NewGitSecretsModule() *modules.GitSecretsModule {
+	return modules.NewGitSecretsModule(e.client)
+}
+
+// NewGitleaksModule creates a new Gitleaks module
+func (e *Engine) NewGitleaksModule() *modules.GitleaksModule {
+	return modules.NewGitleaksModule(e.client)
+}
+
+// NewInfraScanModule creates a new InfraScan module
+func (e *Engine) NewInfraScanModule() *modules.InfraScanModule {
+	return modules.NewInfraScanModule(e.client)
 }
 
 // NewCheckovModule creates a new Checkov module

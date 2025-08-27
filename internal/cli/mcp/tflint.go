@@ -10,7 +10,7 @@ import (
 	"dagger.io/dagger"
 )
 
-// AddTfLintTools adds TFLint MCP tool implementations using direct Dagger calls
+// AddTfLintTools adds TFLint (Terraform linter) MCP tool implementations using direct Dagger calls
 func AddTfLintTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
 	// Ignore executeShipCommand - we use direct Dagger calls
 	addTfLintToolsDirect(s)
@@ -18,79 +18,43 @@ func AddTfLintTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFu
 
 // addTfLintToolsDirect adds TFLint tools using direct Dagger module calls
 func addTfLintToolsDirect(s *server.MCPServer) {
-	// TFLint basic lint tool
-	lintTool := mcp.NewTool("tflint_lint",
-		mcp.WithDescription("Lint Terraform files using real tflint CLI"),
-		mcp.WithString("chdir",
-			mcp.Description("Change working directory before linting"),
+	// TFLint check tool
+	checkTool := mcp.NewTool("tflint_check",
+		mcp.WithDescription("Run TFLint to check Terraform configuration for issues"),
+		mcp.WithString("source_path",
+			mcp.Description("Path to Terraform configuration directory"),
+			mcp.Required(),
 		),
-		mcp.WithString("format",
-			mcp.Description("Output format"),
-			mcp.Enum("default", "json", "checkstyle", "junit", "compact", "sarif"),
-		),
-		mcp.WithString("config",
+		mcp.WithString("config_file",
 			mcp.Description("Path to TFLint configuration file"),
 		),
-		mcp.WithBoolean("recursive",
-			mcp.Description("Run command in each directory recursively"),
-		),
-	)
-	s.AddTool(lintTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		// Create Dagger client
-		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
-		}
-		defer client.Close()
-
-		// Create module instance
-		module := modules.NewTFLintModule(client)
-
-		// Get parameters
-		chdir := request.GetString("chdir", ".")
-		config := request.GetString("config", "")
-
-		// Note: format and recursive parameters not supported in current Dagger implementation
-		if request.GetString("format", "") != "" {
-			return mcp.NewToolResultError("Warning: format parameter is not supported with direct Dagger calls"), nil
-		}
-		if request.GetBool("recursive", false) {
-			return mcp.NewToolResultError("Warning: recursive parameter is not supported with direct Dagger calls"), nil
-		}
-
-		// Use LintWithConfig if config is provided, otherwise LintDirectory
-		var output string
-		if config != "" {
-			output, err = module.LintWithConfig(ctx, chdir, config)
-		} else {
-			output, err = module.LintDirectory(ctx, chdir)
-		}
-
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("TFLint linting failed: %v", err)), nil
-		}
-
-		return mcp.NewToolResultText(output), nil
-	})
-
-	// TFLint lint with rules tool
-	lintWithRulesTool := mcp.NewTool("tflint_lint_with_rules",
-		mcp.WithDescription("Lint Terraform files with specific rules enabled/disabled using real tflint CLI"),
-		mcp.WithString("chdir",
-			mcp.Description("Change working directory before linting"),
-		),
-		mcp.WithString("enable_rule",
-			mcp.Description("Enable specific rule"),
-		),
-		mcp.WithString("disable_rule",
-			mcp.Description("Disable specific rule"),
-		),
 		mcp.WithString("format",
 			mcp.Description("Output format"),
 			mcp.Enum("default", "json", "checkstyle", "junit", "compact", "sarif"),
 		),
+		mcp.WithBoolean("recursive",
+			mcp.Description("Run recursively over subdirectories"),
+		),
+		mcp.WithString("enable_rule",
+			mcp.Description("Enable a specific rule"),
+		),
+		mcp.WithString("disable_rule",
+			mcp.Description("Disable a specific rule"),
+		),
+		mcp.WithString("only",
+			mcp.Description("Run only specified rules"),
+		),
+		mcp.WithString("var_file",
+			mcp.Description("Terraform variables file"),
+		),
+		mcp.WithString("var",
+			mcp.Description("Set Terraform variables"),
+		),
+		mcp.WithBoolean("fix",
+			mcp.Description("Automatically fix issues where possible"),
+		),
 	)
-	s.AddTool(lintWithRulesTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	s.AddTool(checkTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		// Create Dagger client
 		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
 		if err != nil {
@@ -98,37 +62,59 @@ func addTfLintToolsDirect(s *server.MCPServer) {
 		}
 		defer client.Close()
 
-		// Create module instance
-		module := modules.NewTFLintModule(client)
-
 		// Get parameters
-		chdir := request.GetString("chdir", ".")
+		sourcePath := request.GetString("source_path", "")
+		configFile := request.GetString("config_file", "")
+		format := request.GetString("format", "")
+		recursive := request.GetBool("recursive", false)
 		enableRule := request.GetString("enable_rule", "")
 		disableRule := request.GetString("disable_rule", "")
+		only := request.GetString("only", "")
+		varFile := request.GetString("var_file", "")
+		varValue := request.GetString("var", "")
+		fix := request.GetBool("fix", false)
 
-		// Build rule arrays
-		var enableRules, disableRules []string
-		if enableRule != "" {
-			enableRules = []string{enableRule}
-		}
-		if disableRule != "" {
-			disableRules = []string{disableRule}
+		if sourcePath == "" {
+			return mcp.NewToolResultError("source_path is required"), nil
 		}
 
-		// Lint with rules
-		output, err := module.LintWithRules(ctx, chdir, enableRules, disableRules)
+		// Create TFLint module
+		tflintModule := modules.NewTFLintModule(client)
+
+		// Set up options
+		opts := modules.TFLintOptions{
+			ConfigFile:  configFile,
+			Format:      format,
+			Recursive:   recursive,
+			EnableRule:  enableRule,
+			DisableRule: disableRule,
+			Only:        only,
+			VarFile:     varFile,
+			Var:         varValue,
+			Fix:         fix,
+		}
+
+		// Run TFLint
+		result, err := tflintModule.Check(ctx, sourcePath, opts)
 		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("TFLint rules linting failed: %v", err)), nil
+			return mcp.NewToolResultError(fmt.Sprintf("TFLint check failed: %v", err)), nil
 		}
 
-		return mcp.NewToolResultText(output), nil
+		return mcp.NewToolResultText(result), nil
 	})
 
-	// TFLint init plugins tool
+	// TFLint init tool
 	initTool := mcp.NewTool("tflint_init",
-		mcp.WithDescription("Initialize TFLint plugins using real tflint CLI"),
-		mcp.WithString("chdir",
-			mcp.Description("Change working directory before initializing"),
+		mcp.WithDescription("Initialize TFLint in a Terraform configuration directory"),
+		mcp.WithString("source_path",
+			mcp.Description("Path to Terraform configuration directory"),
+			mcp.Required(),
+		),
+		mcp.WithString("config_file",
+			mcp.Description("Path to TFLint configuration file"),
+		),
+		mcp.WithBoolean("upgrade",
+			mcp.Description("Upgrade plugins to the latest available version"),
 		),
 	)
 	s.AddTool(initTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -139,122 +125,30 @@ func addTfLintToolsDirect(s *server.MCPServer) {
 		}
 		defer client.Close()
 
-		// Create module instance
-		module := modules.NewTFLintModule(client)
-
 		// Get parameters
-		chdir := request.GetString("chdir", ".")
+		sourcePath := request.GetString("source_path", "")
+		configFile := request.GetString("config_file", "")
+		upgrade := request.GetBool("upgrade", false)
 
-		// Initialize plugins
-		err = module.InitPlugins(ctx, chdir)
+		if sourcePath == "" {
+			return mcp.NewToolResultError("source_path is required"), nil
+		}
+
+		// Create TFLint module
+		tflintModule := modules.NewTFLintModule(client)
+
+		// Set up options
+		opts := modules.TFLintInitOptions{
+			ConfigFile: configFile,
+			Upgrade:    upgrade,
+		}
+
+		// Initialize TFLint
+		result, err := tflintModule.Init(ctx, sourcePath, opts)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("TFLint init failed: %v", err)), nil
 		}
 
-		return mcp.NewToolResultText("TFLint plugins initialized successfully"), nil
-	})
-
-	// TFLint with variable file tool
-	lintWithVarFileTool := mcp.NewTool("tflint_lint_with_var_file",
-		mcp.WithDescription("Lint Terraform files with variable files using real tflint CLI"),
-		mcp.WithString("chdir",
-			mcp.Description("Change working directory before linting"),
-		),
-		mcp.WithString("var_file",
-			mcp.Description("Path to Terraform variable file"),
-			mcp.Required(),
-		),
-		mcp.WithString("format",
-			mcp.Description("Output format"),
-			mcp.Enum("default", "json", "checkstyle", "junit", "compact", "sarif"),
-		),
-	)
-	s.AddTool(lintWithVarFileTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		// Create Dagger client
-		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
-		}
-		defer client.Close()
-
-		// Create module instance
-		module := modules.NewTFLintModule(client)
-
-		// Get parameters
-		chdir := request.GetString("chdir", ".")
-		varFile := request.GetString("var_file", "")
-		format := request.GetString("format", "json")
-
-		// Lint with variable file
-		output, err := module.LintWithVarFile(ctx, chdir, varFile, format)
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("TFLint var file linting failed: %v", err)), nil
-		}
-
-		return mcp.NewToolResultText(output), nil
-	})
-
-	// TFLint with variables tool
-	lintWithVarTool := mcp.NewTool("tflint_lint_with_var",
-		mcp.WithDescription("Lint Terraform files with individual variables using real tflint CLI"),
-		mcp.WithString("chdir",
-			mcp.Description("Change working directory before linting"),
-		),
-		mcp.WithString("var",
-			mcp.Description("Set Terraform variable (format: 'key=value')"),
-			mcp.Required(),
-		),
-		mcp.WithString("format",
-			mcp.Description("Output format"),
-			mcp.Enum("default", "json", "checkstyle", "junit", "compact", "sarif"),
-		),
-	)
-	s.AddTool(lintWithVarTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		// Create Dagger client
-		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
-		}
-		defer client.Close()
-
-		// Create module instance
-		module := modules.NewTFLintModule(client)
-
-		// Get parameters
-		chdir := request.GetString("chdir", ".")
-		variable := request.GetString("var", "")
-		format := request.GetString("format", "json")
-
-		// Lint with variable
-		output, err := module.LintWithVar(ctx, chdir, variable, format)
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("TFLint variable linting failed: %v", err)), nil
-		}
-
-		return mcp.NewToolResultText(output), nil
-	})
-
-	// TFLint version tool
-	versionTool := mcp.NewTool("tflint_version",
-		mcp.WithDescription("Get TFLint version information using real tflint CLI"),
-	)
-	s.AddTool(versionTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		// Create Dagger client
-		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("failed to create Dagger client: %v", err)), nil
-		}
-		defer client.Close()
-
-		// Create module instance
-		module := modules.NewTFLintModule(client)
-
-		// Get version
-		output, err := module.GetVersion(ctx)
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("TFLint get version failed: %v", err)), nil
-		}
-
-		return mcp.NewToolResultText(output), nil
+		return mcp.NewToolResultText(result), nil
 	})
 }

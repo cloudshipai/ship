@@ -114,3 +114,4 @@ Thumbs.db
 *.log
 logs/
 # Testing CI fix
+.audit-reports/

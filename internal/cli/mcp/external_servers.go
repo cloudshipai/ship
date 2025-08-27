@@ -428,6 +428,114 @@ var ExternalMCPServers = map[string]ship.MCPServerConfig{
 			},
 		},
 	},
+
+	// Development & CI/CD Integration MCP Servers
+	"bitbucket": {
+		Name:      "bitbucket",
+		Command:   "npx",
+		Args:      []string{"-y", "@aashari/mcp-server-atlassian-bitbucket"},
+		Transport: "stdio",
+		Env:       map[string]string{},
+		Variables: []ship.Variable{
+			{
+				Name:        "BITBUCKET_USERNAME",
+				Description: "Atlassian Bitbucket username",
+				Required:    true,
+			},
+			{
+				Name:        "BITBUCKET_APP_PASSWORD",
+				Description: "Atlassian Bitbucket app password (from account settings)",
+				Required:    true,
+				Secret:      true,
+			},
+			{
+				Name:        "BITBUCKET_WORKSPACE",
+				Description: "Bitbucket workspace name",
+				Required:    true,
+			},
+		},
+	},
+	"trello": {
+		Name:      "trello",
+		Command:   "pnpx",
+		Args:      []string{"@delorenj/mcp-server-trello"},
+		Transport: "stdio",
+		Env:       map[string]string{},
+		Variables: []ship.Variable{
+			{
+				Name:        "TRELLO_API_KEY",
+				Description: "Trello API key (get from https://trello.com/app-key)",
+				Required:    true,
+				Secret:      true,
+			},
+			{
+				Name:        "TRELLO_TOKEN",
+				Description: "Trello API token (authorize from the API key page)",
+				Required:    true,
+				Secret:      true,
+			},
+		},
+	},
+
+	// Browser Automation & Testing MCP Servers
+	"playwright": {
+		Name:      "playwright",
+		Command:   "npx",
+		Args:      []string{"-y", "@automatalabs/mcp-server-playwright"},
+		Transport: "stdio",
+		Env:       map[string]string{},
+		Variables: []ship.Variable{
+			{
+				Name:        "PLAYWRIGHT_BROWSER",
+				Description: "Browser to use (chromium, firefox, webkit)",
+				Required:    false,
+				Default:     "chromium",
+			},
+			{
+				Name:        "PLAYWRIGHT_HEADLESS",
+				Description: "Run browser in headless mode (true/false)",
+				Required:    false,
+				Default:     "true",
+			},
+		},
+	},
+
+	// Database Integration MCP Servers  
+	"supabase": {
+		Name:      "supabase",
+		Command:   "npx",
+		Args:      []string{"-y", "@supabase/mcp-server-supabase@latest", "--read-only"},
+		Transport: "stdio",
+		Env:       map[string]string{},
+		Variables: []ship.Variable{
+			{
+				Name:        "SUPABASE_ACCESS_TOKEN",
+				Description: "Supabase personal access token (from dashboard settings)",
+				Required:    true,
+				Secret:      true,
+			},
+			{
+				Name:        "SUPABASE_PROJECT_REF",
+				Description: "Supabase project reference ID",
+				Required:    true,
+			},
+		},
+	},
+	"postgresql": {
+		Name:      "postgresql",
+		Command:   "npx",
+		Args:      []string{"-y", "@modelcontextprotocol/server-postgres"},
+		Transport: "stdio",
+		Env:       map[string]string{},
+		Variables: []ship.Variable{
+			{
+				Name:        "POSTGRES_CONNECTION_STRING",
+				Description: "PostgreSQL connection string (postgresql://user:password@localhost:5432/dbname)",
+				Required:    true,
+				Secret:      true,
+			},
+		},
+	},
 }
 
 // IsExternalMCPServer checks if the tool name matches an external MCP server

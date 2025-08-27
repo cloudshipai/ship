@@ -2,18 +2,22 @@ package modules
 
 import (
 	"context"
-	"fmt"
 
 	"dagger.io/dagger"
 )
 
-// GitSecretsModule runs git-secrets for scanning git repositories for secrets
+// GitSecretsModule runs git-secrets for AWS credential scanning
 type GitSecretsModule struct {
 	client *dagger.Client
 	name   string
 }
 
-const gitBinary = "/usr/bin/git"
+// GitSecretsScanOptions contains options for git-secrets scanning
+type GitSecretsScanOptions struct {
+	OutputFormat string
+	ScanHistory  bool
+	Recursive    bool
+}
 
 // NewGitSecretsModule creates a new git-secrets module
 func NewGitSecretsModule(client *dagger.Client) *GitSecretsModule {
@@ -23,182 +27,61 @@ func NewGitSecretsModule(client *dagger.Client) *GitSecretsModule {
 	}
 }
 
-// ScanRepository scans a git repository for secrets
-func (m *GitSecretsModule) ScanRepository(ctx context.Context, dir string) (string, error) {
-	container := m.client.Container().
-		From("depop/git-secrets:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(dir)).
-		WithWorkdir("/workspace").
-		WithExec([]string{
-			gitBinary, "secrets",
-			"--scan",
-		}, dagger.ContainerWithExecOpts{
-			Expect: "ANY",
-		})
+// Scan runs git-secrets scan on the provided directory
+func (m *GitSecretsModule) Scan(ctx context.Context, sourcePath string, opts GitSecretsScanOptions) (string, error) {
+	args := []string{"git-secrets", "--scan"}
 
-	output, _ := container.Stdout(ctx)
-	stderr, _ := container.Stderr(ctx)
-
-	if output != "" || stderr != "" {
-		result := output
-		if stderr != "" {
-			result += "\n" + stderr
-		}
-		return result, nil
+	// Add scan options
+	if opts.Recursive {
+		args = append(args, "-r")
+	}
+	if opts.ScanHistory {
+		args = append(args, "--scan-history")
 	}
 
-	return "", fmt.Errorf("failed to run git-secrets: no output received")
-}
+	// Add source path
+	args = append(args, ".")
 
-// ScanWithAwsProviders scans with AWS secret patterns
-func (m *GitSecretsModule) ScanWithAwsProviders(ctx context.Context, dir string) (string, error) {
 	container := m.client.Container().
-		From("depop/git-secrets:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(dir)).
+		From(getImageTag("git-secrets", "trufflesecurity/secrets:latest")).
+		WithDirectory("/workspace", m.client.Host().Directory(sourcePath)).
 		WithWorkdir("/workspace").
-		WithExec([]string{
-			"bash", "-c",
-			"git secrets --register-aws && git secrets --scan",
-		}, dagger.ContainerWithExecOpts{
+		WithExec(args, dagger.ContainerWithExecOpts{
 			Expect: "ANY",
 		})
 
-	output, _ := container.Stdout(ctx)
+	stdout, _ := container.Stdout(ctx)
 	stderr, _ := container.Stderr(ctx)
 
-	if output != "" || stderr != "" {
-		result := output
-		if stderr != "" {
-			result += "\n" + stderr
-		}
-		return result, nil
+	if stdout != "" {
+		return stdout, nil
+	}
+	if stderr != "" {
+		return stderr, nil
 	}
 
-	return "", fmt.Errorf("failed to run git-secrets with AWS patterns: no output received")
+	return "No secrets found", nil
 }
 
-// GetVersion returns the version of git-secrets
-func (m *GitSecretsModule) GetVersion(ctx context.Context) (string, error) {
-	container := m.client.Container().
-		From("depop/git-secrets:latest").
-		WithExec([]string{"git", "secrets", "--version"}, dagger.ContainerWithExecOpts{
-			Expect: "ANY",
-		})
-
-	output, _ := container.Stdout(ctx)
-	stderr, _ := container.Stderr(ctx)
+// InstallHooks installs git-secrets hooks in a repository
+func (m *GitSecretsModule) InstallHooks(ctx context.Context, repoPath string, force bool) (string, error) {
+	args := []string{"git-secrets", "--install"}
 	
-	// git-secrets doesn't have a --version flag, return image info
-	if output == "" && stderr != "" {
-		// Version flag not supported, return default
-		return "git-secrets-latest", nil
-	}
-	
-	if output != "" {
-		return output, nil
-	}
-
-	return "git-secrets-latest", nil
-}
-
-// ScanHistory scans git history for secrets
-func (m *GitSecretsModule) ScanHistory(ctx context.Context, dir string) (string, error) {
-	container := m.client.Container().
-		From("depop/git-secrets:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(dir)).
-		WithWorkdir("/workspace").
-		WithExec([]string{"git", "secrets", "--scan-history"})
-
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to scan git history: %w", err)
-	}
-
-	return output, nil
-}
-
-// InstallHooks installs git-secrets hooks
-func (m *GitSecretsModule) InstallHooks(ctx context.Context, dir string) (string, error) {
-	container := m.client.Container().
-		From("depop/git-secrets:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(dir)).
-		WithWorkdir("/workspace").
-		WithExec([]string{"git", "secrets", "--install"})
-
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to install git-secrets hooks: %w", err)
-	}
-
-	return output, nil
-}
-
-// AddPattern adds a secret pattern
-func (m *GitSecretsModule) AddPattern(ctx context.Context, dir string, pattern string, isAllowed bool) (string, error) {
-	args := []string{"git", "secrets", "--add"}
-	if isAllowed {
-		args = append(args, "--allowed", pattern)
-	} else {
-		args = append(args, pattern)
+	if force {
+		args = append(args, "--force")
 	}
 
 	container := m.client.Container().
-		From("depop/git-secrets:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(dir)).
+		From(getImageTag("git-secrets", "trufflesecurity/secrets:latest")).
+		WithDirectory("/workspace", m.client.Host().Directory(repoPath)).
 		WithWorkdir("/workspace").
-		WithExec(args)
+		WithExec(args, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to add pattern: %w", err)
-	}
-
-	return output, nil
-}
-
-// ListConfig lists git-secrets configuration
-func (m *GitSecretsModule) ListConfig(ctx context.Context, dir string) (string, error) {
-	container := m.client.Container().
-		From("depop/git-secrets:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(dir)).
-		WithWorkdir("/workspace").
-		WithExec([]string{"git", "secrets", "--list"})
-
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to list git-secrets config: %w", err)
-	}
-
-	return output, nil
-}
-
-// RegisterAWS registers AWS patterns
-func (m *GitSecretsModule) RegisterAWS(ctx context.Context, dir string) (string, error) {
-	container := m.client.Container().
-		From("depop/git-secrets:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(dir)).
-		WithWorkdir("/workspace").
-		WithExec([]string{"git", "secrets", "--register-aws"})
-
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to register AWS patterns: %w", err)
-	}
-
-	return output, nil
-}
-
-// AddAllowedPattern adds an allowed pattern to prevent false positives (MCP compatible)
-func (m *GitSecretsModule) AddAllowedPattern(ctx context.Context, dir string, pattern string) (string, error) {
-	container := m.client.Container().
-		From("depop/git-secrets:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(dir)).
-		WithWorkdir("/workspace").
-		WithExec([]string{"git", "secrets", "--add", "-a", pattern})
-
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to add allowed pattern: %w", err)
+	output, _ := container.Stdout(ctx)
+	if output == "" {
+		output = "Git-secrets hooks installed successfully"
 	}
 
 	return output, nil

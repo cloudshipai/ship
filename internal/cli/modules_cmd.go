@@ -91,8 +91,6 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 		{"cosign", "Container signing and verification", "security", "gcr.io/projectsigstore/cosign:latest"},
 
 		// Security Tools (High-Priority Supply Chain)
-		{"slsa-verifier", "SLSA provenance verification", "security", "gcr.io/projectsigstore/slsa-verifier:latest"},
-		{"in-toto", "Supply chain attestation", "security", "in-toto/in-toto:latest"},
 		{"gatekeeper", "OPA Gatekeeper policy validation", "security", "openpolicyagent/gatekeeper:latest"},
 		{"kubescape", "Kubernetes security scanning", "security", "quay.io/kubescape/kubescape:latest"},
 		{"dockle", "Container image linting", "security", "goodwithtech/dockle:latest"},
@@ -100,8 +98,6 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 
 		// Security Tools (Supply Chain)
 		{"dependency-track", "OWASP Dependency-Track SBOM analysis", "security", "dependencytrack/bundler:latest"},
-		{"guac", "GUAC supply chain analysis", "security", "ghcr.io/guacsec/guac:latest"},
-		{"sigstore-policy-controller", "Sigstore Policy Controller", "security", "gcr.io/projectsigstore/policy-controller:latest"},
 
 		// Security Tools (Additional)
 		{"actionlint", "GitHub Actions workflow linting", "security", "rhymond/actionlint:latest"},
@@ -121,14 +117,8 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 		{"powerpipe", "Infrastructure benchmarking", "security", "turbot/powerpipe:latest"},
 		{"velero", "Kubernetes backup and disaster recovery", "security", "velero/velero:latest"},
 		{"goldilocks", "Kubernetes resource recommendations", "security", "us-docker.pkg.dev/fairwinds-ops/oss/goldilocks:latest"},
-		{"allstar", "GitHub security policy enforcement", "security", "N/A (GitHub App)"},
-		{"rekor", "Software supply chain transparency", "security", "gcr.io/projectsigstore/rekor-server:latest"},
 		{"osv-scanner", "Open Source Vulnerability scanning", "security", "gcr.io/osv-scanner/osv-scanner:latest"},
 		{"license-detector", "Software license detection", "security", "licensefinder/license_finder:latest"},
-		{"registry", "Container registry operations", "security", "registry:2"},
-		{"cosign-golden", "Enhanced Cosign for golden images", "security", "gcr.io/projectsigstore/cosign:latest"},
-		{"history-scrub", "Git history cleaning and secret removal", "security", "alpine/git:latest"},
-		{"trivy-golden", "Enhanced Trivy for golden images", "security", "aquasec/trivy:latest"},
 		{"iac-plan", "Infrastructure as Code planning", "security", "hashicorp/terraform:latest"},
 
 		// Cloud & Infrastructure Tools
@@ -144,8 +134,6 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 		{"kuttl", "Kubernetes testing framework", "cloud", "kudobuilder/kuttl:latest"},
 		{"litmus", "Chaos engineering for Kubernetes", "cloud", "litmuschaos/litmus:latest"},
 		{"cert-manager", "Certificate management", "cloud", "quay.io/jetstack/cert-manager-controller:latest"},
-		{"step-ca", "Certificate authority operations", "cloud", "smallstep/step-ca:latest"},
-		{"check-ssl-cert", "SSL certificate validation", "cloud", "nablac0d3/sslyze:latest"},
 		{"k8s-network-policy", "Kubernetes network policy management", "cloud", "kinvolk/netfetch:latest"},
 		{"kyverno", "Kubernetes policy management", "cloud", "ghcr.io/kyverno/kyverno:latest"},
 		{"kyverno-multitenant", "Multi-tenant Kyverno policies", "cloud", "ghcr.io/kyverno/kyverno:latest"},

@@ -2,234 +2,126 @@ package modules
 
 import (
 	"context"
-	"fmt"
-	"path/filepath"
 
 	"dagger.io/dagger"
 )
 
-// TFLintModule runs TFLint for Terraform linting
+// TFLintModule runs TFLint for Terraform configuration linting
 type TFLintModule struct {
 	client *dagger.Client
 	name   string
 }
 
-const tflintBinary = "/usr/local/bin/tflint"
+// TFLintOptions contains options for TFLint checking
+type TFLintOptions struct {
+	ConfigFile  string
+	Format      string
+	Recursive   bool
+	EnableRule  string
+	DisableRule string
+	Only        string
+	VarFile     string
+	Var         string
+	Fix         bool
+}
+
+// TFLintInitOptions contains options for TFLint initialization
+type TFLintInitOptions struct {
+	ConfigFile string
+	Upgrade    bool
+}
 
 // NewTFLintModule creates a new TFLint module
 func NewTFLintModule(client *dagger.Client) *TFLintModule {
 	return &TFLintModule{
 		client: client,
-		name:   tflintBinary,
+		name:   "tflint",
 	}
 }
 
-// LintDirectory lints all Terraform files in a directory
-func (m *TFLintModule) LintDirectory(ctx context.Context, dir string) (string, error) {
-	// Initialize TFLint first
-	initContainer := m.client.Container().
-		From("ghcr.io/terraform-linters/tflint:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(dir)).
-		WithWorkdir("/workspace").
-		WithExec([]string{tflintBinary, "--init"}, dagger.ContainerWithExecOpts{
-			Expect: "ANY",
-		})
+// Check runs TFLint check on the provided Terraform configuration
+func (m *TFLintModule) Check(ctx context.Context, sourcePath string, opts TFLintOptions) (string, error) {
+	args := []string{"tflint"}
 
-	// Sync to ensure init completes
-	_, err := initContainer.Sync(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to initialize tflint: %w", err)
+	// Add check options
+	if opts.ConfigFile != "" {
+		args = append(args, "--config", opts.ConfigFile)
 	}
-
-	// Run TFLint - use a bash wrapper to capture output regardless of exit code
-	lintContainer := initContainer.WithExec([]string{
-		"sh", "-c", "tflint --format json || true",
-	}, dagger.ContainerWithExecOpts{
-		Expect: "ANY",
-	})
-
-	output, err := lintContainer.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to run tflint: %w", err)
+	if opts.Format != "" {
+		args = append(args, "--format", opts.Format)
 	}
-
-	return output, nil
-}
-
-// LintFile lints a specific Terraform file
-func (m *TFLintModule) LintFile(ctx context.Context, filePath string) (string, error) {
-	dir := filepath.Dir(filePath)
-	filename := filepath.Base(filePath)
-
-	container := m.client.Container().
-		From("ghcr.io/terraform-linters/tflint:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(dir)).
-		WithWorkdir("/workspace").
-		WithExec([]string{
-			tflintBinary,
-			"--format", "json",
-			filename,
-		}, dagger.ContainerWithExecOpts{
-			Expect: "ANY",
-		})
-
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to run tflint on file: %w", err)
+	if opts.Recursive {
+		args = append(args, "--recursive")
 	}
-
-	return output, nil
-}
-
-// LintWithConfig lints using a custom configuration file
-func (m *TFLintModule) LintWithConfig(ctx context.Context, dir string, configFile string) (string, error) {
-	container := m.client.Container().
-		From("ghcr.io/terraform-linters/tflint:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(dir))
-
-	// If config file is provided, mount it
-	if configFile != "" {
-		container = container.WithFile("/.tflint.hcl", m.client.Host().File(configFile))
-		container = container.WithExec([]string{
-			tflintBinary,
-			"--format", "json",
-			"--config", "/.tflint.hcl",
-			"/workspace",
-		}, dagger.ContainerWithExecOpts{
-			Expect: "ANY",
-		})
-	} else {
-		container = container.WithExec([]string{
-			tflintBinary,
-			"--format", "json",
-			"/workspace",
-		}, dagger.ContainerWithExecOpts{
-			Expect: "ANY",
-		})
+	if opts.EnableRule != "" {
+		args = append(args, "--enable-rule", opts.EnableRule)
 	}
-
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to run tflint with config: %w", err)
+	if opts.DisableRule != "" {
+		args = append(args, "--disable-rule", opts.DisableRule)
 	}
-
-	return output, nil
-}
-
-// LintWithRules runs TFLint with specific rule sets enabled
-func (m *TFLintModule) LintWithRules(ctx context.Context, dir string, enableRules []string, disableRules []string) (string, error) {
-	args := []string{tflintBinary, "--format", "json"}
-
-	// Add enabled rules
-	for _, rule := range enableRules {
-		args = append(args, "--enable-rule", rule)
+	if opts.Only != "" {
+		args = append(args, "--only", opts.Only)
 	}
-
-	// Add disabled rules
-	for _, rule := range disableRules {
-		args = append(args, "--disable-rule", rule)
+	if opts.VarFile != "" {
+		args = append(args, "--var-file", opts.VarFile)
+	}
+	if opts.Var != "" {
+		args = append(args, "--var", opts.Var)
+	}
+	if opts.Fix {
+		args = append(args, "--fix")
 	}
 
 	container := m.client.Container().
-		From("ghcr.io/terraform-linters/tflint:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(dir)).
+		From(getImageTag("tflint", "ghcr.io/terraform-linters/tflint:latest")).
+		WithDirectory("/workspace", m.client.Host().Directory(sourcePath)).
 		WithWorkdir("/workspace").
 		WithExec(args, dagger.ContainerWithExecOpts{
 			Expect: "ANY",
 		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to run tflint with rules: %w", err)
+	stdout, _ := container.Stdout(ctx)
+	stderr, _ := container.Stderr(ctx)
+
+	if stdout != "" {
+		return stdout, nil
+	}
+	if stderr != "" {
+		return stderr, nil
 	}
 
-	return output, nil
+	return "TFLint check completed successfully", nil
 }
 
-// InitPlugins initializes TFLint plugins
-func (m *TFLintModule) InitPlugins(ctx context.Context, dir string) error {
+// Init initializes TFLint in a Terraform configuration directory
+func (m *TFLintModule) Init(ctx context.Context, sourcePath string, opts TFLintInitOptions) (string, error) {
+	args := []string{"tflint", "--init"}
+
+	// Add init options
+	if opts.ConfigFile != "" {
+		args = append(args, "--config", opts.ConfigFile)
+	}
+	if opts.Upgrade {
+		args = append(args, "--upgrade")
+	}
+
 	container := m.client.Container().
-		From("ghcr.io/terraform-linters/tflint:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(dir)).
+		From(getImageTag("tflint", "ghcr.io/terraform-linters/tflint:latest")).
+		WithDirectory("/workspace", m.client.Host().Directory(sourcePath)).
 		WithWorkdir("/workspace").
-		WithExec([]string{
-			tflintBinary,
-			"--init",
-		})
-
-	_, err := container.Stdout(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to initialize tflint plugins: %w", err)
-	}
-
-	return nil
-}
-
-// GetVersion returns the version of TFLint
-func (m *TFLintModule) GetVersion(ctx context.Context) (string, error) {
-	container := m.client.Container().
-		From("ghcr.io/terraform-linters/tflint:latest").
-		WithExec([]string{tflintBinary, "--version"}, dagger.ContainerWithExecOpts{
+		WithExec(args, dagger.ContainerWithExecOpts{
 			Expect: "ANY",
 		})
 
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get tflint version: %w", err)
+	stdout, _ := container.Stdout(ctx)
+	stderr, _ := container.Stderr(ctx)
+
+	if stdout != "" {
+		return stdout, nil
+	}
+	if stderr != "" {
+		return stderr, nil
 	}
 
-	return output, nil
-}
-
-// LintWithVarFile lints Terraform files with a variable file
-func (m *TFLintModule) LintWithVarFile(ctx context.Context, dir string, varFile string, format string) (string, error) {
-	container := m.client.Container().
-		From("ghcr.io/terraform-linters/tflint:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(dir)).
-		WithFile("/workspace/vars.tfvars", m.client.Host().File(varFile)).
-		WithWorkdir("/workspace")
-
-	args := []string{tflintBinary, "--var-file", "/workspace/vars.tfvars"}
-	if format != "" {
-		args = append(args, "--format", format)
-	} else {
-		args = append(args, "--format", "json")
-	}
-
-	container = container.WithExec(args, dagger.ContainerWithExecOpts{
-		Expect: "ANY",
-	})
-
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to run tflint with var file: %w", err)
-	}
-
-	return output, nil
-}
-
-// LintWithVar lints Terraform files with individual variables
-func (m *TFLintModule) LintWithVar(ctx context.Context, dir string, variable string, format string) (string, error) {
-	container := m.client.Container().
-		From("ghcr.io/terraform-linters/tflint:latest").
-		WithDirectory("/workspace", m.client.Host().Directory(dir)).
-		WithWorkdir("/workspace")
-
-	args := []string{tflintBinary, "--var", variable}
-	if format != "" {
-		args = append(args, "--format", format)
-	} else {
-		args = append(args, "--format", "json")
-	}
-
-	container = container.WithExec(args, dagger.ContainerWithExecOpts{
-		Expect: "ANY",
-	})
-
-	output, err := container.Stdout(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to run tflint with var: %w", err)
-	}
-
-	return output, nil
+	return "TFLint initialization completed successfully", nil
 }

@@ -18,26 +18,28 @@ This table provides a quick overview of all Ship tools organized by workflow and
 
 ## All Tools by Category
 
-### Terraform Tools (7 tools)
+### Terraform Tools (11 tools)
 | Tool | Purpose | Use When |
 |------|---------|----------|
-| `tflint` | Terraform syntax and best practices | Before every Terraform apply |
-| `terraform-docs` | Generate module documentation | Team collaboration, module publishing |
-| `checkov` | Multi-framework IaC security | Comprehensive security scanning |
-| `tfsec` | Terraform-specific security | Deep Terraform security analysis |
-| `terrascan` | Policy-as-code security | Custom OPA policies |
-| `inframap` | Infrastructure visualization | Architecture documentation |
-| `openinfraquote` | Cost estimation | Before expensive infrastructure changes |
+| `lint` | General Terraform linting | Basic syntax validation |
+| `tflint` | Advanced Terraform linting | Comprehensive Terraform validation |
+| `cost` | Infrastructure cost estimation | Budget planning |
+| `docs` | Generate documentation | Module documentation |
+| `diagram` | Infrastructure visualization | Architecture diagrams |
+| `terraform-docs` | Advanced module documentation | Detailed module publishing |
+| `openinfraquote` | Detailed cost analysis | Financial impact assessment |
+| `aws-pricing-builtin` | AWS-specific pricing | AWS cost optimization |
 
-### Security Tools (41 tools)
+### Security Tools (31 tools)
 
 #### Vulnerability Scanning
 | Tool | Purpose | Use When |
 |------|---------|----------|
 | `trivy` | Universal vulnerability scanner | Containers, filesystems, git repos |
 | `grype` | Container-focused with SBOM | Detailed container analysis |
-| `nuclei` | Fast template-based scanning | Web apps, infrastructure misconfigs |
 | `osv-scanner` | OSS vulnerability scanning | Official OSSF tool for dependencies |
+| `dependency-track` | SBOM analysis platform | Enterprise vulnerability management |
+| `checkov` | Multi-framework IaC security | Infrastructure as Code security scanning |
 
 #### Secret Detection
 | Tool | Purpose | Use When |
@@ -70,16 +72,15 @@ This table provides a quick overview of all Ship tools organized by workflow and
 |------|---------|----------|
 | `zap` | Web app penetration testing | Comprehensive web security |
 | `nikto` | Web server security | Server misconfiguration |
-| `nmap` | Network discovery/scanning | Network reconnaissance |
 
-#### Cloud Security
+#### Cloud Security & Compliance
 | Tool | Purpose | Use When |
 |------|---------|----------|
 | `prowler` | Multi-cloud security assessment | AWS/GCP/Azure security |
-| `scout-suite` | Cloud configuration auditing | In-depth config analysis |
-| `steampipe` | Cloud asset querying (SQL) | Custom cloud queries |
-| `cloudquery` | Cloud asset inventory | Asset management |
-| `custodian` | Cloud governance automation | Policy enforcement |
+| `scout-suite` | Multi-cloud security auditing | Cloud security posture |
+| `powerpipe` | Infrastructure benchmarking | Compliance and security benchmarks |
+| `openscap` | Security compliance scanning | SCAP compliance validation |
+| `ossf-scorecard` | Open source project security | Supply chain security assessment |
 
 #### Static Analysis & Code Security
 | Tool | Purpose | Use When |
@@ -89,30 +90,37 @@ This table provides a quick overview of all Ship tools organized by workflow and
 | `cfn-nag` | CloudFormation security | AWS CloudFormation |
 | `conftest` | OPA policy testing | Policy validation |
 | `gatekeeper` | OPA policy enforcement | K8s policy enforcement |
-| `kyverno` | K8s policy management | K8s native policies |
+| `license-detector` | Software license detection | License compliance |
+| `iac-plan` | Infrastructure as Code planning | IaC security planning |
+| `tfsec` | Terraform security scanning | Terraform-specific security |
 
-#### Compliance & Governance
+#### Infrastructure & Platform Security
 | Tool | Purpose | Use When |
 |------|---------|----------|
-| `openscap` | Security compliance scanning | SCAP compliance |
-| `ossf-scorecard` | OSS project security scoring | Dependency evaluation |
-| `scancode` | License detection | License compliance |
-| `license-detector` | Software license detection | Legal compliance |
+| `terrascan` | Infrastructure as Code security | Terraform/CloudFormation scanning |
 
-### Cloud Infrastructure Tools (11 tools)
+
+
+### Cloud Infrastructure Tools (17 tools)
 | Tool | Purpose | Use When |
 |------|---------|----------|
-| `packer` | Machine image building | Golden image creation |
+| `cloudquery` | Cloud asset inventory | Multi-cloud asset discovery |
+| `custodian` | Cloud governance automation | Policy enforcement |
 | `terraformer` | Infrastructure import | Import existing infra to Terraform |
-| `tfstate-reader` | Terraform state analysis | State file analysis |
-| `iac-plan` | IaC planning | Infrastructure planning |
-| `infrascan` | Infrastructure security | Infrastructure scanning |
-| `powerpipe` | Infrastructure benchmarking | Compliance benchmarking |
-| `fleet` | GitOps for Kubernetes | K8s GitOps |
-| `kuttl` | Kubernetes testing | K8s test framework |
-| `litmus` | Chaos engineering | K8s resilience testing |
-| `cert-manager` | Certificate management | K8s certificate automation |
+| `inframap` | Infrastructure visualization | Architecture documentation |
+| `infrascan` | Infrastructure security scanning | Security assessment |
+| `aws-iam-rotation` | AWS IAM key rotation | Security automation |
+| `tfstate-reader` | Terraform state analysis | State file inspection |
+| `packer` | Machine image building | Golden image creation |
+| `fleet` | GitOps for Kubernetes | K8s GitOps delivery |
+| `kuttl` | Kubernetes testing | K8s test automation |
+| `litmus` | Chaos engineering | Reliability testing |
+| `cert-manager` | Certificate management | TLS automation |
 | `k8s-network-policy` | Network policy management | K8s network security |
+| `kyverno` | Kubernetes policy engine | Policy management |
+| `kyverno-multitenant` | Multi-tenant K8s policies | Tenant isolation |
+| `github-admin` | GitHub administration | Repository management |
+| `github-packages` | GitHub packages management | Package operations |
 
 ### AWS Tools (4 tools)
 | Tool | Purpose | Use When |
@@ -122,17 +130,6 @@ This table provides a quick overview of all Ship tools organized by workflow and
 | `pmapper` | AWS IAM privilege mapping | Privilege escalation analysis |
 | `policy-sentry` | AWS IAM policy generation | Least-privilege policies |
 
-### Supply Chain Tools (3 tools)
-| Tool | Purpose | Use When |
-|------|---------|----------|
-| `cosign` | Container signing/verification | Supply chain integrity |
-| `dependency-track` | SBOM analysis platform | Enterprise SBOM management |
-| `syft` | SBOM generation | Software bill of materials |
-
-### Development Tools (1 tool)
-| Tool | Purpose | Use When |
-|------|---------|----------|
-| `opencode` | AI coding assistant | AI-powered development |
 
 ## External MCP Servers (16 servers)
 
@@ -216,4 +213,12 @@ Compliance: kube-bench → openscap
 
 ---
 
-**Total: 82 tools** (63 built-in + 16 external MCPs + 3 collections)
+**Total: 79 tools** (63 built-in + 16 external MCPs)
+
+### Summary by Category
+- **Terraform Tools**: 11 tools
+- **Security Tools**: 31 tools  
+- **Cloud Infrastructure Tools**: 17 tools
+- **AWS Tools**: 4 tools
+- **Total Built-in Tools**: 63 tools
+- **External MCP Servers**: 16 servers

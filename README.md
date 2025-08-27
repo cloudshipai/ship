@@ -121,10 +121,19 @@ The Ship Framework provides these key components:
 
 **For Pre-built DevOps Tools** - Use the Ship CLI directly:
 ```bash
-# Access all 63 pre-built tools via MCP
-ship mcp all          # All tools (terraform, security, kubernetes, etc.)
-ship mcp terraform    # Terraform-specific tools (tflint, terraform-docs, etc.)
-ship mcp security     # Security tools (trivy, nuclei, kubescape, etc.)
+# Individual tools (lightweight - only the tool you need)
+ship mcp tflint       # Just TFLint
+ship mcp grype        # Just Grype vulnerability scanner  
+ship mcp nuclei       # Just Nuclei scanner
+ship mcp kubescape    # Just Kubescape K8s security
+
+# Tool categories (multiple related tools)
+ship mcp terraform    # All Terraform tools (7 tools: tflint, terraform-docs, etc.)
+ship mcp security     # All security tools (31 tools: trivy, nuclei, etc.)
+ship mcp kubernetes   # All K8s tools (9 tools: kubescape, velero, etc.)
+
+# Everything (heavyweight - all 63 tools)
+ship mcp all          # All tools across all categories
 ```
 
 ### 2. AI Assistant Integration (MCP)
@@ -134,9 +143,13 @@ Configure your custom MCP servers built with Ship in Claude Desktop or other AI 
 ```json
 {
   "mcpServers": {
-    "ship-all-tools": {
+    "ship-tflint": {
       "command": "ship",
-      "args": ["mcp", "all"]
+      "args": ["mcp", "tflint"]
+    },
+    "ship-grype": {
+      "command": "ship", 
+      "args": ["mcp", "grype"]
     },
     "ship-terraform": {
       "command": "ship",
@@ -149,9 +162,9 @@ Configure your custom MCP servers built with Ship in Claude Desktop or other AI 
       "command": "ship",
       "args": ["mcp", "security"]
     },
-    "ship-external": {
+    "ship-all": {
       "command": "ship",
-      "args": ["mcp", "filesystem", "--var", "FILESYSTEM_ROOT=/workspace"]
+      "args": ["mcp", "all"]
     }
   }
 }
@@ -171,11 +184,19 @@ Ship also includes a CLI for direct usage of infrastructure tools:
 # Navigate to your project directory
 cd your-infrastructure-project
 
-# Start MCP servers for AI assistant integration (MAIN USE CASE)
+# Individual tools (lightweight - best for focused workflows)
+ship mcp tflint             # Just TFLint
+ship mcp grype              # Just Grype vulnerability scanner
+ship mcp nuclei             # Just Nuclei scanner
+ship mcp kubescape          # Just Kubescape K8s security
+
+# Tool categories (multiple related tools)
+ship mcp terraform          # All Terraform tools (7 tools)
+ship mcp security           # All security tools (31 tools)
+ship mcp kubernetes         # All Kubernetes tools (9 tools)
+
+# All tools (heavyweight)
 ship mcp all                # All 63 tools across all categories
-ship mcp terraform          # All Terraform tools (tflint, terraform-docs, checkov, etc.)
-ship mcp security           # All security tools (trivy, grype, nuclei, etc.)
-ship mcp kubernetes         # All Kubernetes tools (kubescape, velero, etc.)
 
 # External MCP server proxying
 ship mcp filesystem --var FILESYSTEM_ROOT=/workspace

@@ -1,0 +1,8 @@
+{
+  "required_fields": ["id", "name"],
+  "processing_options": {
+    "add_timestamp": true,
+    "convert_strings": true
+  },
+  "output_format": "json"
+}

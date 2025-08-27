@@ -60,6 +60,12 @@ var ToolRegistry = map[string][]ToolInfo{
 		{Name: "github-packages", Description: "GitHub Packages security", AddFunc: AddGitHubPackagesTools, HasVariables: true},
 		{Name: "trivy-golden", Description: "Enhanced Trivy for golden images", AddFunc: AddTrivyGoldenTools, HasVariables: false},
 	},
+	"development": {
+		{Name: "opencode", Description: "OpenCode AI coding assistant", AddFunc: AddOpenCodeTools, HasVariables: true},
+	},
+	"monitoring": {
+		{Name: "grafana", Description: "Grafana monitoring and visualization platform", AddFunc: AddGrafanaTools, HasVariables: true},
+	},
 	"terraform": {
 		{Name: "tflint", Description: "Terraform linter", AddFunc: AddTfLintTools, HasVariables: false},
 		{Name: "terraform-docs", Description: "Terraform documentation generator", AddFunc: AddTerraformDocsTools, HasVariables: false},

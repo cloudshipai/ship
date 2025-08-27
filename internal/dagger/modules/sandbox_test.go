@@ -156,6 +156,8 @@ func testContainerAppSandbox(t *testing.T, ctx context.Context, client *dagger.C
 		if err != nil {
 			// Expected to fail if image isn't built, but module should handle gracefully
 			t.Logf("Trivy container scan result (may fail without built image): %v", err)
+		} else {
+			t.Logf("Trivy scan result: %s", result)
 		}
 
 		_ = image    // Use the built image variable to avoid unused error

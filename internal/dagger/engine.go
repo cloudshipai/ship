@@ -108,3 +108,8 @@ func (e *Engine) NewCheckovModule() *modules.CheckovModule {
 func (e *Engine) NewInfraMapModule() *modules.InfraMapModule {
 	return modules.NewInfraMapModule(e.client)
 }
+
+// OpenCode creates a new OpenCode module
+func (e *Engine) OpenCode() *modules.OpenCodeModule {
+	return modules.NewOpenCodeModule(e.client)
+}

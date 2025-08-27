@@ -395,6 +395,39 @@ var ExternalMCPServers = map[string]ship.MCPServerConfig{
 			},
 		},
 	},
+
+	// Third-party Docker-based MCP Servers
+	"grafana": {
+		Name:      "grafana",
+		Command:   "docker",
+		Args:      []string{"run", "--rm", "-i", "mcp/grafana:latest", "-t", "stdio"},
+		Transport: "stdio",
+		Env:       map[string]string{},
+		Variables: []ship.Variable{
+			{
+				Name:        "GRAFANA_URL",
+				Description: "Grafana server URL (e.g., http://localhost:3000 or https://myinstance.grafana.net)",
+				Required:    true,
+			},
+			{
+				Name:        "GRAFANA_API_KEY",
+				Description: "Grafana service account token for authentication",
+				Required:    false,
+				Secret:      true,
+			},
+			{
+				Name:        "GRAFANA_USERNAME",
+				Description: "Grafana username for basic authentication (alternative to API key)",
+				Required:    false,
+			},
+			{
+				Name:        "GRAFANA_PASSWORD",
+				Description: "Grafana password for basic authentication (alternative to API key)",
+				Required:    false,
+				Secret:      true,
+			},
+		},
+	},
 }
 
 // IsExternalMCPServer checks if the tool name matches an external MCP server

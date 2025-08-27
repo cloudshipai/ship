@@ -38,6 +38,17 @@ Ship comes with pre-configured external MCP servers:
   - `BRAVE_API_KEY` (required): Brave Search API key
   - `BRAVE_SEARCH_COUNT` (optional): Number of results (default: `10`)
 
+### Grafana Server
+- **Name**: `grafana`
+- **Description**: Grafana monitoring and visualization platform integration
+- **Docker Image**: `mcp/grafana:latest`
+- **Tools**: Dashboard management, alerting, metrics querying, data source operations
+- **Variables**:
+  - `GRAFANA_URL` (required): Grafana server URL (e.g., `http://localhost:3000` or `https://myinstance.grafana.net`)
+  - `GRAFANA_API_KEY` (required): Grafana service account token
+  - `GRAFANA_USERNAME` (optional): Username for basic auth (alternative to API key)
+  - `GRAFANA_PASSWORD` (optional): Password for basic auth (alternative to API key)
+
 ## CLI Usage
 
 ### Basic Usage
@@ -53,6 +64,9 @@ ship mcp memory
 
 # Start Brave search (requires API key)
 ship mcp brave-search --var BRAVE_API_KEY=your_api_key
+
+# Start Grafana server (requires URL and API key)
+ship mcp grafana --var GRAFANA_URL=http://localhost:3000 --var GRAFANA_API_KEY=your_service_account_token
 ```
 
 ### Using Variables
@@ -68,6 +82,12 @@ ship mcp memory --var MEMORY_STORAGE_PATH=/data --var MEMORY_MAX_SIZE=100MB
 
 # Brave search with custom result count
 ship mcp brave-search --var BRAVE_API_KEY=your_key --var BRAVE_SEARCH_COUNT=20
+
+# Grafana with API key authentication
+ship mcp grafana --var GRAFANA_URL=https://myinstance.grafana.net --var GRAFANA_API_KEY=glsa_xyz123
+
+# Grafana with username/password authentication
+ship mcp grafana --var GRAFANA_URL=http://localhost:3000 --var GRAFANA_USERNAME=admin --var GRAFANA_PASSWORD=admin
 ```
 
 ### Variable Discovery
@@ -78,6 +98,7 @@ List available variables for external MCP servers:
 ship modules info filesystem
 ship modules info memory
 ship modules info brave-search
+ship modules info grafana
 ```
 
 Example output:

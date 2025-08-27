@@ -74,79 +74,58 @@ go install github.com/cloudshipai/ship/cmd/ship@latest
 
 Build your own MCP servers using the Ship framework:
 
-#### Quick Example: Infrastructure MCP Server
+#### Quick Framework Example: Custom MCP Server
+
+**Important**: Ship's pre-built tools (TFLint, Checkov, etc.) are only available through the Ship CLI. The Ship Framework provides the infrastructure for building **custom** MCP servers with your own tools.
 
 ```bash
-# Create a new Go project
-mkdir my-infrastructure-server && cd my-infrastructure-server
-go mod init my-infrastructure-server
-go get github.com/cloudshipai/ship
+# Explore working examples
+cd examples/ship-framework/basic-custom-server
+go mod tidy
+go run main.go
 ```
 
-Create `main.go`:
+The framework provides interfaces for building containerized tools:
 
 ```go
-package main
+// Example custom tool implementation
+type EchoTool struct{}
 
-import (
-    "log"
-    "github.com/cloudshipai/ship/pkg/ship"
-    "github.com/cloudshipai/ship/internal/tools"
-)
-
-func main() {
-    // Build MCP server with Ship's pre-built infrastructure tools
-    server := ship.NewServer("infrastructure-server", "1.0.0").
-        AddTool(tools.NewTFLintTool()).     // Terraform linting
-        Build()
-
-    // Start the MCP server
-    if err := server.ServeStdio(); err != nil {
-        log.Fatalf("Server failed: %v", err)
-    }
+func (t *EchoTool) Name() string { return "echo" }
+func (t *EchoTool) Description() string { return "Echoes input back" }
+func (t *EchoTool) Parameters() []ship.Parameter { /* ... */ }
+func (t *EchoTool) Execute(ctx context.Context, params map[string]interface{}, engine *dagger.Engine) (*ship.ToolResult, error) {
+    // Custom tool logic here
 }
-```
 
-```bash
-# Build and run your MCP server
-go build -o infrastructure-server .
-./infrastructure-server
-```
-
-#### Four Integration Patterns
-
-**1. Ship-First (Recommended):**
-```go
-// Ship manages the entire MCP server
+// Build MCP server with custom tools
 server := ship.NewServer("my-server", "1.0.0").
-    AddTool(tools.NewTFLintTool()).
+    AddTool(&EchoTool{}).
     Build()
+
 server.ServeStdio()
 ```
 
-**2. Bring Your Own MCP Server:**
-```go
-// Add Ship tools to existing mcp-go server  
-shipAdapter := ship.NewMCPAdapter().
-    AddTool(tools.NewTFLintTool())
-shipAdapter.AttachToServer(ctx, existingMCPServer)
-```
+📁 **Working Examples**: Complete examples in [`examples/ship-framework/`](examples/ship-framework/) show:
+- **basic-custom-server**: Simple tools with parameter handling
+- **container-tools**: Containerized tools (Terraform, Docker, YAML validation)
 
-**3. Tool Router (Advanced):**
-```go
-// Route different tools to different servers
-router := ship.NewToolRouter().
-    AddRoute("terraform", terraformAdapter).
-    AddRoute("security", securityAdapter)
-```
+#### Framework Architecture
 
-**4. CLI Usage (Optional):**
+The Ship Framework provides these key components:
+
+**1. Server Builder** - Fluent API for MCP server creation
+**2. Tool Interface** - For implementing containerized tools  
+**3. Registry System** - Managing tools, prompts, and resources
+**4. Dagger Integration** - Secure container execution
+
+**For Pre-built DevOps Tools** - Use the Ship CLI directly:
 ```bash
-# Direct CLI access to tools
-ship mcp all  # Start MCP server with all tools
+# Access all 63 pre-built tools via MCP
+ship mcp all          # All tools (terraform, security, kubernetes, etc.)
+ship mcp terraform    # Terraform-specific tools (tflint, terraform-docs, etc.)
+ship mcp security     # Security tools (trivy, nuclei, kubescape, etc.)
 ```
-
-📚 **Complete Integration Guide**: See [examples/integration-patterns.md](examples/integration-patterns.md) for detailed integration patterns with code examples.
 
 ### 2. AI Assistant Integration (MCP)
 

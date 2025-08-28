@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"syscall"
 	"time"
 	"unicode/utf8"
 
@@ -749,7 +748,7 @@ func executeShipCommandWithContext(ctx context.Context, args []string) (*mcp.Cal
 	cmd := exec.CommandContext(ctx, executable, args...)
 	
 	// Set up process group to handle cleanup properly
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	setProcAttr(cmd)
 	
 	// Execute the command with context timeout
 	output, err := cmd.CombinedOutput()

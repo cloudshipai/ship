@@ -2,7 +2,6 @@
 package all
 
 import (
-	"github.com/cloudshipai/ship/internal/tools"
 	"github.com/cloudshipai/ship/pkg/ship"
 )
 
@@ -10,8 +9,8 @@ import (
 func TerraformRegistry() *ship.Registry {
 	registry := ship.NewRegistry()
 
-	// Add TFLint tool
-	registry.RegisterTool(tools.NewTFLintTool())
+	// TODO: Add TFLint tool when converted to new framework:
+	// registry.RegisterTool(tools.NewTFLintTool())
 
 	// TODO: Add more Terraform tools as they're converted to the framework:
 	// registry.RegisterTool(tools.NewCheckovTool())

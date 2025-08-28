@@ -1,0 +1,613 @@
+package modules
+
+import (
+	"context"
+	"fmt"
+
+	"dagger.io/dagger"
+)
+
+// TerrascanModule runs Terrascan for IaC security scanning
+type TerrascanModule struct {
+	client *dagger.Client
+	name string
+}
+
+
+// NewTerrascanModule creates a new Terrascan module
+func NewTerrascanModule(client *dagger.Client) *TerrascanModule {
+	return &TerrascanModule{
+		client: client,
+		name:   "terrascan",
+	}
+}
+
+// ScanDirectory scans a directory for IaC security issues using Terrascan
+func (m *TerrascanModule) ScanDirectory(ctx context.Context, dir string) (string, error) {
+	container := m.client.Container().
+		From("tenable/terrascan:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(dir)).
+		WithWorkdir("/workspace").
+		WithExec([]string{"terrascan", "scan", "-d", ".", "-o", "json"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		// Terrascan returns non-zero exit code when violations are found
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed to run terrascan: %w", err)
+	}
+
+	return output, nil
+}
+
+// ScanTerraform scans Terraform files specifically
+func (m *TerrascanModule) ScanTerraform(ctx context.Context, dir string) (string, error) {
+	container := m.client.Container().
+		From("tenable/terrascan:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(dir)).
+		WithWorkdir("/workspace").
+		WithExec([]string{"terrascan", "scan", "-i", "terraform", "-d", ".", "-o", "json"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed to run terrascan on terraform: %w", err)
+	}
+
+	return output, nil
+}
+
+// ScanKubernetes scans Kubernetes manifests
+func (m *TerrascanModule) ScanKubernetes(ctx context.Context, dir string) (string, error) {
+	container := m.client.Container().
+		From("tenable/terrascan:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(dir)).
+		WithWorkdir("/workspace").
+		WithExec([]string{"terrascan", "scan", "-i", "k8s", "-d", ".", "-o", "json"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed to run terrascan on kubernetes: %w", err)
+	}
+
+	return output, nil
+}
+
+// ScanCloudFormation scans CloudFormation templates
+func (m *TerrascanModule) ScanCloudFormation(ctx context.Context, dir string) (string, error) {
+	container := m.client.Container().
+		From("tenable/terrascan:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(dir)).
+		WithWorkdir("/workspace").
+		WithExec([]string{"terrascan", "scan", "-i", "cloudformation", "-d", ".", "-o", "json"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed to run terrascan on cloudformation: %w", err)
+	}
+
+	return output, nil
+}
+
+// ScanDockerfiles scans Dockerfile for security issues
+func (m *TerrascanModule) ScanDockerfiles(ctx context.Context, dir string) (string, error) {
+	container := m.client.Container().
+		From("tenable/terrascan:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(dir)).
+		WithWorkdir("/workspace").
+		WithExec([]string{"terrascan", "scan", "-i", "docker", "-d", ".", "-o", "json"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed to run terrascan on docker: %w", err)
+	}
+
+	return output, nil
+}
+
+// ScanWithSeverity scans with a specific severity threshold
+func (m *TerrascanModule) ScanWithSeverity(ctx context.Context, dir string, severity string, iacType string) (string, error) {
+	args := []string{"terrascan", "scan", "-d", ".", "-o", "json"}
+	
+	if iacType != "" {
+		args = append(args, "-i", iacType)
+	}
+	
+	if severity != "" {
+		args = append(args, "--severity", severity)
+	}
+
+	container := m.client.Container().
+		From("tenable/terrascan:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(dir)).
+		WithWorkdir("/workspace").
+		WithExec(args, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed to run terrascan with severity %s: %w", severity, err)
+	}
+
+	return output, nil
+}
+
+// ScanRemote scans remote repository
+func (m *TerrascanModule) ScanRemote(ctx context.Context, repoURL string, repoType string, outputFormat string) (string, error) {
+	args := []string{"terrascan", "scan", "-r", repoURL}
+	if repoType != "" {
+		args = append(args, "--remote-type", repoType)
+	}
+	if outputFormat != "" {
+		args = append(args, "--output", outputFormat)
+	}
+
+	container := m.client.Container().
+		From("tenable/terrascan:latest").
+		WithExec(args, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed to scan remote repository: %w", err)
+	}
+
+	return output, nil
+}
+
+// ScanWithPolicy scans using custom policy path
+func (m *TerrascanModule) ScanWithPolicy(ctx context.Context, dir string, policyPath string, outputFormat string) (string, error) {
+	container := m.client.Container().
+		From("tenable/terrascan:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(dir)).
+		WithDirectory("/policies", m.client.Host().Directory(policyPath)).
+		WithWorkdir("/workspace")
+
+	args := []string{"terrascan", "scan", "-d", ".", "--policy-path", "/policies"}
+	if outputFormat != "" {
+		args = append(args, "--output", outputFormat)
+	}
+
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed to scan with custom policy: %w", err)
+	}
+
+	return output, nil
+}
+
+// ComprehensiveIaCScan performs comprehensive Infrastructure as Code security scanning
+func (m *TerrascanModule) ComprehensiveIaCScan(ctx context.Context, target string, iacType string, outputFormat string, outputFile string, severityThreshold string, policyTypes string, excludeRules string, verbose bool, showPassed bool) (string, error) {
+	container := m.client.Container().
+		From("tenable/terrascan:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(target)).
+		WithWorkdir("/workspace")
+
+	args := []string{"terrascan", "scan", "-i", iacType, "-d", "."}
+	if outputFormat != "" {
+		args = append(args, "-o", outputFormat)
+	}
+	if outputFile != "" {
+		args = append(args, "--output-file", outputFile)
+	}
+	if severityThreshold != "" {
+		args = append(args, "--severity", severityThreshold)
+	}
+	if policyTypes != "" {
+		args = append(args, "--policy-type", policyTypes)
+	}
+	if excludeRules != "" {
+		args = append(args, "--skip-rules", excludeRules)
+	}
+	if verbose {
+		args = append(args, "-v")
+	}
+	if showPassed {
+		args = append(args, "--show-passed")
+	}
+
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed comprehensive IaC scan: %w", err)
+	}
+
+	return output, nil
+}
+
+// ComplianceFrameworkScan scans against compliance frameworks
+func (m *TerrascanModule) ComplianceFrameworkScan(ctx context.Context, target string, complianceFramework string, iacType string, outputFormat string, outputFile string, includeSeverityDetails bool) (string, error) {
+	container := m.client.Container().
+		From("tenable/terrascan:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(target)).
+		WithWorkdir("/workspace")
+
+	args := []string{"terrascan", "scan", "-i", iacType, "-d", ".", "--policy-type", complianceFramework}
+	if outputFormat != "" {
+		args = append(args, "-o", outputFormat)
+	}
+	if outputFile != "" {
+		args = append(args, "--output-file", outputFile)
+	}
+	if includeSeverityDetails {
+		args = append(args, "--show-passed", "-v")
+	}
+
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed compliance framework scan: %w", err)
+	}
+
+	return output, nil
+}
+
+// RemoteRepositoryScan performs advanced remote repository scanning
+func (m *TerrascanModule) RemoteRepositoryScan(ctx context.Context, repoURL string, repoType string, iacType string, branch string, sshKeyPath string, accessToken string, configPath string, outputFormat string) (string, error) {
+	container := m.client.Container().
+		From("tenable/terrascan:latest")
+
+	if sshKeyPath != "" {
+		container = container.WithFile("/ssh_key", m.client.Host().File(sshKeyPath))
+	}
+	if configPath != "" {
+		container = container.WithFile("/config.yaml", m.client.Host().File(configPath))
+	}
+
+	args := []string{"terrascan", "scan", "-r", repoURL, "-t", repoType, "-i", iacType}
+	if branch != "" {
+		args = append(args, "--remote-branch", branch)
+	}
+	if sshKeyPath != "" {
+		args = append(args, "--ssh-key", "/ssh_key")
+	}
+	if accessToken != "" {
+		args = append(args, "--access-token", accessToken)
+	}
+	if configPath != "" {
+		args = append(args, "-c", "/config.yaml")
+	}
+	if outputFormat != "" {
+		args = append(args, "-o", outputFormat)
+	}
+
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed remote repository scan: %w", err)
+	}
+
+	return output, nil
+}
+
+// CustomPolicyManagement manages and validates custom Terrascan policies
+func (m *TerrascanModule) CustomPolicyManagement(ctx context.Context, action string, policyPath string, target string, iacType string, testDataPath string) (string, error) {
+	container := m.client.Container().
+		From("tenable/terrascan:latest")
+
+	if policyPath != "" {
+		container = container.WithDirectory("/policies", m.client.Host().Directory(policyPath))
+	}
+	if target != "" {
+		container = container.WithDirectory("/workspace", m.client.Host().Directory(target))
+	}
+	if testDataPath != "" {
+		container = container.WithDirectory("/testdata", m.client.Host().Directory(testDataPath))
+	}
+
+	var args []string
+	switch action {
+	case "validate":
+		args = []string{"terrascan", "init", "--policy-path", "/policies"}
+	case "test":
+		args = []string{"terrascan", "scan", "--policy-path", "/policies", "-d", "/testdata"}
+	case "scan-with-custom":
+		args = []string{"terrascan", "scan", "-i", iacType, "-d", "/workspace", "--policy-path", "/policies"}
+	default:
+		args = []string{"terrascan", "--help"}
+	}
+
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed custom policy management: %w", err)
+	}
+
+	return output, nil
+}
+
+// CICDPipelineIntegration performs optimized IaC security scanning for CI/CD pipelines
+func (m *TerrascanModule) CICDPipelineIntegration(ctx context.Context, target string, iacType string, pipelineStage string, gatePolicy string, outputFormat string, outputFile string, failOnViolations bool, baselineFile string, quietMode bool) (string, error) {
+	container := m.client.Container().
+		From("tenable/terrascan:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(target)).
+		WithWorkdir("/workspace")
+
+	if baselineFile != "" {
+		container = container.WithFile("/baseline.json", m.client.Host().File(baselineFile))
+	}
+
+	args := []string{"terrascan", "scan", "-i", iacType, "-d", "."}
+
+	// Configure based on pipeline stage and gate policy
+	switch pipelineStage {
+	case "pre-commit":
+		if gatePolicy == "strict" {
+			args = append(args, "--severity", "MEDIUM")
+		} else {
+			args = append(args, "--severity", "HIGH")
+		}
+	case "build":
+		args = append(args, "--severity", "HIGH")
+	case "test":
+		args = append(args, "--severity", "MEDIUM")
+	case "staging", "production":
+		args = append(args, "--severity", "LOW")
+	}
+
+	if outputFormat != "" {
+		args = append(args, "-o", outputFormat)
+	}
+	if outputFile != "" {
+		args = append(args, "--output-file", outputFile)
+	}
+	if baselineFile != "" {
+		args = append(args, "--baseline", "/baseline.json")
+	}
+	if quietMode {
+		args = append(args, "--quiet")
+	}
+
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed CI/CD pipeline integration: %w", err)
+	}
+
+	return output, nil
+}
+
+// GetVersion returns the version of Terrascan
+func (m *TerrascanModule) GetVersion(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From("tenable/terrascan:latest").
+		WithExec([]string{"terrascan", "version"}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get terrascan version: %w", err)
+	}
+
+	return output, nil
+}
+
+// CloudProviderScan performs cloud provider specific security scanning
+func (m *TerrascanModule) CloudProviderScan(ctx context.Context, target string, cloudProvider string, iacType string, securityCategories string, serviceFocus string, includeBestPractices bool, outputFormat string) (string, error) {
+	container := m.client.Container().
+		From("tenable/terrascan:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(target)).
+		WithWorkdir("/workspace")
+
+	args := []string{"terrascan", "scan", "-i", iacType, "-d", ".", "--policy-type", cloudProvider}
+	if securityCategories != "" {
+		args = append(args, "--categories", securityCategories)
+	}
+	if serviceFocus != "" {
+		args = append(args, "--services", serviceFocus)
+	}
+	if includeBestPractices {
+		args = append(args, "--include-best-practices")
+	}
+	if outputFormat != "" {
+		args = append(args, "-o", outputFormat)
+	}
+
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed cloud provider scan: %w", err)
+	}
+
+	return output, nil
+}
+
+// PerformanceOptimization performs high-performance IaC scanning with optimization features
+func (m *TerrascanModule) PerformanceOptimization(ctx context.Context, target string, iacType string, scanMode string, parallelWorkers string, maxFileSize string, skipLargeFiles bool, enableCaching bool, excludeDirs string, enableMetrics bool) (string, error) {
+	container := m.client.Container().
+		From("tenable/terrascan:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(target)).
+		WithWorkdir("/workspace")
+
+	args := []string{"terrascan", "scan", "-i", iacType, "-d", "."}
+
+	// Configure scan mode
+	switch scanMode {
+	case "fast":
+		args = append(args, "--severity", "HIGH", "--skip-rules", "low-priority")
+	case "thorough":
+		args = append(args, "--severity", "LOW", "--show-passed")
+	case "balanced":
+		args = append(args, "--severity", "MEDIUM")
+	}
+
+	if parallelWorkers != "" {
+		args = append(args, "--workers", parallelWorkers)
+	}
+	if maxFileSize != "" {
+		args = append(args, "--max-file-size", maxFileSize)
+	}
+	if skipLargeFiles {
+		args = append(args, "--skip-large-files")
+	}
+	if enableCaching {
+		args = append(args, "--cache")
+	}
+	if excludeDirs != "" {
+		args = append(args, "--exclude-dirs", excludeDirs)
+	}
+	if enableMetrics {
+		args = append(args, "--metrics")
+	}
+
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed performance optimized scan: %w", err)
+	}
+
+	return output, nil
+}
+
+// ComprehensiveReporting generates comprehensive IaC security reports with analytics
+func (m *TerrascanModule) ComprehensiveReporting(ctx context.Context, target string, iacType string, reportType string, outputFormats string, outputDirectory string, includeRemediation bool, includeTrends bool, baselineComparison string, includePolicyDetails bool) (string, error) {
+	container := m.client.Container().
+		From("tenable/terrascan:latest").
+		WithDirectory("/workspace", m.client.Host().Directory(target)).
+		WithWorkdir("/workspace")
+
+	if baselineComparison != "" {
+		container = container.WithFile("/baseline.json", m.client.Host().File(baselineComparison))
+	}
+
+	args := []string{"terrascan", "scan", "-i", iacType, "-d", "."}
+
+	// Configure report-specific settings
+	switch reportType {
+	case "executive-summary":
+		args = append(args, "--severity", "HIGH", "-o", "html")
+	case "technical-detail":
+		args = append(args, "--severity", "LOW", "--show-passed", "-o", "json")
+	case "compliance-audit":
+		args = append(args, "--policy-type", "all", "-o", "sarif")
+	case "risk-assessment":
+		args = append(args, "--severity", "MEDIUM", "-o", "yaml")
+	}
+
+	if outputFormats != "" {
+		args = append(args, "-o", outputFormats)
+	}
+	if outputDirectory != "" {
+		args = append(args, "--output-file", outputDirectory+"/terrascan-report")
+	}
+	if includeRemediation {
+		args = append(args, "--include-remediation")
+	}
+	if includePolicyDetails {
+		args = append(args, "-v")
+	}
+	if baselineComparison != "" {
+		args = append(args, "--baseline", "/baseline.json")
+	}
+
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		stderr, _ := container.Stderr(ctx)
+		if stderr != "" {
+			return stderr, nil
+		}
+		return "", fmt.Errorf("failed comprehensive reporting: %w", err)
+	}
+
+	return output, nil
+}

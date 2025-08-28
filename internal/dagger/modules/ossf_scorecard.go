@@ -13,7 +13,7 @@ type OSSFScorecardModule struct {
 	name   string
 }
 
-const scorecardBinary = "/usr/local/bin/scorecard"
+const scorecardBinary = "scorecard"
 
 // NewOSSFScorecardModule creates a new OSSF Scorecard module
 func NewOSSFScorecardModule(client *dagger.Client) *OSSFScorecardModule {

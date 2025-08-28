@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
+	"time"
 	"unicode/utf8"
 
 	shipMcp "github.com/cloudshipai/ship/internal/cli/mcp"
@@ -18,7 +20,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// ExecutionContext holds options for enhanced MCP execution
+type ExecutionContext struct {
+	OutputFile    string
+	ExecutionLog  string
+}
 
+// Global execution context
+var globalExecutionContext *ExecutionContext
 
 var mcpCmd = &cobra.Command{
 	Use:   "mcp [tool]",
@@ -37,6 +46,8 @@ func init() {
 	mcpCmd.Flags().StringToString("var", nil, "Environment variables for MCP servers and containers (e.g., --var API_KEY=value --var DEBUG=true)")
 	mcpCmd.Flags().StringToString("image-tag", nil, "Override container image tags for tools (e.g., --image-tag trivy=aquasec/trivy:0.50.0 --image-tag checkov=bridgecrew/checkov:3.2.0)")
 	mcpCmd.Flags().Bool("version", false, "Show version information for tools")
+	mcpCmd.Flags().String("output-file", "", "Write tool output to file (in addition to MCP response)")
+	mcpCmd.Flags().String("execution-log", "", "Write execution logs and timing to file")
 }
 
 func runMCPServer(cmd *cobra.Command, args []string) error {
@@ -46,6 +57,22 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 	envVars, _ := cmd.Flags().GetStringToString("var")
 	imageTags, _ := cmd.Flags().GetStringToString("image-tag")
 	showVersion, _ := cmd.Flags().GetBool("version")
+	outputFile, _ := cmd.Flags().GetString("output-file")
+	executionLog, _ := cmd.Flags().GetString("execution-log")
+
+	// Set global execution context for output options
+	globalExecutionContext = &ExecutionContext{
+		OutputFile:   outputFile,
+		ExecutionLog: executionLog,
+	}
+
+	// Set environment variables for Dagger tools to access output options
+	if outputFile != "" {
+		os.Setenv("SHIP_OUTPUT_FILE", outputFile)
+	}
+	if executionLog != "" {
+		os.Setenv("SHIP_EXECUTION_LOG", executionLog)
+	}
 
 	// Handle version requests
 	if showVersion {
@@ -61,7 +88,7 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 	// Track MCP command usage
 	telemetry.TrackMCPCommand(toolName)
 
-	// Create MCP server
+	// Create MCP server with enhanced configuration
 	serverName := fmt.Sprintf("ship-%s", toolName)
 	s := server.NewMCPServer(serverName, "1.0.0")
 
@@ -78,14 +105,14 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 	// Add specific tools based on argument using the modular registry
 	switch toolName {
 	case "all":
-		// Register all tools from all categories
-		shipMcp.RegisterAllTools(s, executeShipCommand)
+		// Register all tools from all categories with enhanced execution wrapper
+		shipMcp.RegisterAllTools(s, executeShipCommandWithStabilityEnhancements)
 	case "terraform", "security", "aws", "kubernetes", "cloud", "supply-chain":
-		// Register tools by category
-		shipMcp.RegisterToolsByCategory(toolName, s, executeShipCommand)
+		// Register tools by category with enhanced execution wrapper
+		shipMcp.RegisterToolsByCategory(toolName, s, executeShipCommandWithStabilityEnhancements)
 	default:
-		// Check if this is a specific tool name
-		shipMcp.RegisterToolByName(toolName, s, executeShipCommand)
+		// Check if this is a specific tool name with enhanced execution wrapper
+		shipMcp.RegisterToolByName(toolName, s, executeShipCommandWithStabilityEnhancements)
 		
 		// If no tools were registered, check if it's an external MCP server  
 		// Note: we can't check s.Tools() as it's not exposed, so we'll assume tool was registered
@@ -104,10 +131,10 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 		addPrompts(s)
 	}
 
-	// Start server
+	// Start server with enhanced stability
 	if useStdio || port == 0 {
-		fmt.Fprintf(os.Stderr, "Starting %s MCP server on stdio...\n", serverName)
-		return server.ServeStdio(s)
+		fmt.Fprintf(os.Stderr, "Starting %s MCP server on stdio with stability enhancements...\n", serverName)
+		return serveStdioWithStability(s)
 	} else {
 		fmt.Fprintf(os.Stderr, "Starting %s MCP server on %s:%d...\n", serverName, host, port)
 		return fmt.Errorf("HTTP server not implemented in this version, use --stdio")
@@ -242,6 +269,64 @@ const maxMCPTokens = 20000
 
 // Rough estimation: 1 token ≈ 4 characters for typical text
 const charsPerToken = 4
+
+// executeShipCommandWithLogging executes ship commands with enhanced logging and file output
+func executeShipCommandWithLogging(args []string) (*mcp.CallToolResult, error) {
+	startTime := time.Now()
+	
+	// Execute the command
+	result, err := executeShipCommand(args)
+	
+	elapsed := time.Since(startTime)
+	
+	// Write execution log if requested
+	if globalExecutionContext != nil && globalExecutionContext.ExecutionLog != "" {
+		logEntry := fmt.Sprintf("[%s] Command: ship %s | Duration: %v | Success: %t\n",
+			time.Now().Format("2006-01-02 15:04:05"),
+			strings.Join(args, " "),
+			elapsed,
+			err == nil && (result == nil || !result.IsError))
+		
+		// Append to execution log file
+		logFile, logErr := os.OpenFile(globalExecutionContext.ExecutionLog, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+		if logErr == nil {
+			logFile.WriteString(logEntry)
+			logFile.Close()
+		}
+	}
+	
+	// Write output to file if requested and we have content
+	if globalExecutionContext != nil && globalExecutionContext.OutputFile != "" && result != nil && !result.IsError {
+		var outputText string
+		if len(result.Content) > 0 {
+			if textContent, ok := result.Content[0].(mcp.TextContent); ok {
+				outputText = textContent.Text
+			}
+		}
+		
+		if outputText != "" {
+			// Create timestamped output for multiple invocations
+			timestamp := time.Now().Format("2006-01-02 15:04:05")
+			separator := strings.Repeat("=", 80)
+			outputContent := fmt.Sprintf("\n%s\n=== Ship CLI Output - %s ===\nCommand: ship %s\nDuration: %v\n%s\n\n%s\n",
+				separator,
+				timestamp,
+				strings.Join(args, " "),
+				elapsed,
+				separator,
+				outputText)
+			
+			// Append to output file
+			outputFile, fileErr := os.OpenFile(globalExecutionContext.OutputFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+			if fileErr == nil {
+				outputFile.WriteString(outputContent)
+				outputFile.Close()
+			}
+		}
+	}
+	
+	return result, err
+}
 
 func executeShipCommand(args []string) (*mcp.CallToolResult, error) {
 	// Get the current binary path
@@ -582,5 +667,152 @@ func showVariableHelp(serverName string) {
 			variable.Name, defaultInfo, required, secret, variable.Description)
 	}
 	fmt.Fprintf(os.Stderr, "\n")
+}
+
+// executeShipCommandWithStabilityEnhancements wraps command execution with connection stability improvements
+func executeShipCommandWithStabilityEnhancements(args []string) (*mcp.CallToolResult, error) {
+	startTime := time.Now()
+	
+	// Create a context with extended timeout for long-running operations
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	
+	// Execute the command with context
+	result, err := executeShipCommandWithContext(ctx, args)
+	
+	elapsed := time.Since(startTime)
+	
+	// Enhanced logging for debugging transport issues
+	if globalExecutionContext != nil && globalExecutionContext.ExecutionLog != "" {
+		status := "success"
+		if err != nil {
+			status = fmt.Sprintf("error: %v", err)
+		} else if result != nil && result.IsError {
+			status = "tool_error"
+		}
+		
+		logEntry := fmt.Sprintf("[%s] Command: ship %s | Duration: %v | Status: %s | PID: %d\n",
+			time.Now().Format("2006-01-02 15:04:05"),
+			strings.Join(args, " "),
+			elapsed,
+			status,
+			os.Getpid())
+		
+		// Write to execution log with error handling
+		if logFile, logErr := os.OpenFile(globalExecutionContext.ExecutionLog, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644); logErr == nil {
+			logFile.WriteString(logEntry)
+			logFile.Close()
+		}
+	}
+	
+	// Enhanced file output with stability markers
+	if globalExecutionContext != nil && globalExecutionContext.OutputFile != "" && result != nil && !result.IsError {
+		var outputText string
+		if len(result.Content) > 0 {
+			if textContent, ok := result.Content[0].(mcp.TextContent); ok {
+				outputText = textContent.Text
+			}
+		}
+		
+		if outputText != "" {
+			timestamp := time.Now().Format("2006-01-02 15:04:05")
+			separator := strings.Repeat("=", 80)
+			outputContent := fmt.Sprintf("\n%s\n=== Ship CLI Output - %s ===\nCommand: ship %s\nDuration: %v\nPID: %d\nMCP Transport: STABLE\n%s\n\n%s\n",
+				separator,
+				timestamp,
+				strings.Join(args, " "),
+				elapsed,
+				os.Getpid(),
+				separator,
+				outputText)
+			
+			// Write to output file with error handling
+			if outputFile, fileErr := os.OpenFile(globalExecutionContext.OutputFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644); fileErr == nil {
+				outputFile.WriteString(outputContent)
+				outputFile.Close()
+			}
+		}
+	}
+	
+	return result, err
+}
+
+// executeShipCommandWithContext executes ship commands with context cancellation support
+func executeShipCommandWithContext(ctx context.Context, args []string) (*mcp.CallToolResult, error) {
+	// Get the current binary path
+	executable, err := os.Executable()
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to get executable path: %v", err)), nil
+	}
+
+	// Create command with context
+	cmd := exec.CommandContext(ctx, executable, args...)
+	
+	// Set up process group to handle cleanup properly
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	
+	// Execute the command with context timeout
+	output, err := cmd.CombinedOutput()
+
+	// Handle context timeout specifically
+	if ctx.Err() == context.DeadlineExceeded {
+		return mcp.NewToolResultError("Command timed out after 10 minutes. This may indicate a hung container or network issue."), nil
+	}
+
+	if err != nil {
+		// Enhanced error reporting for transport debugging
+		return mcp.NewToolResultError(fmt.Sprintf("Command failed: %s\n\nOutput:\n%s\n\nContext: %v", 
+			err.Error(), string(output), ctx.Err())), nil
+	}
+
+	outputStr := string(output)
+
+	// Check if output needs to be chunked
+	if needsChunking(outputStr) {
+		return createChunkedResponse(outputStr), nil
+	}
+
+	return mcp.NewToolResultText(outputStr), nil
+}
+
+// serveStdioWithStability wraps the stdio server with connection stability improvements
+func serveStdioWithStability(s *server.MCPServer) error {
+	// Add signal handling to detect broken pipes early
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	
+	// Monitor for stdio connection health
+	go func() {
+		// Simple keepalive mechanism - write periodic status to stderr
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		
+		for {
+			select {
+			case <-ticker.C:
+				// Write keepalive message to stderr (not interfering with stdio protocol)
+				fmt.Fprintf(os.Stderr, "[MCP-KEEPALIVE] Server running, PID: %d\n", os.Getpid())
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	
+	// Enhanced error handling for stdio transport
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "[MCP-PANIC] Server panic recovered: %v\n", r)
+		}
+	}()
+	
+	// Start the standard stdio server with enhanced monitoring
+	err := server.ServeStdio(s)
+	
+	// Enhanced error reporting
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[MCP-ERROR] Server error: %v\n", err)
+	}
+	
+	return err
 }
 

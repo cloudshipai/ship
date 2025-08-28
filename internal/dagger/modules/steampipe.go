@@ -13,7 +13,7 @@ type SteampipeModule struct {
 	name   string
 }
 
-const steampipeBinary = "/usr/local/bin/steampipe"
+const steampipeBinary = "steampipe"
 
 // NewSteampipeModule creates a new Steampipe module
 func NewSteampipeModule(client *dagger.Client) *SteampipeModule {

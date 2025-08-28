@@ -12,8 +12,8 @@ type GatekeeperModule struct {
 }
 
 const (
-	gatekeeperKubectlBinary = "/usr/local/bin/kubectl"
-	gatekeeperHelmBinary = "/usr/local/bin/helm"
+	gatekeeperKubectlBinary = "kubectl"
+	gatekeeperHelmBinary = "helm"
 	gatekeeperManagerBinary = "/manager"
 )
 

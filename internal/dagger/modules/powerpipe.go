@@ -14,7 +14,7 @@ type PowerpipeModule struct {
 	name   string
 }
 
-const powerpipeBinary = "/usr/local/bin/powerpipe"
+const powerpipeBinary = "powerpipe"
 
 // NewPowerpipeModule creates a new Powerpipe module
 func NewPowerpipeModule(client *dagger.Client) *PowerpipeModule {

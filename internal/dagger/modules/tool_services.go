@@ -14,7 +14,7 @@ type ToolService struct {
 	port   int
 }
 
-const goBinary = "/usr/local/go/bin/go"
+const goBinary = "go"
 
 // SteampipeService exposes Steampipe as an HTTP API service
 func NewSteampipeService(client *dagger.Client) *dagger.Service {

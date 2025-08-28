@@ -15,7 +15,7 @@ type IacPlanModule struct {
 
 const (
 	terraformBinary = "/bin/terraform"
-	tofuBinary = "/usr/local/bin/tofu"
+	tofuBinary = "tofu"
 )
 
 func getBinaryPath(tool string) string {

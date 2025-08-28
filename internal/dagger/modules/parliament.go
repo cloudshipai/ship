@@ -12,7 +12,7 @@ type ParliamentModule struct {
 	name   string
 }
 
-const parliamentBinary = "/usr/local/bin/parliament"
+const parliamentBinary = "parliament"
 
 // NewParliamentModule creates a new Parliament module
 func NewParliamentModule(client *dagger.Client) *ParliamentModule {

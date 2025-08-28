@@ -14,7 +14,7 @@ type PMapperModule struct {
 	name   string
 }
 
-const pmapperBinary = "/usr/local/bin/pmapper"
+const pmapperBinary = "pmapper"
 
 // NewPMapperModule creates a new PMapper module
 func NewPMapperModule(client *dagger.Client) *PMapperModule {

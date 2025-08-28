@@ -1,0 +1,404 @@
+package modules
+
+import (
+	"context"
+	"fmt"
+
+	"dagger.io/dagger"
+)
+
+// TrivyModule runs Trivy for comprehensive vulnerability scanning
+type TrivyModule struct {
+	client *dagger.Client
+	name   string
+}
+
+
+// NewTrivyModule creates a new Trivy module
+func NewTrivyModule(client *dagger.Client) *TrivyModule {
+	return &TrivyModule{
+		client: client,
+		name:   "trivy",
+	}
+}
+
+// ScanImage scans a container image for vulnerabilities
+func (m *TrivyModule) ScanImage(ctx context.Context, imageName string) (string, error) {
+	container := m.client.Container().
+		From(getImageTag("trivy", "aquasec/trivy:latest")).
+		WithExec([]string{
+			"trivy", "image", "--format", "json", "--severity", "HIGH,CRITICAL", imageName,
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
+
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
+	}
+
+	return "", fmt.Errorf("failed to scan image: no output received")
+}
+
+// ScanFilesystem scans a filesystem for vulnerabilities
+func (m *TrivyModule) ScanFilesystem(ctx context.Context, dir string) (string, error) {
+	container := m.client.Container().
+		From(getImageTag("trivy", "aquasec/trivy:latest")).
+		WithDirectory("/workspace", m.client.Host().Directory(dir)).
+		WithWorkdir("/workspace").
+		WithExec([]string{
+			"trivy", "fs", "--format", "json", "--severity", "HIGH,CRITICAL", ".",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
+
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
+	}
+
+	return "", fmt.Errorf("failed to scan filesystem: no output received")
+}
+
+// ScanRepository scans a git repository
+func (m *TrivyModule) ScanRepository(ctx context.Context, repoURL string) (string, error) {
+	container := m.client.Container().
+		From(getImageTag("trivy", "aquasec/trivy:latest")).
+		WithExec([]string{
+			"trivy", "repo", "--format", "json", "--severity", "HIGH,CRITICAL", repoURL,
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
+
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
+	}
+
+	return "", fmt.Errorf("failed to scan repository: no output received")
+}
+
+// ScanConfig scans configuration files for misconfigurations
+func (m *TrivyModule) ScanConfig(ctx context.Context, dir string) (string, error) {
+	container := m.client.Container().
+		From(getImageTag("trivy", "aquasec/trivy:latest")).
+		WithDirectory("/workspace", m.client.Host().Directory(dir)).
+		WithWorkdir("/workspace").
+		WithExec([]string{
+			"trivy", "config", "--format", "json", "--severity", "HIGH,CRITICAL", ".",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
+
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
+	}
+
+	return "", fmt.Errorf("failed to scan config: no output received")
+}
+
+// GetVersion returns the version of Trivy
+func (m *TrivyModule) GetVersion(ctx context.Context) (string, error) {
+	container := m.client.Container().
+		From(getImageTag("trivy", "aquasec/trivy:latest")).
+		WithExec([]string{
+			"trivy", "--version",
+		}, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
+
+	output, _ := container.Stdout(ctx)
+	if output != "" {
+		return output, nil
+	}
+
+	return "", fmt.Errorf("failed to get trivy version: no output received")
+}
+
+// ScanSBOM scans SBOM file for vulnerabilities
+func (m *TrivyModule) ScanSBOM(ctx context.Context, sbomPath string, severity string, outputFormat string, outputFile string, ignoreUnfixed bool) (string, error) {
+	container := m.client.Container().
+		From(getImageTag("trivy", "aquasec/trivy:latest")).
+		WithFile("/sbom.json", m.client.Host().File(sbomPath))
+
+	args := []string{"sbom", "/sbom.json"}
+	if severity != "" {
+		args = append(args, "--severity", severity)
+	}
+	if outputFormat != "" {
+		args = append(args, "--format", outputFormat)
+	}
+	if outputFile != "" {
+		args = append(args, "--output", outputFile)
+	}
+	if ignoreUnfixed {
+		args = append(args, "--ignore-unfixed")
+	}
+
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to scan SBOM: %w", err)
+	}
+
+	return output, nil
+}
+
+// ScanKubernetes scans Kubernetes cluster for vulnerabilities
+func (m *TrivyModule) ScanKubernetes(ctx context.Context, target string, clusterContext string, namespace string, severity string, outputFormat string, scanners string, includeImages bool) (string, error) {
+	container := m.client.Container().
+		From(getImageTag("trivy", "aquasec/trivy:latest"))
+
+	if target == "" {
+		target = "cluster"
+	}
+
+	args := []string{"k8s", target}
+	if clusterContext != "" {
+		args = append(args, "--context", clusterContext)
+	}
+	if namespace != "" {
+		args = append(args, "--namespace", namespace)
+	}
+	if severity != "" {
+		args = append(args, "--severity", severity)
+	}
+	if outputFormat != "" {
+		args = append(args, "--format", outputFormat)
+	}
+	if scanners != "" {
+		args = append(args, "--scanners", scanners)
+	}
+	if includeImages {
+		args = append(args, "--include-images")
+	}
+
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to scan Kubernetes: %w", err)
+	}
+
+	return output, nil
+}
+
+// GenerateSBOM generates Software Bill of Materials
+func (m *TrivyModule) GenerateSBOM(ctx context.Context, target string, targetType string, sbomFormat string, outputFile string, includeDevDeps bool) (string, error) {
+	container := m.client.Container().
+		From(getImageTag("trivy", "aquasec/trivy:latest"))
+
+	if targetType == "fs" {
+		container = container.WithDirectory("/workspace", m.client.Host().Directory(target)).
+			WithWorkdir("/workspace")
+		target = "."
+	}
+
+	args := []string{targetType, "--format", sbomFormat, target}
+	if outputFile != "" {
+		args = append(args, "--output", outputFile)
+	}
+	if includeDevDeps {
+		args = append(args, "--include-dev-deps")
+	}
+
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate SBOM: %w", err)
+	}
+
+	return output, nil
+}
+
+// ScanWithFilters scans with advanced filtering options
+func (m *TrivyModule) ScanWithFilters(ctx context.Context, target string, targetType string, severity string, vulnType string, ignoreFile string, ignoreUnfixed bool, exitCode string) (string, error) {
+	container := m.client.Container().
+		From(getImageTag("trivy", "aquasec/trivy:latest"))
+
+	if targetType == "fs" {
+		container = container.WithDirectory("/workspace", m.client.Host().Directory(target)).
+			WithWorkdir("/workspace")
+		target = "."
+	}
+	if ignoreFile != "" {
+		container = container.WithFile("/.trivyignore", m.client.Host().File(ignoreFile))
+	}
+
+	args := []string{targetType, target}
+	if severity != "" {
+		args = append(args, "--severity", severity)
+	}
+	if vulnType != "" {
+		args = append(args, "--vuln-type", vulnType)
+	}
+	if ignoreFile != "" {
+		args = append(args, "--ignorefile", "/.trivyignore")
+	}
+	if ignoreUnfixed {
+		args = append(args, "--ignore-unfixed")
+	}
+	if exitCode != "" {
+		args = append(args, "--exit-code", exitCode)
+	}
+
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to scan with filters: %w", err)
+	}
+
+	return output, nil
+}
+
+// DatabaseUpdate performs database operations
+func (m *TrivyModule) DatabaseUpdate(ctx context.Context, operation string, skipUpdate bool, cacheDir string) (string, error) {
+	container := m.client.Container().
+		From(getImageTag("trivy", "aquasec/trivy:latest"))
+
+	var args []string
+	switch operation {
+	case "download", "update":
+		args = []string{"image", "--download-db-only", "alpine"}
+		if cacheDir != "" {
+			args = append(args, "--cache-dir", cacheDir)
+		}
+	case "reset", "clean":
+		args = []string{"clean", "--all"}
+		if cacheDir != "" {
+			args = append(args, "--cache-dir", cacheDir)
+		}
+	default:
+		args = []string{"--help"}
+	}
+
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to perform database operation: %w", err)
+	}
+
+	return output, nil
+}
+
+// ServerMode runs Trivy in server mode
+func (m *TrivyModule) ServerMode(ctx context.Context, listenPort string, listenAddress string, debug bool, token string) (string, error) {
+	container := m.client.Container().
+		From(getImageTag("trivy", "aquasec/trivy:latest"))
+
+	args := []string{"server"}
+	if listenPort != "" {
+		args = append(args, "--listen", "0.0.0.0:"+listenPort)
+	}
+	if listenAddress != "" {
+		args = append(args, "--listen", listenAddress)
+	}
+	if debug {
+		args = append(args, "--debug")
+	}
+	if token != "" {
+		args = append(args, "--token", token)
+	}
+
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to start server mode: %w", err)
+	}
+
+	return output, nil
+}
+
+// ClientScan scans using client mode
+func (m *TrivyModule) ClientScan(ctx context.Context, target string, targetType string, serverURL string, token string, outputFormat string) (string, error) {
+	container := m.client.Container().
+		From(getImageTag("trivy", "aquasec/trivy:latest"))
+
+	if targetType == "fs" {
+		container = container.WithDirectory("/workspace", m.client.Host().Directory(target)).
+			WithWorkdir("/workspace")
+		target = "."
+	}
+
+	args := []string{targetType, "--server", serverURL, target}
+	if token != "" {
+		args = append(args, "--token", token)
+	}
+	if outputFormat != "" {
+		args = append(args, "--format", outputFormat)
+	}
+
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to scan using client mode: %w", err)
+	}
+
+	return output, nil
+}
+
+// PluginManagement manages Trivy plugins
+func (m *TrivyModule) PluginManagement(ctx context.Context, action string, pluginName string) (string, error) {
+	container := m.client.Container().
+		From(getImageTag("trivy", "aquasec/trivy:latest"))
+
+	args := []string{"plugin", action}
+	if pluginName != "" && action != "list" {
+		args = append(args, pluginName)
+	}
+
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to manage plugins: %w", err)
+	}
+
+	return output, nil
+}
+
+// ConvertSBOM converts SBOM between different formats
+func (m *TrivyModule) ConvertSBOM(ctx context.Context, inputSBOM string, outputFormat string, outputFile string) (string, error) {
+	container := m.client.Container().
+		From(getImageTag("trivy", "aquasec/trivy:latest")).
+		WithFile("/input.sbom", m.client.Host().File(inputSBOM))
+
+	args := []string{"convert", "--format", outputFormat, "/input.sbom"}
+	if outputFile != "" {
+		args = append(args, "--output", outputFile)
+	}
+
+	container = container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
+
+	output, err := container.Stdout(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert SBOM: %w", err)
+	}
+
+	return output, nil
+}

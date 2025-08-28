@@ -14,7 +14,7 @@ type CosignModule struct {
 	name   string
 }
 
-const cosignBinary = "/ko-app/cosign"
+const cosignBinary = "cosign"
 
 // NewCosignModule creates a new Cosign module
 func NewCosignModule(client *dagger.Client) *CosignModule {

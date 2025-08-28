@@ -14,7 +14,7 @@ type GitHubPackagesModule struct {
 }
 
 const (
-	trivyBinary = "/usr/local/bin/trivy"
+	trivyBinary = "trivy"
 	ghBinary    = "/usr/bin/gh"
 )
 

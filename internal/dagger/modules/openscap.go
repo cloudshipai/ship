@@ -13,7 +13,7 @@ type OpenSCAPModule struct {
 	name   string
 }
 
-const oscapBinary = "/usr/bin/oscap"
+const oscapBinary = "oscap"
 
 // NewOpenSCAPModule creates a new OpenSCAP module
 func NewOpenSCAPModule(client *dagger.Client) *OpenSCAPModule {

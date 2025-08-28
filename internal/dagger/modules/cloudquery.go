@@ -13,7 +13,7 @@ type CloudQueryModule struct {
 	name   string
 }
 
-const cloudQueryBinary = "/app/cloudquery"
+const cloudqueryBinary = "cloudquery"
 
 // NewCloudQueryModule creates a new CloudQuery module
 func NewCloudQueryModule(client *dagger.Client) *CloudQueryModule {
@@ -29,7 +29,7 @@ func (m *CloudQueryModule) SyncWithConfig(ctx context.Context, configPath string
 		From("ghcr.io/cloudquery/cloudquery:latest").
 		WithDirectory("/config", m.client.Host().Directory(configPath)).
 		WithExec([]string{
-			cloudQueryBinary,
+			cloudqueryBinary,
 			"sync",
 			"/config/config.yml",
 		})
@@ -48,7 +48,7 @@ func (m *CloudQueryModule) ValidateConfig(ctx context.Context, configPath string
 		From("ghcr.io/cloudquery/cloudquery:latest").
 		WithDirectory("/config", m.client.Host().Directory(configPath)).
 		WithExec([]string{
-			cloudQueryBinary,
+			cloudqueryBinary,
 			"validate-config",
 			"/config/config.yml",
 		})
@@ -66,7 +66,7 @@ func (m *CloudQueryModule) ListProviders(ctx context.Context) (string, error) {
 	container := m.client.Container().
 		From("ghcr.io/cloudquery/cloudquery:latest").
 		WithExec([]string{
-			cloudQueryBinary,
+			cloudqueryBinary,
 			"provider",
 			"list",
 		})
@@ -85,7 +85,7 @@ func (m *CloudQueryModule) MigrateConfig(ctx context.Context, configPath string)
 		From("ghcr.io/cloudquery/cloudquery:latest").
 		WithDirectory("/config", m.client.Host().Directory(configPath)).
 		WithExec([]string{
-			cloudQueryBinary,
+			cloudqueryBinary,
 			"migrate",
 			"/config/config.yml",
 		})
@@ -126,7 +126,7 @@ func (m *CloudQueryModule) TestConnection(ctx context.Context, configPath string
 		From("ghcr.io/cloudquery/cloudquery:latest").
 		WithDirectory("/config", m.client.Host().Directory(configPath)).
 		WithExec([]string{
-			cloudQueryBinary,
+			cloudqueryBinary,
 			"test-connection",
 			"/config/config.yml",
 		})

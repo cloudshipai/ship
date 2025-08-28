@@ -161,7 +161,7 @@ func (m *SyftModule) LanguageSpecificCataloging(ctx context.Context, target stri
 		}
 	}
 
-	cmd := "/usr/local/bin/syft dir:. -o " + outputFormat
+	cmd := "syft dir:. -o " + outputFormat
 	if len(catalogers) > 0 {
 		cmd += " --catalogers " + catalogers[0]
 	}
@@ -189,7 +189,7 @@ func (m *SyftModule) SupplyChainAnalysis(ctx context.Context, target string, ana
 		WithDirectory("/workspace", m.client.Host().Directory(target)).
 		WithWorkdir("/workspace")
 
-	cmd := "/usr/local/bin/syft dir:."
+	cmd := "syft dir:."
 
 	// Configure analysis depth
 	switch analysisDepth {
@@ -240,7 +240,7 @@ func (m *SyftModule) SBOMComparison(ctx context.Context, baselineTarget string, 
 		container = container.WithDirectory("/comparison", m.client.Host().Directory(comparisonTarget))
 	}
 
-	cmd := "/usr/local/bin/syft /baseline -o syft-json --file /tmp/baseline-sbom.json"
+	cmd := "syft /baseline -o syft-json --file /tmp/baseline-sbom.json"
 	if outputFormat != "" {
 		cmd += " -o " + outputFormat
 	}
@@ -265,7 +265,7 @@ func (m *SyftModule) ComplianceAttestation(ctx context.Context, target string, c
 		WithDirectory("/workspace", m.client.Host().Directory(target)).
 		WithWorkdir("/workspace")
 
-	cmd := "/usr/local/bin/syft dir:."
+	cmd := "syft dir:."
 
 	// Configure output format based on compliance framework
 	switch complianceFramework {
@@ -307,7 +307,7 @@ func (m *SyftModule) ArchiveAnalysis(ctx context.Context, archivePath string, ar
 		From("anchore/syft:latest").
 		WithFile("/archive", m.client.Host().File(archivePath))
 
-	cmd := "/usr/local/bin/syft /archive"
+	cmd := "syft /archive"
 	if outputFormat != "" {
 		cmd += " -o " + outputFormat
 	}
@@ -341,7 +341,7 @@ func (m *SyftModule) CICDPipelineIntegration(ctx context.Context, target string,
 		WithDirectory("/workspace", m.client.Host().Directory(target)).
 		WithWorkdir("/workspace")
 
-	cmd := "/usr/local/bin/syft dir:."
+	cmd := "syft dir:."
 
 	// Configure based on pipeline stage
 	switch pipelineStage {
@@ -398,7 +398,7 @@ func (m *SyftModule) MetadataExtraction(ctx context.Context, target string, meta
 		outputFormat = "syft-json"
 	}
 
-	cmd := "/usr/local/bin/syft dir:. -o " + outputFormat
+	cmd := "syft dir:. -o " + outputFormat
 
 	// Enable all catalogers for comprehensive metadata
 	cmd += " --catalogers all --scope AllLayers"

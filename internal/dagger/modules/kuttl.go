@@ -8,7 +8,7 @@ import (
 )
 
 // kuttlBinary is the path to the kuttl binary in the container
-const kuttlBinary = "/usr/local/bin/kubectl-kuttl"
+const kuttlBinary = "kubectl-kuttl"
 
 // KuttlModule runs KUTTL for Kubernetes testing
 type KuttlModule struct {

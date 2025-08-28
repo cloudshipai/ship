@@ -13,7 +13,7 @@ type ZapModule struct {
 	name   string
 }
 
-const zapBinary = "/zap/zap.sh"
+const zapBinary = "zap.sh"
 
 // NewZapModule creates a new ZAP module
 func NewZapModule(client *dagger.Client) *ZapModule {

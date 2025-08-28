@@ -11,7 +11,7 @@ This table provides a quick overview of all Ship tools organized by workflow and
 | **Secret Management** | `trufflehog`, `gitleaks`, `git-secrets` | `sops`, `history-scrub` | Fast CI checks vs Deep audits |
 | **Kubernetes Operations** | `kubescape`, `kube-bench`, `velero` | `falco`, `kyverno`, `goldilocks` | Assessment → Compliance → Backup → Monitor |
 | **Cloud Security** | `prowler`, `scout-suite`, `steampipe` | `cloudquery`, `custodian` | Multi-cloud security posture |
-| **Web Application Testing** | `nuclei`, `zap`, `nikto` | `nmap` | Template-based vs Manual testing |
+| **Web Application Testing** | `nuclei`, `zap` | `nmap` | Template-based vs Manual testing |
 | **Development & CI/CD** | `semgrep`, `actionlint`, `gitleaks` | `hadolint`, `conftest` | SAST → Workflow validation → Fast scans |
 | **Supply Chain Security** | `syft`, `cosign`, `dependency-track` | `ossf-scorecard` | SBOM → Signing → Analysis |
 | **Compliance & Governance** | `checkov`, `conftest`, `openscap` | `gatekeeper`, `kyverno` | Policy validation → Enforcement |
@@ -30,14 +30,13 @@ This table provides a quick overview of all Ship tools organized by workflow and
 | `openinfraquote` | Detailed cost analysis | Financial impact assessment |
 | `aws-pricing-builtin` | AWS-specific pricing | AWS cost optimization |
 
-### Security Tools (31 tools)
+### Security Tools (29 tools)
 
 #### Vulnerability Scanning
 | Tool | Purpose | Use When |
 |------|---------|----------|
 | `trivy` | Universal vulnerability scanner | Containers, filesystems, git repos |
 | `grype` | Container-focused with SBOM | Detailed container analysis |
-| `osv-scanner` | OSS vulnerability scanning | Official OSSF tool for dependencies |
 | `dependency-track` | SBOM analysis platform | Enterprise vulnerability management |
 | `checkov` | Multi-framework IaC security | Infrastructure as Code security scanning |
 

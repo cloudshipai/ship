@@ -13,7 +13,7 @@ type ContainerRegistryModule struct {
 	name   string
 }
 
-const dockerBinary = "/usr/local/bin/docker"
+const dockerBinary = "docker"
 
 // NewContainerRegistryModule creates a new container registry module
 func NewContainerRegistryModule(client *dagger.Client) *ContainerRegistryModule {

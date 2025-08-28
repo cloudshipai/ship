@@ -13,13 +13,13 @@ type PackerModule struct {
 	name   string
 }
 
-const packerBinary = "/usr/local/bin/packer"
+const packerBinary = "packer"
 
 // NewPackerModule creates a new Packer module
 func NewPackerModule(client *dagger.Client) *PackerModule {
 	return &PackerModule{
 		client: client,
-		name:   packerBinary,
+		name:   "packer",
 	}
 }
 

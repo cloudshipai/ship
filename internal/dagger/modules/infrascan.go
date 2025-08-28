@@ -18,7 +18,7 @@ type InfraScanModule struct {
 
 const (
 	infrascanBinary     = "/usr/local/bin/infrascan"
-	infrascanTrivyBinary = "/usr/local/bin/trivy"
+	infrascanTrivyBinary = "trivy"
 )
 
 // NewInfraScanModule creates a new InfraScan module

@@ -7,8 +7,8 @@ import (
 	"dagger.io/dagger"
 )
 
-// kyvernoMultitenantBinary is the path to the kyverno binary in the container
-const kyvernoMultitenantBinary = "/usr/local/bin/kyverno"
+// kyvernoBinary is the path to the kyverno binary in the container
+const kyvernoBinary = "kyverno"
 
 // KyvernoMultitenantModule runs Kyverno for multi-tenant environments
 type KyvernoMultitenantModule struct {
@@ -62,7 +62,7 @@ spec:
 	container = container.
 		WithNewFile("/policy.yaml", policyYAML).
 		WithExec([]string{
-			kyvernoMultitenantBinary,
+			kyvernoBinary,
 			"apply", "/policy.yaml",
 			"--output", "json",
 		})
@@ -86,7 +86,7 @@ func (m *KyvernoMultitenantModule) ValidateMultitenantSetup(ctx context.Context,
 	}
 
 	container = container.WithExec([]string{
-		kyvernoMultitenantBinary,
+		kyvernoBinary,
 		"test", "/tenants.yaml",
 		"--output", "json",
 	})

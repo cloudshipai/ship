@@ -13,7 +13,7 @@ type FalcoModule struct {
 	name   string
 }
 
-const falcoBinary = "/usr/bin/falco"
+const falcoBinary = "falco"
 
 // NewFalcoModule creates a new Falco module
 func NewFalcoModule(client *dagger.Client) *FalcoModule {

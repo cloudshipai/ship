@@ -13,7 +13,7 @@ type DependencyTrackModule struct {
 // Common binary paths for dependency track tools
 const (
 	dtrackCliBinary = "/usr/local/bin/dtrack-cli"
-	dependencyTrackSyftBinary = "/usr/local/bin/syft"
+	dependencyTrackSyftBinary = "syft"
 	cyclonedxNpmBinary = "/usr/local/bin/cyclonedx-npm"
 	cyclonedxPyBinary = "/usr/local/bin/cyclonedx-py"
 )

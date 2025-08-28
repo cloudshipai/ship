@@ -13,7 +13,7 @@ type PolicySentryModule struct {
 	name   string
 }
 
-const policySentryBinary = "/usr/local/bin/policy-sentry"
+const policySentryBinary = "policy-sentry"
 
 // NewPolicySentryModule creates a new Policy Sentry module
 func NewPolicySentryModule(client *dagger.Client) *PolicySentryModule {

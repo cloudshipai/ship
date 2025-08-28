@@ -3,6 +3,9 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
+	"time"
 
 	"github.com/cloudshipai/ship/internal/dagger/modules"
 	"dagger.io/dagger"
@@ -14,6 +17,50 @@ import (
 func AddCheckovTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
 	// Ignore executeShipCommand - we use direct Dagger calls
 	addCheckovToolsDirect(s)
+}
+
+// logDaggerOutput logs tool output and execution details to files if configured
+func logDaggerOutput(toolName string, args []string, result string, duration time.Duration) {
+	// Get output file paths from environment variables (set by CLI flags)
+	outputFile := os.Getenv("SHIP_OUTPUT_FILE")
+	executionLog := os.Getenv("SHIP_EXECUTION_LOG")
+	
+	// Write execution log if requested
+	if executionLog != "" {
+		logEntry := fmt.Sprintf("[%s] Tool: %s | Args: %s | Duration: %v | Success: true\n",
+			time.Now().Format("2006-01-02 15:04:05"),
+			toolName,
+			strings.Join(args, " "),
+			duration)
+		
+		// Append to execution log file
+		logFile, logErr := os.OpenFile(executionLog, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+		if logErr == nil {
+			logFile.WriteString(logEntry)
+			logFile.Close()
+		}
+	}
+	
+	// Write output to file if requested
+	if outputFile != "" && result != "" {
+		timestamp := time.Now().Format("2006-01-02 15:04:05")
+		separator := strings.Repeat("=", 80)
+		outputContent := fmt.Sprintf("\n%s\n=== Ship CLI Dagger Output - %s ===\nTool: %s\nArgs: %s\nDuration: %v\n%s\n\n%s\n",
+			separator,
+			timestamp,
+			toolName,
+			strings.Join(args, " "),
+			duration,
+			separator,
+			result)
+		
+		// Append to output file
+		outputFileHandle, fileErr := os.OpenFile(outputFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+		if fileErr == nil {
+			outputFileHandle.WriteString(outputContent)
+			outputFileHandle.Close()
+		}
+	}
 }
 
 // addCheckovToolsDirect implements direct Dagger calls for Checkov tools
@@ -40,6 +87,8 @@ func addCheckovToolsDirect(s *server.MCPServer) {
 		),
 	)
 	s.AddTool(scanDirectoryTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		startTime := time.Now()
+		
 		// Create Dagger client
 		client, err := dagger.Connect(ctx, dagger.WithLogOutput(nil))
 		if err != nil {
@@ -57,9 +106,22 @@ func addCheckovToolsDirect(s *server.MCPServer) {
 		// Create Checkov module and scan directory
 		checkovModule := modules.NewCheckovModule(client)
 		result, err := checkovModule.ScanDirectoryWithOptions(ctx, directory, framework, output, compact, quiet)
+		
+		elapsed := time.Since(startTime)
+		
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("checkov directory scan failed: %v", err)), nil
 		}
+
+		// Log output and execution details
+		args := []string{
+			fmt.Sprintf("directory=%s", directory),
+			fmt.Sprintf("framework=%s", framework),
+			fmt.Sprintf("output=%s", output),
+			fmt.Sprintf("compact=%t", compact),
+			fmt.Sprintf("quiet=%t", quiet),
+		}
+		logDaggerOutput("checkov_scan_directory", args, result, elapsed)
 
 		return mcp.NewToolResultText(result), nil
 	})

@@ -13,7 +13,7 @@ type FleetModule struct {
 	name   string
 }
 
-const fleetKubectlBinary = "/usr/local/bin/kubectl"
+const kubectlBinary = "kubectl"
 
 // NewFleetModule creates a new Fleet module
 func NewFleetModule(client *dagger.Client) *FleetModule {
@@ -33,7 +33,7 @@ func (m *FleetModule) GetClusters(ctx context.Context, kubeconfig string) (strin
 	}
 
 	container = container.WithExec([]string{
-		fleetKubectlBinary, "get", "clusters",
+		kubectlBinary, "get", "clusters",
 		"--output", "json",
 	})
 
@@ -55,7 +55,7 @@ func (m *FleetModule) GetGitRepos(ctx context.Context, kubeconfig string) (strin
 	}
 
 	container = container.WithExec([]string{
-		fleetKubectlBinary, "get", "gitrepos",
+		kubectlBinary, "get", "gitrepos",
 		"--output", "json",
 	})
 
@@ -90,7 +90,7 @@ spec:
 	}
 
 	container = container.WithExec([]string{
-		fleetKubectlBinary, "apply", "-f", "/gitrepo.yaml",
+		kubectlBinary, "apply", "-f", "/gitrepo.yaml",
 		"--output", "json",
 	})
 

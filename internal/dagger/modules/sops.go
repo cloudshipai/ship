@@ -11,7 +11,7 @@ type SOPSModule struct {
 	client *dagger.Client
 }
 
-const sopsBinary = "/usr/local/bin/sops"
+const sopsBinary = "sops"
 
 func NewSOPSModule(client *dagger.Client) *SOPSModule {
 	return &SOPSModule{

@@ -13,7 +13,7 @@ type TerraformerModule struct {
 	name   string
 }
 
-const terraformerBinary = "/usr/local/bin/terraformer"
+const terraformerBinary = "terraformer"
 
 // NewTerraformerModule creates a new Terraformer module
 func NewTerraformerModule(client *dagger.Client) *TerraformerModule {

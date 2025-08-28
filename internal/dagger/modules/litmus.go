@@ -8,7 +8,7 @@ import (
 )
 
 // litmusctlBinary is the path to the litmusctl binary in the container
-const litmusctlBinary = "/usr/local/bin/litmusctl"
+const litmusctlBinary = "litmusctl"
 
 // LitmusModule runs Litmus for chaos engineering
 type LitmusModule struct {

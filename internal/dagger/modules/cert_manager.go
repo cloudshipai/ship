@@ -13,7 +13,7 @@ type CertManagerModule struct {
 	name   string
 }
 
-const cmctlBinary = "/usr/local/bin/cmctl"
+const cmctlBinary = "cmctl"
 
 // NewCertManagerModule creates a new cert-manager module
 func NewCertManagerModule(client *dagger.Client) *CertManagerModule {

@@ -13,7 +13,7 @@ type TfstateReaderModule struct {
 	name   string
 }
 
-const tfstateReaderBinary = "/usr/local/bin/tfstate-lookup"
+const tfstateLookupBinary = "tfstate-lookup"
 
 // NewTfstateReaderModule creates a new Terraform state reader module
 func NewTfstateReaderModule(client *dagger.Client) *TfstateReaderModule {

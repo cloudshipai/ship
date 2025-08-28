@@ -13,13 +13,13 @@ type ScoutSuiteModule struct {
 	name   string
 }
 
-const scoutSuiteBinary = "/usr/local/bin/scout"
+const scoutBinary = "scout"
 
 // NewScoutSuiteModule creates a new Scout Suite module
 func NewScoutSuiteModule(client *dagger.Client) *ScoutSuiteModule {
 	return &ScoutSuiteModule{
 		client: client,
-		name:   scoutSuiteBinary,
+		name:   scoutBinary,
 	}
 }
 
@@ -32,7 +32,7 @@ func (m *ScoutSuiteModule) ScanAWS(ctx context.Context, profile string) (string,
 		}).
 		WithEnvVariable("AWS_PROFILE", profile).
 		WithExec([]string{
-			scoutSuiteBinary,
+			scoutBinary,
 			"aws",
 			"--report-dir", "/tmp/scout-report",
 			"--force",
@@ -56,7 +56,7 @@ func (m *ScoutSuiteModule) ScanAzure(ctx context.Context) (string, error) {
 			Expect: "ANY",
 		}).
 		WithExec([]string{
-			scoutSuiteBinary,
+			scoutBinary,
 			"azure",
 			"--report-dir", "/tmp/scout-report",
 			"--force",
@@ -81,7 +81,7 @@ func (m *ScoutSuiteModule) ScanGCP(ctx context.Context, projectID string) (strin
 		}).
 		WithEnvVariable("GOOGLE_CLOUD_PROJECT", projectID).
 		WithExec([]string{
-			scoutSuiteBinary,
+			scoutBinary,
 			"gcp",
 			"--project-id", projectID,
 			"--report-dir", "/tmp/scout-report",
@@ -105,7 +105,7 @@ func (m *ScoutSuiteModule) GetVersion(ctx context.Context) (string, error) {
 		WithExec([]string{"pip", "install", "scoutsuite"}, dagger.ContainerWithExecOpts{
 			Expect: "ANY",
 		}).
-		WithExec([]string{scoutSuiteBinary, "--version"}, dagger.ContainerWithExecOpts{
+		WithExec([]string{scoutBinary, "--version"}, dagger.ContainerWithExecOpts{
 			Expect: "ANY",
 		})
 
@@ -119,7 +119,7 @@ func (m *ScoutSuiteModule) GetVersion(ctx context.Context) (string, error) {
 
 // ServeReport serves Scout Suite report via web server
 func (m *ScoutSuiteModule) ServeReport(ctx context.Context, provider string, reportName string, host string, port string) (string, error) {
-	args := []string{scoutSuiteBinary, provider, "--serve"}
+	args := []string{scoutBinary, provider, "--serve"}
 	
 	if reportName != "" {
 		args = append(args, reportName)
@@ -150,10 +150,10 @@ func (m *ScoutSuiteModule) ServeReport(ctx context.Context, provider string, rep
 
 // Help returns Scout Suite help information
 func (m *ScoutSuiteModule) Help(ctx context.Context, provider string) (string, error) {
-	args := []string{scoutSuiteBinary, "--help"}
+	args := []string{scoutBinary, "--help"}
 	
 	if provider != "" {
-		args = []string{scoutSuiteBinary, provider, "--help"}
+		args = []string{scoutBinary, provider, "--help"}
 	}
 
 	container := m.client.Container().

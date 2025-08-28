@@ -60,12 +60,6 @@ func TestCompilation(t *testing.T) {
 		}
 	})
 
-	t.Run("Nikto", func(t *testing.T) {
-		module := NewNiktoModule(client)
-		if module == nil {
-			t.Error("Failed to create Nikto module")
-		}
-	})
 }
 
 // TestBinaryPathValues tests that binary paths are correctly set to simple names
@@ -83,7 +77,6 @@ func TestBinaryPathValues(t *testing.T) {
 		{"Cosign binary should be 'cosign'", "cosignBinary", "cosign"},
 		{"Scorecard binary should be 'scorecard'", "scorecardBinary", "scorecard"},
 		{"Packer binary should be 'packer'", "packerBinary", "packer"},
-		{"Nikto binary should be 'nikto.pl'", "niktoBinary", "nikto.pl"},
 	}
 
 	for _, tt := range tests {

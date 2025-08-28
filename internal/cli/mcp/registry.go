@@ -17,14 +17,12 @@ type ToolInfo struct {
 var ToolRegistry = map[string][]ToolInfo{
 	"security": {
 		{Name: "trivy", Description: "Comprehensive vulnerability scanner", AddFunc: AddTrivyTools, HasVariables: false},
-		{Name: "grype", Description: "Container vulnerability scanner", AddFunc: AddGrypeTools, HasVariables: false},
 		{Name: "syft", Description: "SBOM generation tool", AddFunc: AddSyftTools, HasVariables: false},
 		{Name: "checkov", Description: "Infrastructure as code static analysis", AddFunc: AddCheckovTools, HasVariables: false},
 		{Name: "terrascan", Description: "IaC security scanner", AddFunc: AddTerrascanTools, HasVariables: false},
 		{Name: "tfsec", Description: "Terraform-specific security scanner", AddFunc: AddTfsecTools, HasVariables: false},
 		{Name: "semgrep", Description: "Static analysis for security", AddFunc: AddSemgrepTools, HasVariables: false},
 		{Name: "actionlint", Description: "GitHub Actions workflow linter", AddFunc: AddActionlintTools, HasVariables: false},
-		{Name: "hadolint", Description: "Dockerfile linter", AddFunc: AddHadolintTools, HasVariables: false},
 		{Name: "conftest", Description: "OPA policy testing", AddFunc: AddConftestTools, HasVariables: false},
 		{Name: "kube-bench", Description: "Kubernetes CIS benchmark", AddFunc: AddKubeBenchTools, HasVariables: false},
 		{Name: "kube-hunter", Description: "Kubernetes penetration testing", AddFunc: AddKubeHunterTools, HasVariables: false},

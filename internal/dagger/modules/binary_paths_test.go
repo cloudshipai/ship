@@ -192,7 +192,6 @@ func TestModuleCreation(t *testing.T) {
 		"OSSF Scorecard": func(c *dagger.Client) interface{} { return NewOSSFScorecardModule(c) },
 		"Packer":         func(c *dagger.Client) interface{} { return NewPackerModule(c) },
 		"InfraScan":      func(c *dagger.Client) interface{} { return NewInfraScanModule(c) },
-		"Nikto":          func(c *dagger.Client) interface{} { return NewNiktoModule(c) },
 	}
 
 	for name, createModule := range modules {

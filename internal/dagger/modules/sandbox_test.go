@@ -98,7 +98,7 @@ func testCostDemoSandbox(t *testing.T, ctx context.Context, client *dagger.Clien
 		
 		// Note: This requires a Terraform plan file to be generated first
 		// In real scenarios, this would be done as part of the test setup
-		result, err := oiq.AnalyzeDirectory(ctx, sandboxDir, "us-east-1")
+		result, err := oiq.Estimate(ctx, sandboxDir, OpenInfraQuoteOptions{})
 		if err != nil {
 			// For testing purposes, we expect this might fail if no plan exists
 			// but the module should handle it gracefully
@@ -172,7 +172,7 @@ func testTerraformQualitySandbox(t *testing.T, ctx context.Context, client *dagg
 	t.Run("TFLintQualityAnalysis", func(t *testing.T) {
 		tflint := &TFLintModule{client: client}
 		
-		result, err := tflint.LintDirectory(ctx, sandboxDir)
+		result, err := tflint.Check(ctx, sandboxDir, TFLintOptions{})
 		if err != nil {
 			t.Fatalf("TFLint analysis failed: %v", err)
 		}
@@ -182,8 +182,8 @@ func testTerraformQualitySandbox(t *testing.T, ctx context.Context, client *dagg
 			t.Errorf("Expected TFLint to find issues in quality sandbox, got: %s", result)
 		}
 
-		// Test JSON output format - using LintDirectory which outputs JSON by default
-		jsonResult, err := tflint.LintDirectory(ctx, sandboxDir)
+		// Test JSON output format - using Check with JSON format
+		jsonResult, err := tflint.Check(ctx, sandboxDir, TFLintOptions{Format: "json"})
 		if err != nil {
 			t.Fatalf("TFLint JSON analysis failed: %v", err)
 		}

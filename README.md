@@ -1,6 +1,6 @@
 # Ship MCP Framework
 
-A comprehensive DevOps toolkit that provides **58 essential infrastructure tools** through AI-enabled MCP (Model Context Protocol) servers. Ship runs all tools securely in containers via Dagger, eliminating local dependencies.
+A comprehensive DevOps toolkit that provides **56 essential infrastructure tools** through AI-enabled MCP (Model Context Protocol) servers. Ship runs all tools securely in containers via Dagger, eliminating local dependencies.
 
 Ship is primarily an **MCP framework** for building AI assistant integrations, with optional CLI capabilities for direct usage.
 
@@ -11,7 +11,7 @@ Ship is primarily an **MCP framework** for building AI assistant integrations, w
 ### Ship MCP Framework
 - **🏗️ MCP Server Builder**: Fluent API for building custom MCP servers for AI assistants
 - **🔧 Container Tool Framework**: Run any tool securely in Docker containers via Dagger
-- **📦 Pre-built Ship Tools**: **58 essential infrastructure tools** ready to use
+- **📦 Pre-built Ship Tools**: **56 essential infrastructure tools** ready to use
 - **🎯 Multiple Usage Patterns**: Pure framework, cherry-pick tools, or everything plus custom extensions
 - **🔒 Security First**: All tools run in isolated containers with no local dependencies
 - **⚡ Performance Optimized**: Leverages Dagger's caching and parallel execution
@@ -198,7 +198,7 @@ ship mcp security           # All security tools (31 tools)
 ship mcp kubernetes         # All Kubernetes tools (9 tools)
 
 # All tools (heavyweight)
-ship mcp all                # All 58 tools across all categories
+ship mcp all                # All 56 tools across all categories
 
 # External MCP server proxying
 ship mcp filesystem --var FILESYSTEM_ROOT=/workspace
@@ -217,7 +217,7 @@ ship modules info terraform # See details about terraform tools
 
 ## 🛠️ Available Tools Reference
 
-Ship provides **58 essential infrastructure tools** across security, infrastructure, cloud, and development workflows. All tools run in isolated containers via Dagger.
+Ship provides **56 essential infrastructure tools** across security, infrastructure, cloud, and development workflows. All tools run in isolated containers via Dagger.
 
 ### Quick Reference by Workflow
 
@@ -259,7 +259,7 @@ ship mcp kubernetes # All K8s tools (kubescape, velero, goldilocks, etc.)
 ship mcp cloud      # All cloud tools (prowler, scout-suite, etc.)
 
 # Full DevOps toolkit
-ship mcp all        # All 58 tools across all categories
+ship mcp all        # All 56 tools across all categories
 ```
 
 📋 **Complete Tools Reference**: See [docs/tools-reference-table.md](docs/tools-reference-table.md) for detailed tool descriptions and usage guidance.

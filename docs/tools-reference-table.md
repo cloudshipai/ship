@@ -7,12 +7,12 @@ This table provides a quick overview of all Ship tools organized by workflow and
 | Workflow | Primary Tools | Supporting Tools | When to Use |
 |----------|---------------|------------------|-------------|
 | **Terraform Development** | `tflint`, `terraform-docs`, `checkov`, `tfsec` | `inframap`, `terrascan`, `openinfraquote` | Terraform syntax → Security → Cost → Documentation |
-| **Container Security** | `trivy`, `grype`, `syft` | `dockle`, `cosign`, `hadolint` | Dockerfile → Build → Scan → Sign |
+| **Container Security** | `trivy`, `syft` | `dockle`, `cosign` | Dockerfile → Build → Scan → Sign |
 | **Secret Management** | `trufflehog`, `gitleaks`, `git-secrets` | `sops`, `history-scrub` | Fast CI checks vs Deep audits |
 | **Kubernetes Operations** | `kubescape`, `kube-bench`, `velero` | `falco`, `kyverno`, `goldilocks` | Assessment → Compliance → Backup → Monitor |
 | **Cloud Security** | `prowler`, `scout-suite`, `steampipe` | `cloudquery`, `custodian` | Multi-cloud security posture |
 | **Web Application Testing** | `nuclei`, `zap` | `nmap` | Template-based vs Manual testing |
-| **Development & CI/CD** | `semgrep`, `actionlint`, `gitleaks` | `hadolint`, `conftest` | SAST → Workflow validation → Fast scans |
+| **Development & CI/CD** | `semgrep`, `actionlint`, `gitleaks` | `conftest` | SAST → Workflow validation → Fast scans |
 | **Supply Chain Security** | `syft`, `cosign`, `dependency-track` | `ossf-scorecard` | SBOM → Signing → Analysis |
 | **Compliance & Governance** | `checkov`, `conftest`, `openscap` | `gatekeeper`, `kyverno` | Policy validation → Enforcement |
 
@@ -30,13 +30,12 @@ This table provides a quick overview of all Ship tools organized by workflow and
 | `openinfraquote` | Detailed cost analysis | Financial impact assessment |
 | `aws-pricing-builtin` | AWS-specific pricing | AWS cost optimization |
 
-### Security Tools (29 tools)
+### Security Tools (27 tools)
 
 #### Vulnerability Scanning
 | Tool | Purpose | Use When |
 |------|---------|----------|
 | `trivy` | Universal vulnerability scanner | Containers, filesystems, git repos |
-| `grype` | Container-focused with SBOM | Detailed container analysis |
 | `dependency-track` | SBOM analysis platform | Enterprise vulnerability management |
 | `checkov` | Multi-framework IaC security | Infrastructure as Code security scanning |
 
@@ -54,7 +53,6 @@ This table provides a quick overview of all Ship tools organized by workflow and
 | `syft` | SBOM generation | Software inventory, supply chain |
 | `dockle` | Container image linting | Dockerfile best practices |
 | `cosign` | Container signing/verification | Supply chain integrity |
-| `hadolint` | Dockerfile linter | Build-time Dockerfile validation |
 
 #### Kubernetes Security
 | Tool | Purpose | Use When |
@@ -187,14 +185,14 @@ terraform-docs → openinfraquote (cost-sensitive)
 ### Security Review Workflow
 ```
 Weekly: prowler + scout-suite (cloud)
-Daily: trivy + grype (containers)
+Daily: trivy (containers)
 Per PR: tflint + checkov + gitleaks
 Monthly: trufflehog + ossf-scorecard
 ```
 
 ### Multi-Tool Security Stack
 ```
-Build: hadolint → trivy → syft → cosign
+Build: trivy → syft → cosign
 Runtime: falco → kubescape
 Compliance: kube-bench → openscap
 ```
@@ -202,7 +200,6 @@ Compliance: kube-bench → openscap
 ## Tool Selection Guide
 
 ### **Choose Trivy if**: You want one tool for most vulnerability scanning
-### **Choose Grype if**: You need detailed SBOM analysis
 ### **Choose Checkov if**: You use multiple IaC frameworks  
 ### **Choose TFSec if**: You're Terraform-focused
 ### **Choose TruffleHog if**: Accuracy and verification are critical
@@ -212,12 +209,12 @@ Compliance: kube-bench → openscap
 
 ---
 
-**Total: 79 tools** (63 built-in + 16 external MCPs)
+**Total: 72 tools** (56 built-in + 16 external MCPs)
 
 ### Summary by Category
 - **Terraform Tools**: 11 tools
-- **Security Tools**: 31 tools  
+- **Security Tools**: 27 tools  
 - **Cloud Infrastructure Tools**: 17 tools
 - **AWS Tools**: 4 tools
-- **Total Built-in Tools**: 63 tools
+- **Total Built-in Tools**: 56 tools
 - **External MCP Servers**: 16 servers

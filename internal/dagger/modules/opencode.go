@@ -111,7 +111,17 @@ func (m *OpenCodeModule) ChatWithSessionAndModel(ctx context.Context, workDir st
 	// Mount OpenCode session storage from host to enable session persistence
 	homeDir := os.Getenv("HOME")
 	if homeDir == "" {
-		homeDir = "/home/" + os.Getenv("USER")
+		// Fallback to current user's home directory
+		if user := os.Getenv("USER"); user != "" {
+			homeDir = "/home/" + user
+		} else {
+			// Final fallback to current working directory's parent
+			if wd, err := os.Getwd(); err == nil {
+				homeDir = filepath.Dir(wd)
+			} else {
+				homeDir = "/tmp"
+			}
+		}
 	}
 	opencodeSessionDir := filepath.Join(homeDir, ".local", "share", "opencode")
 	

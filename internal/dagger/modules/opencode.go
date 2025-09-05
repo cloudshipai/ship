@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"dagger.io/dagger"
 )
@@ -156,25 +157,51 @@ func (m *OpenCodeModule) ChatWithSessionAndModel(ctx context.Context, workDir st
 	// Add the message
 	args = append(args, message)
 	
-	container = container.WithExec(args, dagger.ContainerWithExecOpts{
-		Expect: "ANY",
-	})
-
-	// Conditionally export files based on persistFiles flag
+	// Smart export: Detect actual file changes and only export what changed
 	if persistFiles {
-		// List files in workspace to debug what was created
-		lsOutput, _ := container.WithExec([]string{"ls", "-la", "/workspace"}).Stdout(ctx)
-		fmt.Printf("Debug: Files in container workspace:\n%s\n", lsOutput)
+		// Capture initial state before OpenCode runs
+		fmt.Printf("Capturing initial workspace state...\n")
+		initialState, _ := container.WithExec([]string{"find", "/workspace", "-type", "f", "-exec", "stat", "-c", "%n %Y %s", "{}", "+"}).Stdout(ctx)
 		
-		// Export any files that may have been created back to the host
-		_, err := container.Directory("/workspace").Export(ctx, workDir)
-		if err != nil {
-			// Log but don't fail - file creation might not have happened
-			fmt.Printf("Note: Could not export files from container: %v\n", err)
+		// Now run OpenCode
+		container = container.WithExec(args, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
+		
+		// Capture final state after OpenCode runs
+		fmt.Printf("Capturing final workspace state...\n")
+		finalState, _ := container.WithExec([]string{"find", "/workspace", "-type", "f", "-exec", "stat", "-c", "%n %Y %s", "{}", "+"}).Stdout(ctx)
+		
+		// Compare states to detect changes
+		changedFiles := detectChangedFiles(initialState, finalState)
+		newFiles := detectNewFiles(initialState, finalState)
+		
+		if len(changedFiles) > 0 || len(newFiles) > 0 {
+			fmt.Printf("OpenCode made changes:\n")
+			if len(newFiles) > 0 {
+				fmt.Printf("  New files: %v\n", newFiles)
+			}
+			if len(changedFiles) > 0 {
+				fmt.Printf("  Modified files: %v\n", changedFiles)
+			}
+			
+			// Export the entire workspace since individual file export is complex
+			// But we know OpenCode actually made changes, so this is safe
+			fmt.Printf("Exporting workspace changes back to host...\n")
+			_, err := container.Directory("/workspace").Export(ctx, workDir)
+			if err != nil {
+				fmt.Printf("Error exporting changes: %v\n", err)
+			} else {
+				fmt.Printf("Successfully exported %d changed and %d new files\n", len(changedFiles), len(newFiles))
+			}
 		} else {
-			fmt.Printf("Successfully exported workspace directory to %s\n", workDir)
+			fmt.Printf("No file changes detected - skipping export to prevent unnecessary overwrites\n")
 		}
 	} else {
+		// Ephemeral mode - just run OpenCode without file persistence
+		container = container.WithExec(args, dagger.ContainerWithExecOpts{
+			Expect: "ANY",
+		})
 		fmt.Printf("Running in ephemeral mode - files will not be persisted to host\n")
 	}
 
@@ -452,4 +479,56 @@ func (m *OpenCodeModule) BatchProcess(ctx context.Context, workDir string, patte
 	}
 
 	return "", fmt.Errorf("failed to batch process: no output received")
+}
+
+// detectChangedFiles compares initial and final file states to find modified files
+func detectChangedFiles(initial, final string) []string {
+	initialFiles := parseFileStates(initial)
+	finalFiles := parseFileStates(final)
+	
+	var changed []string
+	for path, finalInfo := range finalFiles {
+		if initialInfo, exists := initialFiles[path]; exists {
+			// File existed before, check if it changed
+			if initialInfo != finalInfo {
+				changed = append(changed, path)
+			}
+		}
+	}
+	return changed
+}
+
+// detectNewFiles finds files that exist in final state but not in initial state
+func detectNewFiles(initial, final string) []string {
+	initialFiles := parseFileStates(initial)
+	finalFiles := parseFileStates(final)
+	
+	var newFiles []string
+	for path := range finalFiles {
+		if _, exists := initialFiles[path]; !exists {
+			newFiles = append(newFiles, path)
+		}
+	}
+	return newFiles
+}
+
+// parseFileStates parses stat output into a map of file path -> "mtime size"
+func parseFileStates(statOutput string) map[string]string {
+	files := make(map[string]string)
+	lines := strings.Split(strings.TrimSpace(statOutput), "\n")
+	
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) >= 3 {
+			// Format: /workspace/file.txt 1725567890 1234
+			path := parts[0]
+			mtime := parts[1]
+			size := parts[2]
+			files[path] = mtime + " " + size
+		}
+	}
+	return files
 }

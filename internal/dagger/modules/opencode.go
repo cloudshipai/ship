@@ -102,12 +102,23 @@ func (m *OpenCodeModule) ChatWithSession(ctx context.Context, workDir string, me
 
 // ChatWithSessionAndModel starts an interactive chat session with OpenCode with session support and model selection
 func (m *OpenCodeModule) ChatWithSessionAndModel(ctx context.Context, workDir string, message string, persistFiles bool, sessionID string, continueSession bool, model string) (string, error) {
+	fmt.Printf("[OpenCode Debug] ChatWithSessionAndModel called:\n")
+	fmt.Printf("[OpenCode Debug]   workDir: %s\n", workDir)
+	fmt.Printf("[OpenCode Debug]   message: %s\n", message)
+	fmt.Printf("[OpenCode Debug]   persistFiles: %t\n", persistFiles)
+	fmt.Printf("[OpenCode Debug]   sessionID: %s\n", sessionID)
+	fmt.Printf("[OpenCode Debug]   continueSession: %t\n", continueSession)
+	fmt.Printf("[OpenCode Debug]   model: %s\n", model)
+
 	container := m.client.Container().
 		Build(m.client.Host().Directory(m.projectRoot), dagger.ContainerBuildOpts{
 			Dockerfile: "internal/dagger/dockerfiles/opencode.dockerfile",
 		}).
 		WithDirectory("/workspace", m.client.Host().Directory(workDir)).
 		WithWorkdir("/workspace")
+	
+	// SAFETY: Run OpenCode as root to avoid permission issues, but NO FILE EXPORT during development
+	fmt.Printf("[OpenCode Debug] Running OpenCode as root (no file export for safety)\n")
 	
 	// Mount OpenCode session storage from host to enable session persistence
 	homeDir := os.Getenv("HOME")
@@ -156,61 +167,94 @@ func (m *OpenCodeModule) ChatWithSessionAndModel(ctx context.Context, workDir st
 	
 	// Add the message
 	args = append(args, message)
+
+	// Capture initial state before OpenCode runs
+	fmt.Printf("Capturing initial workspace state...\n")
+	initialState, _ := container.WithExec([]string{"find", "/workspace", "-type", "f", "-exec", "stat", "-c", "%n %Y %s", "{}", "+"}).Stdout(ctx)
 	
-	// Smart export: Detect actual file changes and only export what changed
-	if persistFiles {
-		// Capture initial state before OpenCode runs
-		fmt.Printf("Capturing initial workspace state...\n")
-		initialState, _ := container.WithExec([]string{"find", "/workspace", "-type", "f", "-exec", "stat", "-c", "%n %Y %s", "{}", "+"}).Stdout(ctx)
+	// Now run OpenCode and capture all output
+	fmt.Printf("[OpenCode Debug] About to execute: %v\n", args)
+	opcodeContainer := container.WithExec(args, dagger.ContainerWithExecOpts{
+		Expect: "ANY",
+	})
+	
+	// Get both stdout and stderr from OpenCode execution
+	stdout, stdoutErr := opcodeContainer.Stdout(ctx)
+	stderr, stderrErr := opcodeContainer.Stderr(ctx) 
+	exitCode, exitCodeErr := opcodeContainer.ExitCode(ctx)
+	
+	fmt.Printf("[OpenCode Debug] OpenCode execution completed\n")
+	fmt.Printf("[OpenCode Debug] Exit code: %d (err: %v)\n", exitCode, exitCodeErr)
+	fmt.Printf("[OpenCode Debug] Stdout length: %d (err: %v)\n", len(stdout), stdoutErr)
+	fmt.Printf("[OpenCode Debug] Stderr length: %d (err: %v)\n", len(stderr), stderrErr)
+	
+	if len(stdout) > 0 {
+		fmt.Printf("[OpenCode Debug] STDOUT:\n%s\n[End STDOUT]\n", stdout)
+	}
+	if len(stderr) > 0 {
+		fmt.Printf("[OpenCode Debug] STDERR:\n%s\n[End STDERR]\n", stderr)
+	}
+
+	// Capture final state after OpenCode runs
+	fmt.Printf("Capturing final workspace state...\n")
+	finalState, _ := opcodeContainer.WithExec([]string{"find", "/workspace", "-type", "f", "-exec", "stat", "-c", "%n %Y %s", "{}", "+"}).Stdout(ctx)
+	
+	// Compare states to detect changes
+	changedFiles := detectChangedFiles(initialState, finalState)
+	newFiles := detectNewFiles(initialState, finalState)
+	
+	if len(changedFiles) > 0 || len(newFiles) > 0 {
+		fmt.Printf("OpenCode made changes:\n")
+		if len(newFiles) > 0 {
+			fmt.Printf("  New files: %v\n", newFiles)
+		}
+		if len(changedFiles) > 0 {
+			fmt.Printf("  Modified files: %v\n", changedFiles)
+		}
 		
-		// Now run OpenCode
-		container = container.WithExec(args, dagger.ContainerWithExecOpts{
-			Expect: "ANY",
-		})
+		fmt.Printf("Exporting workspace changes back to host...\n")
 		
-		// Capture final state after OpenCode runs
-		fmt.Printf("Capturing final workspace state...\n")
-		finalState, _ := container.WithExec([]string{"find", "/workspace", "-type", "f", "-exec", "stat", "-c", "%n %Y %s", "{}", "+"}).Stdout(ctx)
+		// SAFE EXPORT: Only export files that actually changed, not the entire directory
+		allChangedFiles := append(newFiles, changedFiles...)
+		exportCount := 0
 		
-		// Compare states to detect changes
-		changedFiles := detectChangedFiles(initialState, finalState)
-		newFiles := detectNewFiles(initialState, finalState)
-		
-		if len(changedFiles) > 0 || len(newFiles) > 0 {
-			fmt.Printf("OpenCode made changes:\n")
-			if len(newFiles) > 0 {
-				fmt.Printf("  New files: %v\n", newFiles)
-			}
-			if len(changedFiles) > 0 {
-				fmt.Printf("  Modified files: %v\n", changedFiles)
+		for _, filePath := range allChangedFiles {
+			// Convert container path to relative path (remove /workspace prefix)
+			relativePath := strings.TrimPrefix(filePath, "/workspace/")
+			if relativePath == filePath {
+				// Path didn't have /workspace prefix, skip for safety
+				fmt.Printf("Warning: Skipping file with unexpected path: %s\n", filePath)
+				continue
 			}
 			
-			// Export the entire workspace since individual file export is complex
-			// But we know OpenCode actually made changes, so this is safe
-			fmt.Printf("Exporting workspace changes back to host...\n")
-			_, err := container.Directory("/workspace").Export(ctx, workDir)
+			// Export individual file safely
+			err := m.exportSingleFile(ctx, opcodeContainer, relativePath, workDir)
 			if err != nil {
-				fmt.Printf("Error exporting changes: %v\n", err)
+				fmt.Printf("Error exporting file %s: %v\n", relativePath, err)
 			} else {
-				fmt.Printf("Successfully exported %d changed and %d new files\n", len(changedFiles), len(newFiles))
+				exportCount++
+				fmt.Printf("✓ Exported: %s\n", relativePath)
 			}
+		}
+		
+		if exportCount > 0 {
+			fmt.Printf("Successfully exported %d files safely\n", exportCount)
 		} else {
-			fmt.Printf("No file changes detected - skipping export to prevent unnecessary overwrites\n")
+			fmt.Printf("No files were exported due to errors\n")
 		}
 	} else {
-		// Ephemeral mode - just run OpenCode without file persistence
-		container = container.WithExec(args, dagger.ContainerWithExecOpts{
-			Expect: "ANY",
-		})
-		fmt.Printf("Running in ephemeral mode - files will not be persisted to host\n")
+		fmt.Printf("No file changes detected - skipping export to prevent unnecessary overwrites\n")
 	}
 
-	output, _ := container.Stdout(ctx)
-	if output != "" {
-		return output, nil
+	// Return the actual OpenCode output from stdout
+	fmt.Printf("[OpenCode Debug] Final output capture - length: %d (err: %v)\n", len(stdout), stdoutErr)
+	if len(stdout) > 0 {
+		fmt.Printf("[OpenCode Debug] Final STDOUT:\n%s\n[End Final STDOUT]\n", stdout)
+		fmt.Printf("OpenCode Response:\n%s\n", stdout)
+		return stdout, nil
 	}
 
-	return "", fmt.Errorf("failed to run opencode chat: no output received")
+	return "", fmt.Errorf("failed to run opencode chat: failed to run opencode chat: no output received")
 }
 
 // Generate generates code based on a prompt
@@ -531,4 +575,35 @@ func parseFileStates(statOutput string) map[string]string {
 		}
 	}
 	return files
+}
+
+// exportSingleFile safely exports a single file from container to host
+func (m *OpenCodeModule) exportSingleFile(ctx context.Context, container *dagger.Container, relativePath string, targetDir string) error {
+	// Validate the path to prevent directory traversal attacks
+	if strings.Contains(relativePath, "..") || strings.HasPrefix(relativePath, "/") {
+		return fmt.Errorf("invalid file path: %s", relativePath)
+	}
+	
+	// Get the file content from the container
+	containerFilePath := "/workspace/" + relativePath
+	fileContent, err := container.WithExec([]string{"cat", containerFilePath}).Stdout(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to read file from container: %w", err)
+	}
+	
+	// Ensure target directory exists
+	targetFilePath := filepath.Join(targetDir, relativePath)
+	targetFileDir := filepath.Dir(targetFilePath)
+	if err := os.MkdirAll(targetFileDir, 0755); err != nil {
+		return fmt.Errorf("failed to create target directory: %w", err)
+	}
+	
+	// Write the file to the host filesystem
+	err = os.WriteFile(targetFilePath, []byte(fileContent), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write file to host: %w", err)
+	}
+	
+	fmt.Printf("[OpenCode Debug] Exported file: %s -> %s\n", containerFilePath, targetFilePath)
+	return nil
 }

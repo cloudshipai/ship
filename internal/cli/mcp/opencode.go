@@ -2,10 +2,65 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
+	"log"
+	"os"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
+
+// logOpenCodeInteraction logs OpenCode MCP interactions to /tmp/opencode_mcp.log
+func logOpenCodeInteraction(phase string, toolName string, request *mcp.CallToolRequest, result *mcp.CallToolResult, err error, duration time.Duration) {
+	logFile := "/tmp/opencode_mcp.log"
+	
+	// Create log entry
+	timestamp := time.Now().Format("2006-01-02 15:04:05.000")
+	
+	var logEntry map[string]interface{}
+	if phase == "INPUT" {
+		// Log input
+		requestData, _ := json.MarshalIndent(request, "", "  ")
+		logEntry = map[string]interface{}{
+			"timestamp": timestamp,
+			"phase":     phase,
+			"tool":      toolName,
+			"request":   json.RawMessage(requestData),
+		}
+	} else {
+		// Log output
+		var resultData []byte
+		if result != nil {
+			resultData, _ = json.MarshalIndent(result, "", "  ")
+		}
+		
+		logEntry = map[string]interface{}{
+			"timestamp": timestamp,
+			"phase":     phase,
+			"tool":      toolName,
+			"result":    json.RawMessage(resultData),
+			"error":     nil,
+			"duration":  duration.String(),
+		}
+		
+		if err != nil {
+			logEntry["error"] = err.Error()
+		}
+	}
+	
+	// Write to log file
+	logData, _ := json.MarshalIndent(logEntry, "", "  ")
+	
+	file, fileErr := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if fileErr != nil {
+		log.Printf("Failed to open OpenCode log file: %v", fileErr)
+		return
+	}
+	defer file.Close()
+	
+	file.WriteString(string(logData) + "\n---\n")
+}
 
 // AddOpenCodeTools adds OpenCode AI coding assistant tools to the MCP server
 func AddOpenCodeTools(s *server.MCPServer, executeShipCommand ExecuteShipCommandFunc) {
@@ -23,6 +78,10 @@ func AddOpenCodeTools(s *server.MCPServer, executeShipCommand ExecuteShipCommand
 	)
 
 	s.AddTool(opencodeRunTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		startTime := time.Now()
+		
+		// Log input
+		logOpenCodeInteraction("INPUT", "opencode_run", &request, nil, nil, 0)
 		message := request.GetString("message", "")
 		workdir := request.GetString("workdir", ".")
 		persistFiles := request.GetBool("persist_files", true)
@@ -59,7 +118,14 @@ func AddOpenCodeTools(s *server.MCPServer, executeShipCommand ExecuteShipCommand
 		// Add the message
 		args = append(args, message)
 
-		return executeShipCommand(args)
+		// Execute the command
+		result, err := executeShipCommand(args)
+		duration := time.Since(startTime)
+		
+		// Log output
+		logOpenCodeInteraction("OUTPUT", "opencode_run", &request, result, err, duration)
+		
+		return result, err
 	})
 
 	// OpenCode Version - Get version information

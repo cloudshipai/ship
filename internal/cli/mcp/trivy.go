@@ -3,8 +3,10 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/cloudshipai/ship/internal/dagger/modules"
+	"github.com/cloudshipai/ship/internal/telemetry"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"dagger.io/dagger"
@@ -136,12 +138,20 @@ func addTrivyToolsDirect(s *server.MCPServer) {
 			return mcp.NewToolResultError("Warning: include_dev_deps parameter not supported with direct Dagger calls"), nil
 		}
 
+		// Track tool execution
+		start := time.Now()
+		
 		// Scan filesystem
 		output, err := module.ScanFilesystem(ctx, dir)
+		
+		duration := time.Since(start)
+		
 		if err != nil {
+			telemetry.TrackToolExecution("trivy_filesystem", duration, false, "scan_failed")
 			return mcp.NewToolResultError(fmt.Sprintf("Trivy filesystem scan failed: %v", err)), nil
 		}
-
+		
+		telemetry.TrackToolExecution("trivy_filesystem", duration, true, "")
 		return mcp.NewToolResultText(output), nil
 	})
 

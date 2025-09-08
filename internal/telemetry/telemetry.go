@@ -13,10 +13,11 @@ import (
 )
 
 const (
-	// PostHog configuration from your project
-	defaultAPIKey  = "phc_3h5yqMKKJsnxofspAcEouPsmJkbm2UfX0DGuhaa19f"
-	defaultHost    = "https://us-i.posthog.com"
-	defaultTimeout = 3 * time.Second
+	// PostHog configuration
+	defaultAPIKey   = "phc_3h5yqMKKJsnxofsqFxCEoUFmn3vbm2UFXDDKuhdai9f"
+	defaultHost     = "https://us-i.posthog.com"
+	defaultTimeout  = 3 * time.Second
+	defaultProjectID = "203190"
 )
 
 type Client struct {
@@ -86,6 +87,89 @@ func Close() {
 
 // TrackMCPCommand tracks when a user runs an MCP command
 func TrackMCPCommand(toolName string) {
+	trackEvent("shp_mcp_command_executed", posthog.NewProperties().
+		Set("tool_name", toolName).
+		Set("command", "mcp").
+		Set("version", getVersion()))
+}
+
+// TrackCLICommand tracks when a user runs a CLI command
+func TrackCLICommand(commandName string, subcommand string, args []string) {
+	props := posthog.NewProperties().
+		Set("command", commandName).
+		Set("version", getVersion())
+	
+	if subcommand != "" {
+		props.Set("subcommand", subcommand)
+	}
+	
+	if len(args) > 0 {
+		props.Set("arg_count", len(args))
+	}
+	
+	trackEvent("shp_cli_command_executed", props)
+}
+
+// TrackBuildXOperation tracks BuildX operations
+func TrackBuildXOperation(operation string, platform string, success bool) {
+	trackEvent("shp_buildx_operation", posthog.NewProperties().
+		Set("operation", operation).
+		Set("platform", platform).
+		Set("success", success).
+		Set("version", getVersion()))
+}
+
+// TrackToolExecution tracks when a security/infrastructure tool is executed
+func TrackToolExecution(toolName string, executionTime time.Duration, success bool, errorType string) {
+	props := posthog.NewProperties().
+		Set("tool_name", toolName).
+		Set("execution_time_ms", executionTime.Milliseconds()).
+		Set("success", success).
+		Set("version", getVersion())
+	
+	if !success && errorType != "" {
+		props.Set("error_type", errorType)
+	}
+	
+	trackEvent("shp_tool_execution", props)
+}
+
+// TrackDaggerOperation tracks Dagger-related operations
+func TrackDaggerOperation(operation string, module string, success bool, executionTime time.Duration) {
+	trackEvent("shp_dagger_operation", posthog.NewProperties().
+		Set("operation", operation).
+		Set("module", module).
+		Set("success", success).
+		Set("execution_time_ms", executionTime.Milliseconds()).
+		Set("version", getVersion()))
+}
+
+// TrackError tracks significant errors
+func TrackError(errorType string, component string, errorMessage string) {
+	trackEvent("shp_error_occurred", posthog.NewProperties().
+		Set("error_type", errorType).
+		Set("component", component).
+		Set("error_message_hash", hashString(errorMessage)). // Hash for privacy
+		Set("version", getVersion()))
+}
+
+// TrackAppStart tracks when the application starts
+func TrackAppStart(command string) {
+	trackEvent("shp_app_started", posthog.NewProperties().
+		Set("entry_command", command).
+		Set("version", getVersion()))
+}
+
+// TrackConfigOperation tracks config-related operations
+func TrackConfigOperation(operation string, success bool) {
+	trackEvent("shp_config_operation", posthog.NewProperties().
+		Set("operation", operation).
+		Set("success", success).
+		Set("version", getVersion()))
+}
+
+// trackEvent is a helper function for sending events asynchronously
+func trackEvent(eventName string, properties posthog.Properties) {
 	if globalClient == nil || !globalClient.enabled {
 		return
 	}
@@ -95,16 +179,10 @@ func TrackMCPCommand(toolName string) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		// Create properties
-		properties := posthog.NewProperties().
-			Set("tool_name", toolName).
-			Set("command", "mcp").
-			Set("version", getVersion())
-
 		// Capture the event
 		err := globalClient.posthog.Enqueue(posthog.Capture{
 			DistinctId: globalClient.anonymousID,
-			Event:      "shp_mcp_command_executed",
+			Event:      eventName,
 			Properties: properties,
 		})
 
@@ -144,6 +222,17 @@ func getVersion() string {
 		return version
 	}
 	return "dev"
+}
+
+// hashString creates a hash of a string for privacy (used for error messages)
+func hashString(input string) string {
+	if input == "" {
+		return ""
+	}
+	hasher := sha256.New()
+	hasher.Write([]byte(input))
+	hash := hasher.Sum(nil)
+	return fmt.Sprintf("%x", hash)[:16] // First 16 chars of hash
 }
 
 // IsEnabled returns whether telemetry is enabled

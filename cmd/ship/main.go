@@ -42,7 +42,16 @@ func main() {
 	// Set version for telemetry
 	os.Setenv("SHIP_VERSION", getVersion())
 
+	// Track app start
+	command := "ship"
+	if len(os.Args) > 1 {
+		command = os.Args[1]
+	}
+	telemetry.TrackAppStart(command)
+
 	if err := cli.Execute(getVersion(), commit, date); err != nil {
+		// Track error
+		telemetry.TrackError("cli_execution", "main", err.Error())
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}

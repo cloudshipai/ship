@@ -3,9 +3,11 @@ package cli
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/cloudshipai/ship/internal/dagger"
 	"github.com/cloudshipai/ship/internal/dagger/modules"
+	"github.com/cloudshipai/ship/internal/telemetry"
 	"github.com/spf13/cobra"
 )
 
@@ -49,32 +51,48 @@ Examples:
   # Build with custom Dockerfile location
   ship buildx build --src-dir ./myapp --tag myapp:latest --dockerfile-path docker/Dockerfile`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		start := time.Now()
 		srcDir, _ := cmd.Flags().GetString("src-dir")
 		tag, _ := cmd.Flags().GetString("tag")
 		platform, _ := cmd.Flags().GetString("platform")
 		dockerfilePath, _ := cmd.Flags().GetString("dockerfile-path")
 
+		// Track CLI command
+		telemetry.TrackCLICommand("buildx", "build", args)
+
 		if srcDir == "" {
+			telemetry.TrackError("validation", "buildx_build", "src-dir is required")
 			return fmt.Errorf("--src-dir is required")
 		}
 		if tag == "" {
+			telemetry.TrackError("validation", "buildx_build", "tag is required")
 			return fmt.Errorf("--tag is required")
 		}
 
 		ctx := context.Background()
 		engine, err := dagger.NewEngine(ctx)
 		if err != nil {
+			telemetry.TrackError("dagger", "buildx_build", err.Error())
 			return fmt.Errorf("failed to create dagger engine: %w", err)
 		}
 		defer engine.Close()
 
 		buildxModule := modules.NewBuildXModule(engine.GetClient())
 		result, err := buildxModule.Build(ctx, srcDir, tag, platform, dockerfilePath)
+		
+		duration := time.Since(start)
+		success := err == nil
+		
+		// Track BuildX operation
+		telemetry.TrackBuildXOperation("build", platform, success)
+		
 		if err != nil {
+			telemetry.TrackError("buildx", "build", err.Error())
 			return fmt.Errorf("buildx build failed: %w", err)
 		}
 
 		fmt.Println(result)
+		telemetry.TrackDaggerOperation("buildx_build", "buildx", true, duration)
 		return nil
 	},
 }

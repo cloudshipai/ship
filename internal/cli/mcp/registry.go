@@ -50,6 +50,7 @@ var ToolRegistry = map[string][]ToolInfo{
 	},
 	"development": {
 		{Name: "opencode", Description: "OpenCode AI coding assistant", AddFunc: AddOpenCodeTools, HasVariables: true},
+		{Name: "buildx", Description: "Docker BuildX multi-platform image building", AddFunc: AddBuildXTools, HasVariables: false},
 	},
 	"terraform": {
 		{Name: "tflint", Description: "Terraform linter", AddFunc: AddTfLintTools, HasVariables: false},

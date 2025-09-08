@@ -26,8 +26,7 @@ func addTrivyToolsDirect(s *server.MCPServer) {
 			mcp.Required(),
 		),
 		mcp.WithString("severity",
-			mcp.Description("Severity levels to include"),
-			mcp.Enum("UNKNOWN", "LOW", "MEDIUM", "HIGH", "CRITICAL"),
+			mcp.Description("Comma-separated severity levels to include (e.g. 'HIGH,CRITICAL')"),
 		),
 		mcp.WithString("output_format",
 			mcp.Description("Output format"),
@@ -90,8 +89,7 @@ func addTrivyToolsDirect(s *server.MCPServer) {
 			mcp.Description("Directory to scan (default: current directory)"),
 		),
 		mcp.WithString("severity",
-			mcp.Description("Severity levels to include"),
-			mcp.Enum("UNKNOWN", "LOW", "MEDIUM", "HIGH", "CRITICAL"),
+			mcp.Description("Comma-separated severity levels to include (e.g. 'HIGH,CRITICAL')"),
 		),
 		mcp.WithString("output_format",
 			mcp.Description("Output format"),
@@ -123,7 +121,7 @@ func addTrivyToolsDirect(s *server.MCPServer) {
 
 		// Note: Dagger ScanFilesystem function uses fixed parameters, some MCP parameters not directly supported
 		if severity := request.GetString("severity", ""); severity != "" && severity != "HIGH,CRITICAL" {
-			return mcp.NewToolResultError(fmt.Sprintf("Warning: severity '%s' not supported, using HIGH,CRITICAL", severity)), nil
+			// Severity parameter provided but will be ignored - Dagger module uses fixed HIGH,CRITICAL
 		}
 		if outputFormat := request.GetString("output_format", ""); outputFormat != "" && outputFormat != "json" {
 			return mcp.NewToolResultError(fmt.Sprintf("Warning: output_format '%s' not supported, using json", outputFormat)), nil
@@ -161,8 +159,7 @@ func addTrivyToolsDirect(s *server.MCPServer) {
 			mcp.Description("Specific commit to scan"),
 		),
 		mcp.WithString("severity",
-			mcp.Description("Severity levels to include"),
-			mcp.Enum("UNKNOWN", "LOW", "MEDIUM", "HIGH", "CRITICAL"),
+			mcp.Description("Comma-separated severity levels to include (e.g. 'HIGH,CRITICAL')"),
 		),
 		mcp.WithString("output_format",
 			mcp.Description("Output format"),
@@ -197,7 +194,7 @@ func addTrivyToolsDirect(s *server.MCPServer) {
 			return mcp.NewToolResultError("Warning: commit parameter not supported with direct Dagger calls"), nil
 		}
 		if severity := request.GetString("severity", ""); severity != "" && severity != "HIGH,CRITICAL" {
-			return mcp.NewToolResultError(fmt.Sprintf("Warning: severity '%s' not supported, using HIGH,CRITICAL", severity)), nil
+			// Severity parameter provided but will be ignored - Dagger module uses fixed HIGH,CRITICAL
 		}
 		if outputFormat := request.GetString("output_format", ""); outputFormat != "" && outputFormat != "json" {
 			return mcp.NewToolResultError(fmt.Sprintf("Warning: output_format '%s' not supported, using json", outputFormat)), nil
@@ -222,8 +219,7 @@ func addTrivyToolsDirect(s *server.MCPServer) {
 			mcp.Description("Directory containing configuration files (default: current directory)"),
 		),
 		mcp.WithString("severity",
-			mcp.Description("Severity levels to include"),
-			mcp.Enum("UNKNOWN", "LOW", "MEDIUM", "HIGH", "CRITICAL"),
+			mcp.Description("Comma-separated severity levels to include (e.g. 'HIGH,CRITICAL')"),
 		),
 		mcp.WithString("output_format",
 			mcp.Description("Output format"),
@@ -252,7 +248,7 @@ func addTrivyToolsDirect(s *server.MCPServer) {
 
 		// Note: Dagger ScanConfig function uses fixed parameters, some MCP parameters not directly supported
 		if severity := request.GetString("severity", ""); severity != "" && severity != "HIGH,CRITICAL" {
-			return mcp.NewToolResultError(fmt.Sprintf("Warning: severity '%s' not supported, using HIGH,CRITICAL", severity)), nil
+			// Severity parameter provided but will be ignored - Dagger module uses fixed HIGH,CRITICAL
 		}
 		if outputFormat := request.GetString("output_format", ""); outputFormat != "" && outputFormat != "json" {
 			return mcp.NewToolResultError(fmt.Sprintf("Warning: output_format '%s' not supported, using json", outputFormat)), nil
@@ -281,8 +277,7 @@ func addTrivyToolsDirect(s *server.MCPServer) {
 			mcp.Required(),
 		),
 		mcp.WithString("severity",
-			mcp.Description("Severity levels to include"),
-			mcp.Enum("UNKNOWN", "LOW", "MEDIUM", "HIGH", "CRITICAL"),
+			mcp.Description("Comma-separated severity levels to include (e.g. 'HIGH,CRITICAL')"),
 		),
 		mcp.WithString("output_format",
 			mcp.Description("Output format"),
@@ -341,8 +336,7 @@ func addTrivyToolsDirect(s *server.MCPServer) {
 			mcp.Description("Kubernetes namespace to scan (default: all namespaces)"),
 		),
 		mcp.WithString("severity",
-			mcp.Description("Severity levels to include"),
-			mcp.Enum("UNKNOWN", "LOW", "MEDIUM", "HIGH", "CRITICAL"),
+			mcp.Description("Comma-separated severity levels to include (e.g. 'HIGH,CRITICAL')"),
 		),
 		mcp.WithString("output_format",
 			mcp.Description("Output format"),

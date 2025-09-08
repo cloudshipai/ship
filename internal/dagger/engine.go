@@ -123,3 +123,8 @@ func (e *Engine) NewInfraMapModule() *modules.InfraMapModule {
 func (e *Engine) OpenCode() *modules.OpenCodeModule {
 	return modules.NewOpenCodeModule(e.client)
 }
+
+// NewBuildXModule creates a new BuildX module
+func (e *Engine) NewBuildXModule() *modules.BuildXModule {
+	return modules.NewBuildXModule(e.client)
+}

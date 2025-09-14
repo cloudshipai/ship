@@ -90,6 +90,12 @@ var ToolRegistry = map[string][]ToolInfo{
 		{Name: "aws-iam-rotation", Description: "AWS IAM credential rotation", AddFunc: AddAWSIAMRotationTools, HasVariables: true},
 		{Name: "aws-pricing", Description: "AWS pricing and cost calculator", AddFunc: AddAWSPricingTools, HasVariables: true},
 	},
+	"finops": {
+		{Name: "finops-discover", Description: "Discover cloud resources with cost optimization data", AddFunc: AddFinOpsDiscoverTools, HasVariables: true},
+		{Name: "finops-recommend", Description: "Generate cost optimization recommendations", AddFunc: AddFinOpsRecommendTools, HasVariables: true},
+		{Name: "finops-analyze", Description: "Analyze cost data and trends", AddFunc: AddFinOpsAnalyzeTools, HasVariables: true},
+		{Name: "finops-query", Description: "Agent-driven flexible finops queries", AddFunc: AddFinOpsQueryTools, HasVariables: true},
+	},
 }
 
 // RegisterAllTools registers all tools with the MCP server

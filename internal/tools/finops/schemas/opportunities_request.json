@@ -1,0 +1,176 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cloudshipai.com/schemas/finops/opportunities-request.json",
+  "title": "FinOps Opportunities Request",
+  "description": "Schema for cost optimization opportunities sent to CloudshipAI Station",
+  "type": "object",
+  "required": ["tenant_id", "data_type", "timestamp", "source", "version", "metadata", "opportunities"],
+  "properties": {
+    "tenant_id": {
+      "type": "string",
+      "description": "Tenant identifier for data isolation"
+    },
+    "data_type": {
+      "type": "string",
+      "const": "opportunities",
+      "description": "Type of data being sent"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when data was collected"
+    },
+    "source": {
+      "type": "string",
+      "const": "ship-finops-recommend",
+      "description": "Source system identifier"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^v\\d+\\.\\d+\\.\\d+$",
+      "description": "API version"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["provider"],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": ["aws", "gcp", "azure", "kubernetes"],
+          "description": "Cloud provider"
+        },
+        "finding_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["rightsizing", "reserved_instances", "spot_instances", "storage_optimization", "idle_resources"]
+          },
+          "description": "Types of findings included"
+        },
+        "min_savings_filter": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Minimum savings threshold applied"
+        }
+      }
+    },
+    "opportunities": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Opportunity"
+      },
+      "description": "List of optimization opportunities"
+    }
+  },
+  "definitions": {
+    "Opportunity": {
+      "type": "object",
+      "required": ["id", "resource_id", "opportunity_type", "vendor", "title", "description", "estimated_savings_monthly_usd", "currency", "complexity", "risk_level", "implementation_effort", "created_at"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique opportunity identifier"
+        },
+        "resource_id": {
+          "type": "string",
+          "description": "Target resource identifier"
+        },
+        "resource_arn": {
+          "type": "string",
+          "description": "Resource ARN (AWS) or equivalent identifier"
+        },
+        "opportunity_type": {
+          "type": "string",
+          "enum": ["rightsizing", "reserved_instances", "spot_instances", "storage_optimization", "idle_resources"],
+          "description": "Type of optimization opportunity"
+        },
+        "vendor": {
+          "type": "string",
+          "enum": ["aws", "gcp", "azure", "kubernetes"],
+          "description": "Cloud provider"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Brief opportunity title"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "description": "Detailed opportunity description"
+        },
+        "estimated_savings_monthly_usd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Estimated monthly savings in USD"
+        },
+        "currency": {
+          "type": "string",
+          "const": "USD",
+          "description": "Currency code"
+        },
+        "complexity": {
+          "type": "string",
+          "enum": ["S", "M", "L", "XL"],
+          "description": "Implementation complexity (S=Simple, M=Medium, L=Large, XL=Extra Large)"
+        },
+        "risk_level": {
+          "type": "string",
+          "enum": ["Low", "Medium", "High", "Critical"],
+          "description": "Risk level of implementing this opportunity"
+        },
+        "implementation_effort": {
+          "type": "string",
+          "enum": ["Low", "Medium", "High"],
+          "description": "Effort required to implement"
+        },
+        "recommendation_details": {
+          "$ref": "#/definitions/RecommendationDetails"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when opportunity was identified"
+        }
+      }
+    },
+    "RecommendationDetails": {
+      "type": "object",
+      "properties": {
+        "current_configuration": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Current resource configuration"
+        },
+        "recommended_configuration": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Recommended new configuration"
+        },
+        "implementation_steps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Step-by-step implementation guide"
+        },
+        "prerequisites": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Prerequisites for implementation"
+        },
+        "risks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Potential risks and mitigation strategies"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,282 @@
+syntax = "proto3";
+
+package finops.v1;
+
+option go_package = "github.com/cloudshipai/ship/internal/tools/finops/grpc/v1;finopsv1";
+
+import "google/protobuf/timestamp.proto";
+
+// FinOpsService defines the gRPC service for FinOps data from Ship tools
+service FinOpsService {
+  // ReportResources reports discovered cloud resources to Station
+  rpc ReportResources(ReportResourcesRequest) returns (ReportResourcesResponse);
+  
+  // ReportOpportunities reports cost optimization opportunities to Station
+  rpc ReportOpportunities(ReportOpportunitiesRequest) returns (ReportOpportunitiesResponse);
+  
+  // ReportCostData reports cost analysis data to Station
+  rpc ReportCostData(ReportCostDataRequest) returns (ReportCostDataResponse);
+  
+  // ReportInsights reports cost insights and anomalies to Station
+  rpc ReportInsights(ReportInsightsRequest) returns (ReportInsightsResponse);
+  
+  // HealthCheck verifies the FinOps service health
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// Common request metadata
+message RequestMetadata {
+  string tenant_id = 1;
+  string source = 2;      // "ship-finops-discover", "ship-finops-recommend", etc.
+  string version = 3;     // Tool version
+  google.protobuf.Timestamp timestamp = 4;
+  map<string, string> labels = 5;  // Additional metadata
+}
+
+// === Resource Discovery Messages ===
+
+message ReportResourcesRequest {
+  RequestMetadata metadata = 1;
+  repeated Resource resources = 2;
+}
+
+message ReportResourcesResponse {
+  bool success = 1;
+  string request_id = 2;
+  int32 resources_processed = 3;
+  repeated ReportError errors = 4;
+  repeated ReportWarning warnings = 5;
+}
+
+message Resource {
+  string id = 1;
+  string name = 2;
+  ResourceType type = 3;
+  VendorType vendor = 4;
+  string region = 5;
+  string account_id = 6;
+  map<string, string> tags = 7;
+  CostData cost = 8;
+  UtilizationMetrics utilization = 9;
+  ResourceSpecs specifications = 10;
+  map<string, string> configuration = 11;  // JSON-serialized config
+  google.protobuf.Timestamp last_updated = 12;
+}
+
+enum ResourceType {
+  RESOURCE_TYPE_UNSPECIFIED = 0;
+  RESOURCE_TYPE_COMPUTE = 1;
+  RESOURCE_TYPE_STORAGE = 2;
+  RESOURCE_TYPE_DATABASE = 3;
+  RESOURCE_TYPE_SERVERLESS = 4;
+  RESOURCE_TYPE_NETWORK = 5;
+  RESOURCE_TYPE_CACHE = 6;
+  RESOURCE_TYPE_KUBERNETES = 7;
+}
+
+enum VendorType {
+  VENDOR_TYPE_UNSPECIFIED = 0;
+  VENDOR_TYPE_AWS = 1;
+  VENDOR_TYPE_GCP = 2;
+  VENDOR_TYPE_AZURE = 3;
+  VENDOR_TYPE_KUBERNETES = 4;
+}
+
+message CostData {
+  double hourly_rate_usd = 1;
+  double daily_rate_usd = 2;
+  double monthly_rate_usd = 3;
+  string currency = 4;
+  google.protobuf.Timestamp last_updated = 5;
+}
+
+message UtilizationMetrics {
+  MetricValue cpu = 1;
+  MetricValue memory = 2;
+  MetricValue storage = 3;
+  MetricValue network = 4;
+  MetricValue iops = 5;
+  TimePeriod period = 6;
+  google.protobuf.Timestamp last_updated = 7;
+}
+
+message MetricValue {
+  double average = 1;
+  double peak = 2;
+  double minimum = 3;
+  string unit = 4;
+  map<int32, double> percentiles = 5;  // P50, P95, P99
+}
+
+message ResourceSpecs {
+  string instance_type = 1;
+  int32 cpu_count = 2;
+  double memory_gb = 3;
+  double storage_gb = 4;
+  string storage_type = 5;
+}
+
+message TimePeriod {
+  google.protobuf.Timestamp start = 1;
+  google.protobuf.Timestamp end = 2;
+}
+
+// === Opportunities Messages ===
+
+message ReportOpportunitiesRequest {
+  RequestMetadata metadata = 1;
+  repeated Opportunity opportunities = 2;
+}
+
+message ReportOpportunitiesResponse {
+  bool success = 1;
+  string request_id = 2;
+  int32 opportunities_processed = 3;
+  repeated ReportError errors = 4;
+  repeated ReportWarning warnings = 5;
+}
+
+message Opportunity {
+  string id = 1;
+  string resource_id = 2;
+  string resource_arn = 3;
+  OpportunityType type = 4;
+  VendorType vendor = 5;
+  string title = 6;
+  string description = 7;
+  double estimated_savings_monthly_usd = 8;
+  string currency = 9;
+  string complexity = 10;           // XS, S, M, L, XL
+  string risk_level = 11;          // Low, Medium, High
+  string implementation_effort = 12;
+  map<string, string> tags = 13;
+  string region = 14;
+  string service = 15;
+  string account_id = 16;
+  RecommendationDetails recommendation_details = 17;
+  google.protobuf.Timestamp created_at = 18;
+  google.protobuf.Timestamp valid_until = 19;
+}
+
+enum OpportunityType {
+  OPPORTUNITY_TYPE_UNSPECIFIED = 0;
+  OPPORTUNITY_TYPE_RIGHTSIZING = 1;
+  OPPORTUNITY_TYPE_IDLE_RESOURCE = 2;
+  OPPORTUNITY_TYPE_COMMITMENT = 3;
+  OPPORTUNITY_TYPE_STORAGE_OPTIMIZATION = 4;
+  OPPORTUNITY_TYPE_SPOT_INSTANCES = 5;
+}
+
+message RecommendationDetails {
+  map<string, string> current_configuration = 1;     // JSON-serialized
+  map<string, string> recommended_configuration = 2;  // JSON-serialized
+  repeated string implementation_steps = 3;
+  repeated string prerequisites = 4;
+  repeated string rollback_plan = 5;
+  string testing_guidance = 6;
+}
+
+// === Cost Data Messages ===
+
+message ReportCostDataRequest {
+  RequestMetadata metadata = 1;
+  repeated CostRecord cost_records = 2;
+}
+
+message ReportCostDataResponse {
+  bool success = 1;
+  string request_id = 2;
+  int32 records_processed = 3;
+  repeated ReportError errors = 4;
+  repeated ReportWarning warnings = 5;
+}
+
+message CostRecord {
+  string resource_id = 1;
+  TimePeriod period = 2;
+  double amount = 3;
+  string currency = 4;
+  string service = 5;
+  string region = 6;
+  map<string, string> tags = 7;
+  map<string, string> metadata = 8;  // JSON-serialized additional data
+}
+
+// === Insights Messages ===
+
+message ReportInsightsRequest {
+  RequestMetadata metadata = 1;
+  repeated Insight insights = 2;
+}
+
+message ReportInsightsResponse {
+  bool success = 1;
+  string request_id = 2;
+  int32 insights_processed = 3;
+  repeated ReportError errors = 4;
+  repeated ReportWarning warnings = 5;
+}
+
+message Insight {
+  string id = 1;
+  InsightType type = 2;
+  InsightSeverity severity = 3;
+  string title = 4;
+  string description = 5;
+  string category = 6;
+  repeated string resources_affected = 7;
+  double cost_impact_usd = 8;
+  TimePeriod time_range = 9;
+  VendorType vendor = 10;
+  string region = 11;
+  string service = 12;
+  map<string, string> tags = 13;
+  map<string, string> metadata = 14;  // JSON-serialized additional data
+  google.protobuf.Timestamp created_at = 15;
+}
+
+enum InsightType {
+  INSIGHT_TYPE_UNSPECIFIED = 0;
+  INSIGHT_TYPE_COST_ANOMALY = 1;
+  INSIGHT_TYPE_USAGE_ANOMALY = 2;
+  INSIGHT_TYPE_TREND = 3;
+  INSIGHT_TYPE_COMPLIANCE = 4;
+  INSIGHT_TYPE_GOVERNANCE = 5;
+  INSIGHT_TYPE_OPTIMIZATION = 6;
+}
+
+enum InsightSeverity {
+  INSIGHT_SEVERITY_UNSPECIFIED = 0;
+  INSIGHT_SEVERITY_LOW = 1;
+  INSIGHT_SEVERITY_MEDIUM = 2;
+  INSIGHT_SEVERITY_HIGH = 3;
+  INSIGHT_SEVERITY_CRITICAL = 4;
+}
+
+// === Health Check Messages ===
+
+message HealthCheckRequest {
+  string service = 1;  // Optional service name
+}
+
+message HealthCheckResponse {
+  bool healthy = 1;
+  string status = 2;
+  map<string, string> details = 3;
+  google.protobuf.Timestamp timestamp = 4;
+}
+
+// === Common Error/Warning Messages ===
+
+message ReportError {
+  string code = 1;
+  string message = 2;
+  string field = 3;
+  map<string, string> details = 4;
+}
+
+message ReportWarning {
+  string code = 1;
+  string message = 2;
+  string field = 3;
+}

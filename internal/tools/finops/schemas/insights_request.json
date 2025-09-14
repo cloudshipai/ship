@@ -1,0 +1,194 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cloudshipai.com/schemas/finops/insights-request.json",
+  "title": "FinOps Insights Request",
+  "description": "Schema for cost insights and anomalies sent to CloudshipAI Station",
+  "type": "object",
+  "required": ["tenant_id", "data_type", "timestamp", "source", "version", "metadata", "insights"],
+  "properties": {
+    "tenant_id": {
+      "type": "string",
+      "description": "Tenant identifier for data isolation"
+    },
+    "data_type": {
+      "type": "string",
+      "const": "insights",
+      "description": "Type of data being sent"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when data was collected"
+    },
+    "source": {
+      "type": "string",
+      "const": "ship-finops-analyze",
+      "description": "Source system identifier"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^v\\d+\\.\\d+\\.\\d+$",
+      "description": "API version"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["analysis_type"],
+      "properties": {
+        "analysis_type": {
+          "type": "string",
+          "enum": ["cost_anomaly_detection", "trend_analysis", "budget_alerts", "usage_patterns", "optimization_tracking"],
+          "description": "Type of analysis performed"
+        },
+        "provider": {
+          "type": "string",
+          "enum": ["aws", "gcp", "azure", "kubernetes"],
+          "description": "Cloud provider"
+        },
+        "confidence_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Confidence threshold for insights"
+        }
+      }
+    },
+    "insights": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Insight"
+      },
+      "description": "List of insights and anomalies"
+    }
+  },
+  "definitions": {
+    "Insight": {
+      "type": "object",
+      "required": ["id", "type", "severity", "title", "description", "time_range", "vendor"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique insight identifier"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["cost_anomaly", "usage_spike", "budget_exceeded", "trend_change", "optimization_opportunity", "resource_waste"],
+          "description": "Type of insight"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "critical"],
+          "description": "Severity level"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Brief insight title"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "description": "Detailed insight description"
+        },
+        "cost_impact_usd": {
+          "type": "number",
+          "description": "Estimated cost impact in USD"
+        },
+        "time_range": {
+          "$ref": "#/definitions/TimeRange"
+        },
+        "vendor": {
+          "type": "string",
+          "enum": ["aws", "gcp", "azure", "kubernetes"],
+          "description": "Cloud provider"
+        },
+        "region": {
+          "type": "string",
+          "description": "Cloud region affected"
+        },
+        "service": {
+          "type": "string",
+          "description": "Cloud service affected"
+        },
+        "resource_id": {
+          "type": "string",
+          "description": "Specific resource identifier (if applicable)"
+        },
+        "tags": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Resource tags for context"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Confidence score for the insight"
+        },
+        "metrics": {
+          "$ref": "#/definitions/InsightMetrics"
+        },
+        "recommendations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Recommended actions"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when insight was generated"
+        }
+      }
+    },
+    "TimeRange": {
+      "type": "object",
+      "required": ["start", "end"],
+      "properties": {
+        "start": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Time range start (ISO 8601)"
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Time range end (ISO 8601)"
+        }
+      }
+    },
+    "InsightMetrics": {
+      "type": "object",
+      "properties": {
+        "baseline_value": {
+          "type": "number",
+          "description": "Baseline value for comparison"
+        },
+        "current_value": {
+          "type": "number",
+          "description": "Current observed value"
+        },
+        "percentage_change": {
+          "type": "number",
+          "description": "Percentage change from baseline"
+        },
+        "absolute_change": {
+          "type": "number",
+          "description": "Absolute change from baseline"
+        },
+        "threshold_exceeded": {
+          "type": "boolean",
+          "description": "Whether a threshold was exceeded"
+        },
+        "threshold_value": {
+          "type": "number",
+          "description": "The threshold value that was set"
+        }
+      }
+    }
+  }
+}

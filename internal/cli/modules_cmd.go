@@ -170,6 +170,12 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 		{"aws-eks", "AWS EKS and Kubernetes operations", "aws-mcp", "N/A (MCP Server)"},
 		{"aws-ec2", "AWS EC2 compute operations", "aws-mcp", "N/A (MCP Server)"},
 		{"aws-s3", "AWS S3 storage operations", "aws-mcp", "N/A (MCP Server)"},
+
+		// FinOps Tools
+		{"finops-discover", "Discover cloud resources with cost optimization data", "finops", "N/A (Built-in MCP)"},
+		{"finops-recommend", "Generate cost optimization recommendations", "finops", "N/A (Built-in MCP)"},
+		{"finops-analyze", "Analyze cost data and trends", "finops", "N/A (Built-in MCP)"},
+		{"finops-query", "Agent-driven flexible finops queries", "finops", "N/A (Built-in MCP)"},
 	}
 
 	// Create table writer
@@ -188,6 +194,7 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 	securityTools := 0
 	cloudTools := 0
 	awsIamTools := 0
+	finopsTools := 0
 	metaTools := 0
 	externalServers := 0
 	awsMcpServers := 0
@@ -202,6 +209,8 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 			cloudTools++
 		case "aws-iam":
 			awsIamTools++
+		case "finops":
+			finopsTools++
 		case "meta":
 			metaTools++
 		case "mcp-external":
@@ -211,11 +220,11 @@ func runModulesList(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	totalBuiltinTools := terraformTools + securityTools + cloudTools + awsIamTools
+	totalBuiltinTools := terraformTools + securityTools + cloudTools + awsIamTools + finopsTools
 
 	fmt.Printf("\nTotal: %d tools available\n", len(mcpTools))
-	fmt.Printf("  - Built-in tools: %d (%d terraform, %d security, %d cloud, %d aws-iam)\n",
-		totalBuiltinTools, terraformTools, securityTools, cloudTools, awsIamTools)
+	fmt.Printf("  - Built-in tools: %d (%d terraform, %d security, %d cloud, %d aws-iam, %d finops)\n",
+		totalBuiltinTools, terraformTools, securityTools, cloudTools, awsIamTools, finopsTools)
 	fmt.Printf("  - Collections: %d\n", metaTools)
 	fmt.Printf("  - External MCP servers: %d\n", externalServers)
 	fmt.Printf("  - AWS Labs MCP servers: %d\n", awsMcpServers)
@@ -550,7 +559,7 @@ func isExternalMCPServerModule(serverName string) bool {
 
 // isBuiltinMCPTool checks if the given name is a built-in MCP tool
 func isBuiltinMCPTool(toolName string) bool {
-	builtinTools := []string{"lint", "checkov", "trivy", "cost", "docs", "diagram", "all"}
+	builtinTools := []string{"lint", "checkov", "trivy", "cost", "docs", "diagram", "all", "finops-discover", "finops-recommend", "finops-analyze", "finops-query"}
 	for _, tool := range builtinTools {
 		if tool == toolName {
 			return true
@@ -690,6 +699,30 @@ func showBuiltinToolInfo(toolName string) error {
 			Description: "All built-in Ship tools combined in a single MCP server",
 			Type:        "meta",
 			Examples:    []string{"ship mcp all", "ship mcp"},
+		},
+		"finops-discover": {
+			Name:        "finops-discover",
+			Description: "Discover cloud resources across providers with cost and utilization data",
+			Type:        "finops",
+			Examples:    []string{"ship finops discover --provider aws", "ship mcp finops-discover"},
+		},
+		"finops-recommend": {
+			Name:        "finops-recommend",
+			Description: "Generate cost optimization recommendations using vendor-specific engines",
+			Type:        "finops",
+			Examples:    []string{"ship finops recommend --provider aws --finding-types rightsizing", "ship mcp finops-recommend"},
+		},
+		"finops-analyze": {
+			Name:        "finops-analyze",
+			Description: "Analyze cost data and trends with insights and anomaly detection",
+			Type:        "finops",
+			Examples:    []string{"ship finops analyze --provider aws --time-window 30d", "ship mcp finops-analyze"},
+		},
+		"finops-query": {
+			Name:        "finops-query",
+			Description: "Execute flexible finops queries with natural language support",
+			Type:        "finops",
+			Examples:    []string{"ship finops query --query 'show me underutilized EC2 instances'", "ship mcp finops-query"},
 		},
 	}
 

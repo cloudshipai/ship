@@ -1,0 +1,189 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cloudshipai.com/schemas/finops/inventory-request.json",
+  "title": "FinOps Resource Inventory Request",
+  "description": "Schema for resource inventory data sent to CloudshipAI Station",
+  "type": "object",
+  "required": ["tenant_id", "data_type", "timestamp", "source", "version", "metadata", "resources"],
+  "properties": {
+    "tenant_id": {
+      "type": "string",
+      "description": "Tenant identifier for data isolation"
+    },
+    "data_type": {
+      "type": "string",
+      "const": "resource_inventory",
+      "description": "Type of data being sent"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when data was collected"
+    },
+    "source": {
+      "type": "string",
+      "const": "ship-finops-discover",
+      "description": "Source system identifier"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^v\\d+\\.\\d+\\.\\d+$",
+      "description": "API version"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["provider"],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": ["aws", "gcp", "azure", "kubernetes"],
+          "description": "Cloud provider"
+        },
+        "region": {
+          "type": "string",
+          "description": "Cloud region"
+        },
+        "discovery_options": {
+          "type": "object",
+          "properties": {
+            "resource_types": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["compute", "storage", "network", "database", "serverless"]
+              },
+              "description": "Types of resources discovered"
+            },
+            "tags": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Tag filters applied during discovery"
+            }
+          }
+        }
+      }
+    },
+    "resources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Resource"
+      },
+      "description": "List of discovered resources"
+    }
+  },
+  "definitions": {
+    "Resource": {
+      "type": "object",
+      "required": ["id", "name", "type", "vendor", "region", "cost"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique resource identifier"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable resource name"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["compute", "storage", "network", "database", "serverless"],
+          "description": "Resource type category"
+        },
+        "vendor": {
+          "type": "string",
+          "enum": ["aws", "gcp", "azure", "kubernetes"],
+          "description": "Cloud provider"
+        },
+        "region": {
+          "type": "string",
+          "description": "Resource region"
+        },
+        "account_id": {
+          "type": "string",
+          "description": "Cloud account/subscription ID"
+        },
+        "tags": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Resource tags"
+        },
+        "cost": {
+          "$ref": "#/definitions/Cost"
+        },
+        "utilization": {
+          "$ref": "#/definitions/Utilization"
+        },
+        "specifications": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Resource-specific specifications"
+        },
+        "configuration": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Current resource configuration"
+        }
+      }
+    },
+    "Cost": {
+      "type": "object",
+      "required": ["hourly_rate_usd", "monthly_rate_usd", "currency"],
+      "properties": {
+        "hourly_rate_usd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Hourly cost in USD"
+        },
+        "monthly_rate_usd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Monthly cost in USD"
+        },
+        "currency": {
+          "type": "string",
+          "const": "USD",
+          "description": "Currency code"
+        }
+      }
+    },
+    "Utilization": {
+      "type": "object",
+      "properties": {
+        "cpu": {
+          "$ref": "#/definitions/UtilizationMetric"
+        },
+        "memory": {
+          "$ref": "#/definitions/UtilizationMetric"
+        },
+        "storage": {
+          "$ref": "#/definitions/UtilizationMetric"
+        },
+        "network": {
+          "$ref": "#/definitions/UtilizationMetric"
+        }
+      }
+    },
+    "UtilizationMetric": {
+      "type": "object",
+      "required": ["average"],
+      "properties": {
+        "average": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Average utilization percentage"
+        },
+        "peak": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Peak utilization percentage"
+        }
+      }
+    }
+  }
+}

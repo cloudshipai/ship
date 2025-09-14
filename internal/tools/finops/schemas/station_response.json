@@ -1,0 +1,188 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cloudshipai.com/schemas/finops/station-response.json",
+  "title": "Station API Response Schema",
+  "description": "Standard response schema for all CloudshipAI Station FinOps API endpoints",
+  "type": "object",
+  "required": ["success", "request_id", "timestamp"],
+  "properties": {
+    "success": {
+      "type": "boolean",
+      "description": "Whether the request was processed successfully"
+    },
+    "request_id": {
+      "type": "string",
+      "pattern": "^req-[a-f0-9]+$",
+      "description": "Unique request identifier for tracking"
+    },
+    "records_processed": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of records successfully processed"
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ApiError"
+      },
+      "description": "List of errors encountered (empty for successful requests)"
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ApiWarning"
+      },
+      "description": "List of non-critical warnings"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "processing_time_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Processing time in milliseconds"
+        },
+        "storage_location": {
+          "type": "string",
+          "format": "uri",
+          "description": "Where the data was stored (e.g., S3 path)"
+        },
+        "next_sync_recommended": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Recommended timestamp for next data sync"
+        },
+        "validation_results": {
+          "$ref": "#/definitions/ValidationResults"
+        }
+      }
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Response timestamp (ISO 8601)"
+    }
+  },
+  "definitions": {
+    "ApiError": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "INVALID_REQUEST",
+            "MISSING_REQUIRED_FIELD",
+            "INVALID_FORMAT",
+            "SCHEMA_VALIDATION_FAILED",
+            "AUTHENTICATION_FAILED",
+            "AUTHORIZATION_FAILED",
+            "RATE_LIMIT_EXCEEDED",
+            "INTERNAL_SERVER_ERROR",
+            "SERVICE_UNAVAILABLE"
+          ],
+          "description": "Error code"
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable error message"
+        },
+        "field": {
+          "type": "string",
+          "description": "Field that caused the error (if applicable)"
+        },
+        "details": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Additional error details"
+        }
+      }
+    },
+    "ApiWarning": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "MISSING_TAG",
+            "DEPRECATED_FIELD",
+            "DATA_QUALITY_ISSUE",
+            "RATE_LIMIT_APPROACHING",
+            "PARTIAL_DATA",
+            "STALE_DATA"
+          ],
+          "description": "Warning code"
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable warning message"
+        },
+        "field": {
+          "type": "string",
+          "description": "Field that generated the warning (if applicable)"
+        },
+        "suggestion": {
+          "type": "string",
+          "description": "Suggested action to resolve the warning"
+        }
+      }
+    },
+    "ValidationResults": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "type": "string",
+          "description": "Schema version used for validation"
+        },
+        "valid_records": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of records that passed validation"
+        },
+        "invalid_records": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of records that failed validation"
+        },
+        "validation_errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ValidationError"
+          },
+          "description": "Detailed validation errors"
+        }
+      }
+    },
+    "ValidationError": {
+      "type": "object",
+      "required": ["record_index", "field_path", "error_type", "message"],
+      "properties": {
+        "record_index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Index of the record that failed validation"
+        },
+        "field_path": {
+          "type": "string",
+          "description": "JSON path to the field that failed validation"
+        },
+        "error_type": {
+          "type": "string",
+          "enum": ["required", "type", "format", "range", "pattern", "enum"],
+          "description": "Type of validation error"
+        },
+        "message": {
+          "type": "string",
+          "description": "Validation error message"
+        },
+        "expected": {
+          "description": "Expected value or format"
+        },
+        "received": {
+          "description": "Actual value received"
+        }
+      }
+    }
+  }
+}

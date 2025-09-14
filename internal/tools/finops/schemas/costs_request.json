@@ -1,0 +1,160 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cloudshipai.com/schemas/finops/costs-request.json",
+  "title": "FinOps Cost Data Request",
+  "description": "Schema for cost analysis data sent to CloudshipAI Station",
+  "type": "object",
+  "required": ["tenant_id", "data_type", "timestamp", "source", "version", "metadata", "cost_records"],
+  "properties": {
+    "tenant_id": {
+      "type": "string",
+      "description": "Tenant identifier for data isolation"
+    },
+    "data_type": {
+      "type": "string",
+      "const": "cost_data",
+      "description": "Type of data being sent"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when data was collected"
+    },
+    "source": {
+      "type": "string",
+      "const": "ship-finops-analyze",
+      "description": "Source system identifier"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^v\\d+\\.\\d+\\.\\d+$",
+      "description": "API version"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["provider"],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": ["aws", "gcp", "azure", "kubernetes"],
+          "description": "Cloud provider"
+        },
+        "time_window": {
+          "type": "string",
+          "pattern": "^\\d+[dwmy]$",
+          "description": "Time window for cost data (e.g., '30d', '1w', '6m', '1y')"
+        },
+        "granularity": {
+          "type": "string",
+          "enum": ["hourly", "daily", "weekly", "monthly"],
+          "description": "Data granularity"
+        },
+        "group_by": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["service", "region", "account", "resource_id", "tag"]
+          },
+          "description": "Dimensions used for grouping cost data"
+        },
+        "currency": {
+          "type": "string",
+          "const": "USD",
+          "description": "Currency code"
+        }
+      }
+    },
+    "cost_records": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/CostRecord"
+      },
+      "description": "List of cost records"
+    }
+  },
+  "definitions": {
+    "CostRecord": {
+      "type": "object",
+      "required": ["period", "amount", "currency", "service"],
+      "properties": {
+        "resource_id": {
+          "type": "string",
+          "description": "Resource identifier (optional for aggregated data)"
+        },
+        "resource_arn": {
+          "type": "string",
+          "description": "Resource ARN or equivalent identifier"
+        },
+        "period": {
+          "$ref": "#/definitions/TimePeriod"
+        },
+        "amount": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Cost amount"
+        },
+        "currency": {
+          "type": "string",
+          "const": "USD",
+          "description": "Currency code"
+        },
+        "service": {
+          "type": "string",
+          "description": "Cloud service name (e.g., 'EC2-Instance', 'S3-Storage')"
+        },
+        "region": {
+          "type": "string",
+          "description": "Cloud region"
+        },
+        "account_id": {
+          "type": "string",
+          "description": "Cloud account/subscription ID"
+        },
+        "tags": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Resource tags for cost allocation"
+        },
+        "usage_quantity": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Usage quantity (e.g., hours, GB)"
+        },
+        "usage_unit": {
+          "type": "string",
+          "description": "Unit of usage measurement"
+        },
+        "rate": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Unit rate"
+        },
+        "dimensions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Additional cost dimensions"
+        }
+      }
+    },
+    "TimePeriod": {
+      "type": "object",
+      "required": ["start", "end"],
+      "properties": {
+        "start": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Period start timestamp (ISO 8601)"
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Period end timestamp (ISO 8601)"
+        }
+      }
+    }
+  }
+}

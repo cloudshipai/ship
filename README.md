@@ -74,47 +74,47 @@ Run Ship in a Docker container with all tools available:
 
 ```bash
 # Build the Ship Docker image
-docker build -t cloudshipai/ship:latest .
+docker build -t ghcr.io/cloudshipai/ship:latest .
 
 # Or use the pre-built image (if available)
-docker pull cloudshipai/ship:latest
+docker pull ghcr.io/cloudshipai/ship:latest
 
 # Test the container
-docker run --rm cloudshipai/ship:latest version
+docker run --rm ghcr.io/cloudshipai/ship:latest version
 
 # Run dagger test to verify setup
 docker run --rm --group-add=999 \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  cloudshipai/ship:latest dagger-test
+  ghcr.io/cloudshipai/ship:latest dagger-test
 
 # Run BuildX version check
 docker run --rm --group-add=999 \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  cloudshipai/ship:latest buildx version
+  ghcr.io/cloudshipai/ship:latest buildx version
 
 # Run Ship MCP server with semgrep
 docker run --rm -i --group-add=999 \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v $(pwd):/workspace \
-  cloudshipai/ship:latest mcp semgrep
+  ghcr.io/cloudshipai/ship:latest mcp semgrep
 
 # Run Ship with specific tools
 docker run --rm -i --group-add=999 \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v $(pwd):/workspace \
-  cloudshipai/ship:latest mcp terraform
+  ghcr.io/cloudshipai/ship:latest mcp terraform
 
 # Run Ship with all tools
 docker run --rm -i --group-add=999 \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v $(pwd):/workspace \
-  cloudshipai/ship:latest mcp all
+  ghcr.io/cloudshipai/ship:latest mcp all
 
 # Interactive mode
 docker run --rm -it --group-add=999 \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v $(pwd):/workspace \
-  cloudshipai/ship:latest mcp --help
+  ghcr.io/cloudshipai/ship:latest mcp --help
 ```
 
 **Important**: The Docker container requires:

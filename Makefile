@@ -172,27 +172,28 @@ release-patch:
 .PHONY: docker-build
 docker-build:
 	@echo "Building Docker image..."
-	docker build -t cloudshipai/ship:latest -t cloudshipai/ship:$(VERSION) .
+	docker build -t ghcr.io/cloudshipai/ship:latest -t ghcr.io/cloudshipai/ship:$(VERSION) .
 
-## docker-push: Push Docker image to registry
+## docker-push: Push Docker image to GitHub Container Registry
 .PHONY: docker-push
 docker-push: docker-build
-	@echo "Pushing Docker images..."
-	docker push cloudshipai/ship:latest
-	docker push cloudshipai/ship:$(VERSION)
+	@echo "Pushing Docker images to GHCR..."
+	@echo "$$GITHUB_TOKEN" | docker login ghcr.io -u cloudshipai --password-stdin
+	docker push ghcr.io/cloudshipai/ship:latest
+	docker push ghcr.io/cloudshipai/ship:$(VERSION)
 
 ## docker-run: Run Docker container
 .PHONY: docker-run
 docker-run:
 	@echo "Running Docker container..."
-	docker run --rm -it cloudshipai/ship:latest
+	docker run --rm -it ghcr.io/cloudshipai/ship:latest
 
 ## docker-test: Test Docker container
 .PHONY: docker-test
 docker-test:
 	@echo "Testing Docker container..."
-	docker run --rm cloudshipai/ship:latest version
-	docker run --rm --group-add=999 -v /var/run/docker.sock:/var/run/docker.sock cloudshipai/ship:latest dagger-test
+	docker run --rm ghcr.io/cloudshipai/ship:latest version
+	docker run --rm --group-add=999 -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/cloudshipai/ship:latest dagger-test
 
 .PHONY: all
 all: clean deps lint test build

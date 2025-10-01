@@ -6,7 +6,7 @@ This guide shows you how to configure Ship's MCP servers using Docker with Claud
 
 - Docker installed and running
 - Claude Desktop or other MCP-compatible AI assistant
-- Ship Docker image: `cloudshipai/ship:latest`
+- Ship Docker image: `ghcr.io/cloudshipai/ship:latest`
 
 ## Quick Start
 
@@ -14,13 +14,13 @@ This guide shows you how to configure Ship's MCP servers using Docker with Claud
 
 ```bash
 # Build from source
-docker build -t cloudshipai/ship:latest .
+docker build -t ghcr.io/cloudshipai/ship:latest .
 
 # Or pull from Docker Hub (when available)
-docker pull cloudshipai/ship:latest
+docker pull ghcr.io/cloudshipai/ship:latest
 
 # Verify it works
-docker run --rm cloudshipai/ship:latest version
+docker run --rm ghcr.io/cloudshipai/ship:latest version
 ```
 
 ## Claude Desktop Configuration
@@ -49,7 +49,7 @@ Edit your `claude_desktop_config.json` file and add Ship MCP servers:
         "/var/run/docker.sock:/var/run/docker.sock",
         "-v",
         "${workspaceFolder}:/workspace",
-        "cloudshipai/ship:latest",
+        "ghcr.io/cloudshipai/ship:latest",
         "mcp",
         "security"
       ]
@@ -65,7 +65,7 @@ Edit your `claude_desktop_config.json` file and add Ship MCP servers:
         "/var/run/docker.sock:/var/run/docker.sock",
         "-v",
         "${workspaceFolder}:/workspace",
-        "cloudshipai/ship:latest",
+        "ghcr.io/cloudshipai/ship:latest",
         "mcp",
         "terraform"
       ]
@@ -81,7 +81,7 @@ Edit your `claude_desktop_config.json` file and add Ship MCP servers:
         "/var/run/docker.sock:/var/run/docker.sock",
         "-v",
         "${workspaceFolder}:/workspace",
-        "cloudshipai/ship:latest",
+        "ghcr.io/cloudshipai/ship:latest",
         "mcp",
         "all"
       ]
@@ -102,19 +102,19 @@ Configure individual tools for lightweight, focused analysis:
   "mcpServers": {
     "ship-semgrep": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "cloudshipai/ship:latest", "mcp", "semgrep"]
+      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "ghcr.io/cloudshipai/ship:latest", "mcp", "semgrep"]
     },
     "ship-trivy": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "cloudshipai/ship:latest", "mcp", "trivy"]
+      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "ghcr.io/cloudshipai/ship:latest", "mcp", "trivy"]
     },
     "ship-gitleaks": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "cloudshipai/ship:latest", "mcp", "gitleaks"]
+      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "ghcr.io/cloudshipai/ship:latest", "mcp", "gitleaks"]
     },
     "ship-checkov": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "cloudshipai/ship:latest", "mcp", "checkov"]
+      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "ghcr.io/cloudshipai/ship:latest", "mcp", "checkov"]
     }
   }
 }
@@ -126,15 +126,15 @@ Configure individual tools for lightweight, focused analysis:
   "mcpServers": {
     "ship-tflint": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "cloudshipai/ship:latest", "mcp", "tflint"]
+      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "ghcr.io/cloudshipai/ship:latest", "mcp", "tflint"]
     },
     "ship-terraform-docs": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "cloudshipai/ship:latest", "mcp", "terraform-docs"]
+      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "ghcr.io/cloudshipai/ship:latest", "mcp", "terraform-docs"]
     },
     "ship-tfsec": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "cloudshipai/ship:latest", "mcp", "tfsec"]
+      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "ghcr.io/cloudshipai/ship:latest", "mcp", "tfsec"]
     }
   }
 }
@@ -146,11 +146,11 @@ Configure individual tools for lightweight, focused analysis:
   "mcpServers": {
     "ship-kubescape": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "cloudshipai/ship:latest", "mcp", "kubescape"]
+      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "ghcr.io/cloudshipai/ship:latest", "mcp", "kubescape"]
     },
     "ship-kube-bench": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "cloudshipai/ship:latest", "mcp", "kube-bench"]
+      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "ghcr.io/cloudshipai/ship:latest", "mcp", "kube-bench"]
     }
   }
 }
@@ -165,37 +165,37 @@ Configure tool collections for comprehensive analysis:
   "mcpServers": {
     "ship-security": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "cloudshipai/ship:latest", "mcp", "security"],
+      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "ghcr.io/cloudshipai/ship:latest", "mcp", "security"],
       "description": "All security tools (31 tools)"
     },
     "ship-terraform": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "cloudshipai/ship:latest", "mcp", "terraform"],
+      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "ghcr.io/cloudshipai/ship:latest", "mcp", "terraform"],
       "description": "All Terraform tools (7 tools)"
     },
     "ship-kubernetes": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "cloudshipai/ship:latest", "mcp", "kubernetes"],
+      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "ghcr.io/cloudshipai/ship:latest", "mcp", "kubernetes"],
       "description": "All Kubernetes tools (9 tools)"
     },
     "ship-cloud": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "cloudshipai/ship:latest", "mcp", "cloud"],
+      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "ghcr.io/cloudshipai/ship:latest", "mcp", "cloud"],
       "description": "All cloud tools"
     },
     "ship-finops": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "cloudshipai/ship:latest", "mcp", "finops"],
+      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "ghcr.io/cloudshipai/ship:latest", "mcp", "finops"],
       "description": "All FinOps tools"
     },
     "ship-supply-chain": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "cloudshipai/ship:latest", "mcp", "supply-chain"],
+      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "ghcr.io/cloudshipai/ship:latest", "mcp", "supply-chain"],
       "description": "All supply chain security tools"
     },
     "ship-all": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "cloudshipai/ship:latest", "mcp", "all"],
+      "args": ["run", "-i", "--rm", "--group-add=999", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", "${workspaceFolder}:/workspace", "ghcr.io/cloudshipai/ship:latest", "mcp", "all"],
       "description": "All 56+ tools"
     }
   }
@@ -220,7 +220,7 @@ For tools requiring credentials (AWS, cloud services, etc.):
         "/var/run/docker.sock:/var/run/docker.sock",
         "-v",
         "${workspaceFolder}:/workspace",
-        "cloudshipai/ship:latest",
+        "ghcr.io/cloudshipai/ship:latest",
         "mcp",
         "prowler",
         "--var",
@@ -334,7 +334,7 @@ Ensure the workspace mount path is correct:
 Check Docker is running:
 ```bash
 docker ps
-docker run --rm cloudshipai/ship:latest version
+docker run --rm ghcr.io/cloudshipai/ship:latest version
 ```
 
 ## After Configuration
@@ -350,14 +350,14 @@ docker run --rm cloudshipai/ship:latest version
 docker run --rm -i --group-add=999 \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v $(pwd):/workspace \
-  cloudshipai/ship:latest mcp semgrep
+  ghcr.io/cloudshipai/ship:latest mcp semgrep
 
 # Test with workspace
 cd your-project
 docker run --rm -i --group-add=999 \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v $(pwd):/workspace \
-  cloudshipai/ship:latest mcp tflint
+  ghcr.io/cloudshipai/ship:latest mcp tflint
 ```
 
 ## Resources

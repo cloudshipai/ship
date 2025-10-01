@@ -64,9 +64,64 @@ curl -fsSL https://raw.githubusercontent.com/cloudshipai/ship/main/install.sh | 
 ### Install with Go
 
 ```bash
-# Install directly with Go  
+# Install directly with Go
 go install github.com/cloudshipai/ship/cmd/ship@latest
 ```
+
+### Docker Container
+
+Run Ship in a Docker container with all tools available:
+
+```bash
+# Build the Ship Docker image
+docker build -t cloudshipai/ship:latest .
+
+# Or use the pre-built image (if available)
+docker pull cloudshipai/ship:latest
+
+# Test the container
+docker run --rm cloudshipai/ship:latest version
+
+# Run dagger test to verify setup
+docker run --rm --group-add=999 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  cloudshipai/ship:latest dagger-test
+
+# Run BuildX version check
+docker run --rm --group-add=999 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  cloudshipai/ship:latest buildx version
+
+# Run Ship MCP server with semgrep
+docker run --rm -i --group-add=999 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v $(pwd):/workspace \
+  cloudshipai/ship:latest mcp semgrep
+
+# Run Ship with specific tools
+docker run --rm -i --group-add=999 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v $(pwd):/workspace \
+  cloudshipai/ship:latest mcp terraform
+
+# Run Ship with all tools
+docker run --rm -i --group-add=999 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v $(pwd):/workspace \
+  cloudshipai/ship:latest mcp all
+
+# Interactive mode
+docker run --rm -it --group-add=999 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v $(pwd):/workspace \
+  cloudshipai/ship:latest mcp --help
+```
+
+**Important**: The Docker container requires:
+- Docker socket access (`-v /var/run/docker.sock:/var/run/docker.sock`) for Dagger to run containerized tools
+- Docker group permission (`--group-add=999` or your Docker group GID) for socket access
+- Volume mount of your project directory (`-v $(pwd):/workspace`) for Ship to analyze your code
+- All tools run securely in nested containers via Dagger
 
 ## 🏃 Quick Start
 

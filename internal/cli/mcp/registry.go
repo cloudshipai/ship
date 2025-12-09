@@ -47,6 +47,7 @@ var ToolRegistry = map[string][]ToolInfo{
 		{Name: "infrascan", Description: "Infrastructure security scanning", AddFunc: AddInfrascanTools, HasVariables: true},
 		{Name: "github-admin", Description: "GitHub administration tools", AddFunc: AddGitHubAdminTools, HasVariables: true},
 		{Name: "github-packages", Description: "GitHub Packages security", AddFunc: AddGitHubPackagesTools, HasVariables: true},
+		{Name: "openvas", Description: "OpenVAS/Greenbone vulnerability management integration", AddFunc: AddOpenVASTools, HasVariables: true},
 	},
 	"development": {
 		{Name: "opencode", Description: "OpenCode AI coding assistant", AddFunc: AddOpenCodeTools, HasVariables: true},
